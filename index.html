@@ -7,6 +7,25 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<!-- =====================================================================
+     PENGATURAN FIREBASE  (ganti isi di bawah ini dengan milikmu)
+     ===================================================================== -->
+<script>
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyBHGgbrIdjVHaYI3pXNcfPCS_LL27gc-o4",
+  authDomain: "eiger-jateng01.firebaseapp.com",
+  projectId: "eiger-jateng01",
+  storageBucket: "eiger-jateng01.firebasestorage.app",
+  messagingSenderId: "1089210014855",
+  appId: "1:1089210014855:web:66b86b6cf0debe10ddac22"
+};
+/* email akun admin (boleh lebih dari satu), harus sama dengan di Firestore Rules */
+const ADMIN_EMAILS = ["fany.dzikri17@gmail.com"];
+</script>
+<!-- ===================================================================== -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <style>
 :root{
   --navy:#0F3192; --navy-deep:#0A2470; --navy-ink:#0B1B4A; --navy-tint:#EEF2FB;
@@ -220,6 +239,19 @@ table.tbl{width:100%;border-collapse:collapse;font-size:13.5px}
 @keyframes sp{to{transform:rotate(360deg)}}
 @media (prefers-reduced-motion:reduce){.spin{animation-duration:3s}.toast,.brandbar{transition:none}}
 
+/* login */
+.modal-ov{position:fixed;inset:0;background:rgba(11,27,74,.5);z-index:80;display:flex;align-items:center;justify-content:center;padding:16px}
+.modal{background:var(--surface);border-radius:12px;width:min(400px,100%);padding:24px;border-top:4px solid var(--orange);box-shadow:0 20px 50px rgba(11,27,74,.3)}
+.modal h2{margin:0 0 4px;font-size:20px;font-weight:800;color:var(--navy)}
+.modal label{display:block;font-weight:700;font-size:12.5px;margin:14px 0 5px}
+.modal .inp{width:100%}
+.modal .err{color:var(--bad);font-size:13px;min-height:18px;margin-top:10px}
+.modal .row-act{justify-content:flex-end}
+.login-card{max-width:420px;margin:30px auto;background:var(--surface);border:1px solid var(--line);border-top:4px solid var(--orange);border-radius:12px;padding:24px}
+.login-card h2{margin:0 0 4px;font-size:20px;font-weight:800;color:var(--navy)}
+.login-card label{display:block;font-weight:700;font-size:12.5px;margin:14px 0 5px}
+.login-card .inp{width:100%}
+.login-card .err{color:var(--bad);font-size:13px;min-height:18px;margin-top:10px}
 /* daily report */
 .rp-top{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
 .rp-tile{display:flex;align-items:stretch;border-radius:10px;overflow:hidden;border:1px solid var(--line);background:var(--surface)}
@@ -272,7 +304,7 @@ table.rp{border-collapse:separate;border-spacing:0;font-size:13px;width:100%;min
   <div class="period" id="periodBox"></div>
 </div></section>
 <main class="wrap"><div id="view"><div class="loading"><span class="spin"></span>Memuat data area…</div></div></main>
-<footer><div class="wrap"><span><strong>Monitoring Penjualan Jateng 01</strong> &middot; PT. Eigerindo MPI</span><span>Data diperbarui setiap admin mengunggah Item DSR</span></div></footer>
+<footer><div class="wrap"><span><strong>Monitoring Penjualan Jateng 01</strong> &middot; PT. Eigerindo MPI</span><span>Data diperbarui setiap admin mengunggah Sales Report &amp; Item DSR &middot; <a href="#" id="admLink" style="color:var(--navy);font-weight:700">Kelola data (admin)</a></span></div></footer>
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -353,6 +385,7 @@ function parseWorkbook(buf, fileName) {
     const rows = XLSX.utils.sheet_to_json(wb.Sheets[sn], { header: 1, raw: true, defval: null, blankrows: false });
     for (let i = 0; i < Math.min(rows.length, 25); i++) {
       const h = (rows[i] || []).map(normH);
+      if (h.includes('locationcode') && h.includes('bruto')) return parseSR(rows, i, h, fileName);
       if (h.includes('dailyratio') || (h.some(x => x === 'date' || x === 'tanggal') && h.some(x => /ratio|bobot|weight/.test(x)) && !h.includes('orderno'))) return parseWeights(rows, i, h, fileName);
       if (h.includes('sitecode')) return parseTarget(rows, i, h, fileName);
       if (h.includes('orderno') && h.includes('skucode')) return parseDSR(rows, i, h, fileName);
@@ -482,6 +515,34 @@ function parseWeights(rows, hi, h, fileName) {
   for (const k in w) w[k] = w[k] / sum;
   return { kind: 'WGT', file: fileName, month: res.m, w, days: res.out.length, rawSum };
 }
+/* Sales Report (ringkasan per toko per region): harian (1 tanggal) atau kumulatif mulai tanggal 1 */
+function parseSR(rows, hi, h, fileName, region) {
+  region = String(region || (typeof App !== 'undefined' && App.region) || 'JATENG 01').trim().toUpperCase();
+  let from = null, to = null;
+  for (let i = 0; i < hi; i++) for (const c of rows[i] || []) {
+    const s = String(c ?? ''); let m = s.match(/From\s*Date\s*:\s*(.+)/i); if (m) { const d = parseDateTime(m[1]); if (d) from = d.d; }
+    m = s.match(/To\s*Date\s*:\s*(.+)/i); if (m) { const d = parseDateTime(m[1]); if (d) to = d.d; }
+  }
+  if (!from || !to) throw new Error('Tanggal "From Date" / "To Date" tidak ditemukan di Sales Report.');
+  if (from.slice(0, 7) !== to.slice(0, 7)) throw new Error('Sales Report harus dalam satu bulan yang sama.');
+  const daily = from === to;
+  if (!daily && +from.slice(8) !== 1) throw new Error('Sales Report harus 1 tanggal (harian) atau kumulatif mulai tanggal 1.');
+  const C = { reg: colIdx(h, 'region'), code: colIdx(h, 'locationcode'), name: colIdx(h, 'locationname'), q: colIdx(h, 'quantity', 'qty'), b: colIdx(h, 'bruto'), n: colIdx(h, 'netto') };
+  if (C.code < 0 || C.b < 0) throw new Error('Kolom Location Code / Bruto tidak ditemukan.');
+  const regions = new Set(); let cur = ''; const stores = {}; let n = 0;
+  for (let i = hi + 1; i < rows.length; i++) {
+    const r = rows[i] || [];
+    const rg = C.reg >= 0 ? String(r[C.reg] ?? '').trim() : '';
+    if (rg) { cur = rg.toUpperCase(); regions.add(rg); }
+    const code = String(r[C.code] ?? '').trim();
+    if (!code || /total/i.test(code)) continue;
+    if (C.reg >= 0 && cur !== region) continue;
+    stores[code] = { code, name: String(r[C.name] ?? '').replace(/\s+/g, ' ').trim(), v: [numV(r[C.q]), numV(r[C.b]), C.n >= 0 ? numV(r[C.n]) : numV(r[C.b])] };
+    n++;
+  }
+  if (!n) throw new Error(`Tidak ada toko region ${region} di file ini. Region yang ada: ${[...regions].slice(0, 30).join(', ')}.`);
+  return { kind: 'SR', file: fileName, region, from, to, daily, month: from.slice(0, 7), day: +to.slice(8), stores, rows: n };
+}
 function basisVal(o, b) {
   if (!o) return 0;
   const eiger = o.eiger != null ? o.eiger : (o.offline || 0) + (o.ea || 0) + (o.wab || 0);
@@ -532,7 +593,7 @@ function encodeStockParts(code, date, items, meta) {
 /* ================= state ================= */
 const App = {
   db: null, user: null, admin: false,
-  index: { sales: {}, stock: {} }, stores: {}, targets: {}, tgtDetail: {}, tgtBasis: 'total', weights: {}, log: [],
+  index: { sales: {}, stock: {} }, stores: {}, targets: {}, tgtDetail: {}, tgtBasis: 'total', weights: {}, sr: {}, region: 'JATENG 01', log: [],
   lines: [], loaded: new Set(), sku: {}, stock: {}, lastDate: null, cache: {},
   page: 'area', period: { mode: 'mtd' },
   ui: { store: '', sorts: {}, more: {}, prodQ: '', prodC3: '', prodStore: '', stTab: 'sum', stStore: '', stStatus: '', stQ: '', trQ: '', trStore: '', admMonth: '', tgtMonth: '' },
@@ -555,7 +616,7 @@ async function withRetry(fn) {
   for (let i = 0; ; i++) {
     try { return await fn(); }
     catch (e) {
-      if (i >= 3 || !['unavailable', 'resource_exhausted'].includes(e && e.code)) throw e;
+      if (i >= 3 || !['unavailable', 'resource_exhausted', 'resource-exhausted', 'deadline-exceeded', 'aborted'].includes(e && e.code)) throw e;
       await sleep(900 * (i + 1) + Math.random() * 500);
     }
   }
@@ -566,11 +627,13 @@ async function loadAll() {
   const [ix, st, tg, lg, wg] = await Promise.all(['index', 'stores', 'targets', 'log', 'weights'].map(g));
   App.weights = wg.exists ? (clone(wg.data()).byMonth || {}) : {};
   App.index = ix.exists ? clone(ix.data()) : {}; App.index.sales = App.index.sales || {}; App.index.stock = App.index.stock || {};
-  App.stores = st.exists ? (clone(st.data()).list || {}) : {};
+  const STD = st.exists ? clone(st.data()) : {};
+  App.stores = STD.list || {}; App.region = STD.region || 'JATENG 01';
   const TG = tg.exists ? clone(tg.data()) : {};
   App.targets = TG.byMonth || {}; App.tgtDetail = TG.detail || {}; App.tgtBasis = TG.basis || 'total';
   App.log = lg.exists ? (clone(lg.data()).items || []) : [];
-  App.lines = []; App.loaded = new Set(); App.sku = {}; App.stock = {}; App.cache = {};
+  App.lines = []; App.loaded = new Set(); App.sku = {}; App.stock = {}; App.cache = {}; App.sr = {};
+  try { const srs = await withRetry(() => App.db.collection('sr').limit(200).get()); for (const d of srs.docs) { const b = d.data(); if (b && b.m) App.sr[b.m] = clone(b); } } catch (e) { console.error(e); }
   computeLastDate();
   await loadStock();
   const months = Object.keys(App.index.sales).sort();
@@ -635,6 +698,25 @@ const TYPE_LABEL = { rg: 'Reguler', bz: 'Bazaar', ot: 'Lainnya' };
 const typeOk = c => !App.ui.typeF || sType(c) === App.ui.typeF;
 const activeStores = () => storeCodes().filter(typeOk);
 const hasTypes = () => new Set(storeCodes().map(sType)).size > 1;
+/* ---- data Sales Report: harian & kumulatif per toko, [qty, bruto, netto] ---- */
+const ZV = [0, 0, 0];
+function srDayRaw(c, m, dd) { const M = App.sr[m]; if (!M) return null; const x = (M.s || {})[c]; if (x && x.d && x.d[dd]) return x.d[dd]; return (M.days || []).includes(dd) ? ZV : null; }
+function srCkp(c, m, dd) { const M = App.sr[m]; if (!M) return null; const x = (M.s || {})[c]; if (x && x.c && x.c[dd]) return x.c[dd]; return (M.cums || []).includes(dd) ? ZV : null; }
+function srCum(c, iso) {
+  const m = iso.slice(0, 7), dd = +iso.slice(8), M = App.sr[m]; if (!M) return null;
+  const direct = srCkp(c, m, dd); if (direct) return direct;
+  let best = 0; for (const k of M.cums || []) if (k < dd && k > best) best = k;
+  let acc = best ? srCkp(c, m, best).slice() : [0, 0, 0];
+  for (let d = best + 1; d <= dd; d++) { const v = srDayRaw(c, m, d); if (!v) return null; acc = acc.map((a, i) => a + v[i]); }
+  return acc;
+}
+function srDaily(c, iso) {
+  const m = iso.slice(0, 7), dd = +iso.slice(8); const v = srDayRaw(c, m, dd); if (v) return v;
+  const a = srCum(c, iso), b = dd === 1 ? [0, 0, 0] : srCum(c, addDays(iso, -1));
+  return a && b ? a.map((x, i) => x - b[i]) : null;
+}
+function srLast() { let L = null; for (const m in App.sr) { const M = App.sr[m]; const ds = [...(M.days || []), ...(M.cums || [])]; if (ds.length) { const iso = m + '-' + pad(Math.max(...ds)); if (!L || iso > L) L = iso; } } return L; }
+const repLast = () => { const a = App.lastDate, b = srLast(); return !a ? b : !b ? a : (a > b ? a : b); };
 const linesIn = (from, to, store) => App.lines.filter(l => l.d >= from && l.d <= to && (store ? l.s === store : typeOk(l.s)));
 function agg(lines) {
   const mk = () => ({ n: 0, g: 0, q: 0, trx: new Set() });
@@ -752,13 +834,14 @@ const PAGES = [['area', 'Ringkasan area'], ['report', 'Monitoring sales'], ['tok
 function renderNav() {
   $('#nav').innerHTML = PAGES.filter(p => p[0] !== 'admin' || App.admin).map(([k, l]) => `<button data-go="${k}" class="${App.page === k ? 'on' : ''}"><svg viewBox="0 0 24 24" aria-hidden="true">${ICON[k]}</svg>${l}</button>`).join('');
   const L = App.lastDate;
-  $('#sideFoot').innerHTML = `<span>${storeCodes().length} site · data s/d ${L ? fmtDate(L) : '–'}</span><button id="reloadBtn">Muat ulang</button>`;
+  const RL = repLast();
+  $('#sideFoot').innerHTML = `<span>${storeCodes().length} site · data s/d ${RL ? fmtDate(RL) : '–'}</span><button id="reloadBtn">Muat ulang</button>${App.authUser ? `<button id="logoutBtn" title="${esc(App.authUser.email || '')}" style="background:#E46636">Keluar</button>` : `<button id="loginBtn" style="background:#E46636">Masuk admin</button>`}`;
 }
 function renderPeriod() {
   const box = $('#periodBox');
   const tsel = hasTypes() && App.page !== 'toko' ? `<label class="small muted" for="typeSel">Jenis toko</label><select id="typeSel" class="inp"><option value="">Semua toko</option>${['rg', 'bz', 'ot'].filter(t => storeCodes().some(c => sType(c) === t)).map(t => `<option value="${t}" ${App.ui.typeF === t ? 'selected' : ''}>${TYPE_LABEL[t]}</option>`).join('')}</select>` : '';
-  if (!App.lastDate || App.page === 'admin') { box.innerHTML = ''; return; }
   if (App.page === 'report') { box.innerHTML = tsel; return; }
+  if (!App.lastDate || App.page === 'admin') { box.innerHTML = ''; return; }
   const L = App.lastDate, cm = L.slice(0, 7);
   const months = Object.keys(App.index.sales).sort().reverse().filter(m => m !== cm);
   const p = App.period;
@@ -793,12 +876,12 @@ function render() {
   destroyCharts(); App.tables = {};
   renderNav(); renderPeriod();
   const view = $('#view');
-  if (!App.lastDate && App.page !== 'admin' && !Object.keys(App.index.stock).length) {
+  if (!App.lastDate && App.page !== 'admin' && !Object.keys(App.index.stock).length && !srLast()) {
     setHead('Monitoring Penjualan Jateng 01', '');
-    view.innerHTML = `<div class="empty-state"><h2>Belum ada data di dashboard</h2><p class="muted">${App.admin ? 'Upload file Item DSR Report dan Export by Bin dari semua toko di halaman Kelola data. Setelah tersimpan, semua orang yang membuka link ini langsung melihat datanya tanpa upload.' : 'Admin area belum mengunggah data. Coba buka lagi nanti.'}</p>${App.admin ? '<button class="btn primary" data-go="admin">Buka Kelola data</button>' : ''}</div>`;
+    view.innerHTML = `<div class="empty-state"><h2>Belum ada data di dashboard</h2><p class="muted">${App.admin ? 'Upload file Item DSR Report dan Export by Bin dari semua toko di halaman Kelola data. Setelah tersimpan, semua orang yang membuka link ini langsung melihat datanya tanpa upload.' : 'Admin area belum mengunggah data. Coba buka lagi nanti.'}</p>${App.admin ? '<button class="btn primary" data-go="admin">Buka Kelola data</button>' : '<p class="small muted">Kamu admin? <a href="#" id="admLink" style="color:var(--navy);font-weight:700">Masuk sebagai admin</a> untuk upload.</p>'}</div>`;
     return;
   }
-  if (!App.lastDate && App.page !== 'admin' && App.page !== 'stok') { App.page = 'stok'; }
+  if (!App.lastDate && !['admin', 'stok', 'report'].includes(App.page)) { App.page = srLast() ? 'report' : 'stok'; }
   const fn = { area: pageArea, report: pageReport, toko: pageStore, produk: pageProduct, stok: pageStock, admin: pageAdmin }[App.page] || pageArea;
   try { fn(view); } catch (e) { console.error(e); view.innerHTML = `<div class="empty-state"><h2>Halaman gagal ditampilkan</h2><p class="muted">${esc(e.message)}</p></div>`; }
 }
@@ -941,11 +1024,13 @@ function reportData(D, val) {
   const cum = new Map(), dd = new Map();
   for (const l of App.lines) { if (l.d < from || l.d > D) continue; const v = val === 'g' ? l.g : l.n; cum.set(l.s, (cum.get(l.s) || 0) + v); if (l.d === D) dd.set(l.s, (dd.get(l.s) || 0) + v); }
   const rows = activeStores().map(c => {
-    const T = monthTarget(c, m), cs = cum.get(c) || 0, ds = dd.get(c) || 0, cT = T * cw, dT = T * dw, last = lastDateOf(c);
-    return { c, type: sType(c), name: (App.stores[c] && (App.stores[c].alias ? App.stores[c].alias : App.stores[c].name)) || c, T, mAch: T ? cs / T : null, cT, cs, cAch: cT ? cs / cT : null, cDiff: cs - cT, dT, ds, dAch: dT ? ds / dT : null, dDiff: ds - dT, last, late: !last || last < D };
+    const vi = val === 'g' ? 1 : 2; const sc = srCum(c, D), sd = srDaily(c, D);
+    const cs = sc ? sc[vi] : (cum.get(c) || 0), ds = sd ? sd[vi] : (dd.get(c) || 0);
+    const T = monthTarget(c, m), cT = T * cw, dT = T * dw, last = lastDateOf(c), viaSR = !!(sc && sd);
+    return { c, type: sType(c), name: (App.stores[c] && (App.stores[c].alias ? App.stores[c].alias : App.stores[c].name)) || c, T, mAch: T ? cs / T : null, cT, cs, cAch: cT ? cs / cT : null, cDiff: cs - cT, dT, ds, dAch: dT ? ds / dT : null, dDiff: ds - dT, last, viaSR, late: !viaSR && (!last || last < D) };
   }).filter(r => r.T || r.cs);
   const t = sumRows(rows);
-  return { D, m, cw, dw, rows, t, hasW: !!wOf(m) };
+  return { D, m, cw, dw, rows, t, hasW: !!wOf(m), nSR: rows.filter(r => r.viaSR).length };
 }
 function sumRows(rows) {
   const t = rows.reduce((a, r) => { a.T += r.T; a.cT += r.cT; a.cs += r.cs; a.dT += r.dT; a.ds += r.ds; return a; }, { T: 0, cT: 0, cs: 0, dT: 0, ds: 0 });
@@ -975,12 +1060,12 @@ function rpSub(label, t) {
   return `<tr class="subt"><td></td><td class="nm">Subtotal ${esc(label.toLowerCase())}</td><td class="r sep">${fmtN(t.T)}</td><td class="r">${pct2s(t.mAch)}</td><td class="r sep">${fmtN(t.cT)}</td><td class="r">${fmtN(t.cs)}</td><td class="st ${stCls(t.cAch)}"></td><td class="r">${pct2s(t.cAch)}</td>${rpDiff(t.cDiff)}<td class="r sep">${fmtN(t.dT)}</td><td class="r">${fmtN(t.ds)}</td><td class="st ${stCls(t.dAch)}"></td><td class="r">${pct2s(t.dAch)}</td>${rpDiff(t.dDiff)}</tr>`;
 }
 function pageReport(view) {
-  const U = App.ui; const maxD = App.lastDate;
+  const U = App.ui; const maxD = repLast();
   let D = U.rpDate && U.rpDate <= maxD ? U.rpDate : maxD; U.rpDate = D;
   const val = U.rpVal || 'g';
   if (!App.loaded.has(D.slice(0, 7)) && App.index.sales[D.slice(0, 7)]) { view.innerHTML = '<div class="loading"><span class="spin"></span>Mengambil data…</div>'; ensureMonths(D, D).then(render); return; }
   const R = reportData(D, val);
-  setHead('Daily report Jateng 01' + (App.ui.typeF ? ' · ' + TYPE_LABEL[App.ui.typeF] : ''), R.rows.length + ' site · tanggal ' + fmtDate(D) + ' · kumulatif 1–' + (+D.slice(8)) + ' ' + fmtMonth(R.m) + (R.hasW ? ' · bobot harian ' + fmtPct(R.cw, 1) : ' · bobot harian belum diupload, target dibagi rata'));
+  setHead('Daily report Jateng 01' + (App.ui.typeF ? ' · ' + TYPE_LABEL[App.ui.typeF] : ''), R.rows.length + ' site · tanggal ' + fmtDate(D) + ' · sumber: ' + (R.nSR === R.rows.length ? 'Sales Report' : R.nSR ? `Sales Report ${R.nSR} site, Item DSR ${R.rows.length - R.nSR} site` : 'Item DSR') + ' · kumulatif 1–' + (+D.slice(8)) + ' ' + fmtMonth(R.m) + (R.hasW ? ' · bobot harian ' + fmtPct(R.cw, 1) : ' · bobot harian belum diupload, target dibagi rata'));
   const st = U.rpSort || { k: 'mAch', dir: 'desc' };
   const groups = rpGroups(R.rows);
   const sh = (k, l) => `<th class="s" data-rps="${k}">${l}${st.k === k ? (st.dir === 'asc' ? ' ▲' : ' ▼') : ''}</th>`;
@@ -989,7 +1074,7 @@ function pageReport(view) {
   view.innerHTML = `<div class="stack">
     <div class="filters" style="margin:0">
       <label class="small muted" for="rpDate">Tanggal laporan</label><input type="date" id="rpDate" class="inp" value="${D}" max="${maxD}">
-      <div class="seg" role="group" aria-label="Nilai sales"><button data-rpv="n" class="${val === 'n' ? 'on' : ''}">Net sales</button><button data-rpv="g" class="${val === 'g' ? 'on' : ''}">Gross sales</button></div>
+      <div class="seg" role="group" aria-label="Nilai sales"><button data-rpv="n" class="${val === 'n' ? 'on' : ''}">Netto</button><button data-rpv="g" class="${val === 'g' ? 'on' : ''}">Bruto</button></div>
       <span style="flex:1"></span>
       <button class="btn" id="rpXls" hidden>Download Excel</button>
     </div>
@@ -1013,8 +1098,9 @@ function pageReport(view) {
   App.ui.rpLast = R;
   getDownloads().then(dl => { const b = $('#rpXls'); if (b && dl && typeof XLSX !== 'undefined') b.hidden = false; });
 }
-let _dl;
-function getDownloads() { if (!_dl) _dl = (window.claude && window.claude.use ? window.claude.use('downloads') : Promise.resolve(null)).catch(() => null); return _dl; }
+function getDownloads() {
+  return Promise.resolve({ save: async ({ filename, data }) => { const url = URL.createObjectURL(data instanceof Blob ? data : new Blob([data])); const a = document.createElement('a'); a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 3000); } });
+}
 async function exportReport() {
   const R = App.ui.rpLast; if (!R) return; const dl = await getDownloads(); if (!dl) { toast('Download tidak tersedia di tampilan ini'); return; }
   const r4 = x => x == null ? null : Math.round(x * 10000) / 10000;
@@ -1214,8 +1300,9 @@ function pageStock(view) {
 
 /* ================= halaman: kelola data (admin) ================= */
 function pageAdmin(view) {
-  if (!App.admin) { App.page = 'area'; return render(); }
+  if (!App.admin) { App.page = 'area'; openLogin(); return render(); }
   setHead('Kelola data', 'Upload sekali di sini, semua yang membuka link langsung melihat data terbaru');
+  const permNote = '';
   const months = Object.keys(App.index.sales).sort().reverse();
   const cm = App.ui.admMonth && months.includes(App.ui.admMonth) ? App.ui.admMonth : (months[0] || todayISO().slice(0, 7));
   const tm = App.ui.tgtMonth || (App.lastDate ? App.lastDate.slice(0, 7) : todayISO().slice(0, 7));
@@ -1223,12 +1310,13 @@ function pageAdmin(view) {
   const tmOpts = [...new Set([addMonths(tm, -1), tm, addMonths(tm, 1), ...Object.keys(App.targets), ...months])].sort().reverse();
   const codes = storeCodes().filter(c => sType(c) !== 'bz' || monthTarget(c, tm) || (App.index.sales[tm] || {})[c] || (App.tgtDetail[tm] || {})[c]);
   const allCodes = storeCodes();
-  view.innerHTML = `<div class="stack">
-    <section class="card"><div class="card-h"><h3>Upload data</h3><p class="small muted">Item DSR Report (penjualan), Export by Bin (stok), file target bulanan, dan bobot target harian. Bisa banyak file & banyak toko sekaligus.</p></div>
+  view.innerHTML = `<div class="stack">${permNote}
+    <section class="card"><div class="card-h"><h3>Upload data</h3><p class="small muted">Sales Report (harian & kumulatif), Item DSR Report, Export by Bin (stok), target bulanan, dan bobot harian. Bisa banyak file sekaligus.</p></div>
+      <div class="filters"><label class="small" for="regIn">Region di Sales Report</label><input id="regIn" class="inp sm" value="${esc(App.region)}" style="width:150px"><span class="small muted">Hanya toko di region ini yang diambil dari Sales Report.</span></div>
       <label class="drop" id="drop"><input type="file" id="fileIn" multiple accept=".xlsx,.xls,.csv"><b>Pilih file</b><span class="small muted">atau seret file ke sini. Toko dikenali otomatis dari kolom Location.</span></label>
       <div class="pend" id="pend"></div>
       <div class="row-act"><button class="btn primary" id="saveBtn" ${App.pending.some(p => !p.err) ? '' : 'disabled'}>Simpan ke database</button><button class="btn" id="clrBtn" ${App.pending.length ? '' : 'disabled'}>Kosongkan daftar</button><span id="saveMsg" class="small muted"></span></div>
-      <p class="small muted" style="margin-top:10px">Tanggal yang sama untuk toko yang sama akan diganti dengan data baru, jadi aman upload ulang. Untuk stok, yang disimpan hanya snapshot terbaru tiap toko.</p></section>
+      <p class="small muted" style="margin-top:10px">File yang diupload bersamaan digabung otomatis, jadi DSR boleh dipecah per toko, per tanggal, atau per bagian. Tanggal yang sama untuk toko yang sama di upload berikutnya akan diganti dengan data baru, jadi aman upload ulang. Untuk stok, yang disimpan hanya snapshot terbaru tiap toko.</p></section>
     <section class="card"><div class="card-h"><h3>Kelengkapan data</h3><select id="covM" class="inp sm">${months.map(m => `<option value="${m}" ${m === cm ? 'selected' : ''}>${fmtMonth(m)}</option>`).join('') || '<option>Belum ada</option>'}</select></div><div id="cov" style="overflow-x:auto"></div></section>
     <section class="card"><div class="card-h"><h3>Target & nama toko</h3><div class="filters" style="margin:0"><select id="tgtM" class="inp sm">${tmOpts.map(m => `<option value="${m}" ${m === tm ? 'selected' : ''}>${fmtMonth(m)}</option>`).join('')}</select>
       <label class="small muted" for="tgtB">Target yang dipakai</label><select id="tgtB" class="inp sm">${[['offline', 'Offline'], ['eiger', 'Eiger (Offline + EA + WAB)'], ['total', 'Total (Eiger + Outlive)']].map(([k, l]) => `<option value="${k}" ${App.tgtBasis === k ? 'selected' : ''}>${l}</option>`).join('')}</select></div></div>
@@ -1252,13 +1340,17 @@ function pageAdmin(view) {
   renderPending(); renderCoverage(cm);
   $('#logT').innerHTML = tbl('log', { rows: App.log.slice().reverse(), limit: 15, empty: 'Belum ada upload.', cols: [
     { k: 'at', label: 'Waktu', h: r => esc(new Date(r.at).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })) },
-    { k: 'kind', label: 'Jenis', h: r => ({ DSR: 'Penjualan', INV: 'Stok', TGT: 'Target', WGT: 'Bobot harian', DEL: 'Hapus' }[r.kind] || r.kind) }, { k: 'file', label: 'File', h: r => `<span class="small">${esc(r.file)}</span>` },
+    { k: 'kind', label: 'Jenis', h: r => ({ DSR: 'Penjualan', INV: 'Stok', TGT: 'Target', WGT: 'Bobot harian', SR: 'Sales Report', DEL: 'Hapus' }[r.kind] || r.kind) }, { k: 'file', label: 'File', h: r => `<span class="small">${esc(r.file)}</span>` },
     { k: 'stores', label: 'Toko', r: 1 }, { k: 'info', label: 'Isi', h: r => esc(r.info) }] });
 }
 function renderPending() {
   const el = $('#pend'); if (!el) return;
   el.innerHTML = App.pending.map((p, i) => {
     if (p.err) return `<div class="pend-i"><span class="k err">Gagal</span><div><div class="f">${esc(p.file)}</div><div class="d">${esc(p.err)}</div></div><button class="btn sm" data-rmp="${i}">Hapus</button></div>`;
+    if (p.kind === 'SR') {
+      const st = Object.values(p.stores); const b = st.reduce((a, x) => a + x.v[1], 0);
+      return `<div class="pend-i"><span class="k dsr">Sales Report</span><div><div class="f">${esc(p.file)}</div><div class="d">${p.daily ? 'Harian ' + fmtDate(p.from) : 'Kumulatif ' + fmtDateS(p.from) + ' – ' + fmtDate(p.to)} · ${p.rows} site ${esc(p.region)} · bruto ${fmtRp(b)}</div></div><button class="btn sm" data-rmp="${i}">Hapus</button></div>`;
+    }
     if (p.kind === 'WGT') {
       const warn = p.days !== dim(p.month) ? ` <b style="color:var(--warn)">hanya ${p.days} dari ${dim(p.month)} hari</b>` : '';
       return `<div class="pend-i"><span class="k">Bobot harian</span><div><div class="f">${esc(p.file)}</div><div class="d">${fmtMonth(p.month)} · ${p.days} hari · total ${fmtPct(p.rawSum, 2)}${warn}</div></div><button class="btn sm" data-rmp="${i}">Hapus</button></div>`;
@@ -1319,7 +1411,13 @@ async function saveAll() {
         stores[S.code] = { ...(stores[S.code] || {}), name: longer((stores[S.code] || {}).name, S.name) };
         Object.assign(metaAll, S.meta);
         const byDay = {}; for (const l of S.lines) (byDay[l.d] || (byDay[l.d] = [])).push(l);
-        for (const d in byDay) { const m = d.slice(0, 7), dd = +d.slice(8); ((pend[S.code] || (pend[S.code] = {}))[m] || (pend[S.code][m] = {}))[dd] = byDay[d]; }
+        for (const d in byDay) {
+          const m = d.slice(0, 7), dd = +d.slice(8); const M = ((pend[S.code] || (pend[S.code] = {}))[m] || (pend[S.code][m] = {}));
+          if (!M[dd]) { M[dd] = byDay[d]; continue; }
+          /* hari yang sama dari file lain di upload yang sama: gabungkan, buang baris kembar */
+          const key = l => [l.o, l.sku, l.t, l.q, l.g, l.n].join('|'); const seen = new Set(M[dd].map(key));
+          for (const l of byDay[d]) if (!seen.has(key(l))) M[dd].push(l);
+        }
       }
       const nets = Object.values(p.stores).reduce((s, x) => s + x.lines.reduce((a, l) => a + l.n, 0), 0);
       log.push({ at: now, kind: 'DSR', file: p.file, stores: Object.keys(p.stores).length, info: (p.from === p.to ? fmtDate(p.from) : fmtDate(p.from) + ' – ' + fmtDate(p.to)) + ', net ' + fmtRpS(nets) });
@@ -1375,6 +1473,24 @@ async function saveAll() {
       }
       await withRetry(() => metaDoc('targets').set(T));
     }
+    const srs = items.filter(p => p.kind === 'SR');
+    if (srs.length) {
+      say('Menyimpan Sales Report…');
+      const byM = {}; for (const p of srs) (byM[p.month] || (byM[p.month] = [])).push(p);
+      for (const m in byM) {
+        const fr = await withRetry(() => App.db.doc('sr/' + m).get());
+        const M = fr.exists ? clone(fr.data()) : { m, s: {}, days: [], cums: [] }; M.s = M.s || {}; M.days = M.days || []; M.cums = M.cums || [];
+        for (const p of byM[m]) {
+          const dd = p.day, key = p.daily ? 'd' : 'c', list = p.daily ? M.days : M.cums;
+          for (const c in M.s) if (M.s[c][key]) delete M.s[c][key][dd];
+          for (const c in p.stores) { const x = M.s[c] || (M.s[c] = {}); (x[key] || (x[key] = {}))[dd] = p.stores[c].v.map(v => Math.round(v)); }
+          if (!list.includes(dd)) list.push(dd); list.sort((a, b) => a - b);
+          for (const c in p.stores) { const nm = p.stores[c].name; stores[c] = { ...(stores[c] || {}), name: longer((stores[c] || {}).name, nm) }; }
+          log.push({ at: now, kind: 'SR', file: p.file, stores: p.rows, info: (p.daily ? 'harian ' + fmtDate(p.from) : 'kumulatif ' + fmtDateS(p.from) + ' – ' + fmtDate(p.to)) + ', bruto ' + fmtRpS(Object.values(p.stores).reduce((a, x) => a + x.v[1], 0)) });
+        }
+        await withRetry(() => App.db.doc('sr/' + m).set(M));
+      }
+    }
     const wgts = items.filter(p => p.kind === 'WGT');
     if (wgts.length) {
       say('Menyimpan bobot harian…');
@@ -1385,7 +1501,7 @@ async function saveAll() {
     }
     say('Menyimpan ringkasan…');
     await withRetry(() => metaDoc('index').set(idx));
-    await withRetry(() => metaDoc('stores').set({ list: stores }));
+    await withRetry(() => metaDoc('stores').set({ list: stores, region: App.region }));
     await withRetry(() => metaDoc('log').set({ items: log.slice(-80) }));
     App.pending = [];
     say('Memuat ulang dashboard…');
@@ -1394,7 +1510,7 @@ async function saveAll() {
     render();
   } catch (e) {
     console.error(e);
-    const why = e && e.code === 'invalid_argument' ? 'Akun ini tidak punya izin menulis data (hanya pemilik/editor).' : e && e.code === 'quota_exceeded' ? 'Kapasitas database penuh. Hapus data bulan lama dulu.' : (e && (e.message || e.code)) || String(e);
+    const why = e && e.code === 'permission-denied' ? 'Akun ini tidak terdaftar sebagai admin di Firestore Rules.' : e && e.code === 'resource-exhausted' ? 'Kuota harian Firebase habis. Coba lagi besok, atau hapus data bulan lama.' : (e && (e.message || e.code)) || String(e);
     say('Gagal menyimpan: ' + why); btn.disabled = false;
   }
 }
@@ -1406,9 +1522,9 @@ async function saveTargets() {
   $$('[data-type]').forEach(i => { const c = i.dataset.type; st[c] = st[c] || { name: c }; if (i.value !== autoType(c)) st[c].type = i.value; else delete st[c].type; });
   try {
     await withRetry(() => metaDoc('targets').set({ byMonth: t, detail: App.tgtDetail, basis: App.tgtBasis }));
-    await withRetry(() => metaDoc('stores').set({ list: st }));
+    await withRetry(() => metaDoc('stores').set({ list: st, region: App.region }));
     App.targets = t; App.stores = st; App.cache = {}; toast('Target & nama toko tersimpan'); render();
-  } catch (e) { toast('Gagal menyimpan: ' + (e.code === 'invalid_argument' ? 'tidak ada izin menulis' : (e.message || e.code))); }
+  } catch (e) { toast('Gagal menyimpan: ' + (e.code === 'permission-denied' ? 'akun ini bukan admin' : (e.message || e.code))); }
 }
 async function saveBasis(b) {
   const t = clone(App.targets);
@@ -1450,6 +1566,10 @@ document.addEventListener('click', async e => {
   if (t.id === 'rpXls') { exportReport(); return; }
   const tb = t.closest('[data-sttab]'); if (tb) { App.ui.stTab = tb.dataset.sttab; render(); return; }
   const rp = t.closest('[data-rmp]'); if (rp) { App.pending.splice(+rp.dataset.rmp, 1); renderPending(); return; }
+  if (t.id === 'admLink' || t.id === 'loginBtn') { e.preventDefault(); if (App.admin) go('admin'); else openLogin(); return; }
+  if (t.id === 'logoutBtn') { App.auth.signOut(); toast('Kamu sudah keluar'); App.page = 'area'; return; }
+  if (t.id === 'lgCancel' || t.classList.contains('modal-ov')) { closeLogin(); return; }
+  if (t.id === 'lgGo') { doLogin(); return; }
   if (t.id === 'saveBtn') { saveAll(); return; }
   if (t.id === 'clrBtn') { App.pending = []; renderPending(); return; }
   if (t.id === 'tgtSave') { saveTargets(); return; }
@@ -1475,6 +1595,7 @@ document.addEventListener('change', async e => {
   if (t.id === 'covM') { App.ui.admMonth = t.value; renderCoverage(t.value); return; }
   if (t.id === 'tgtM') { App.ui.tgtMonth = t.value; render(); return; }
   if (t.id === 'wgtM') { App.ui.wgtMonth = t.value; render(); return; }
+  if (t.id === 'regIn') { const v = t.value.trim().toUpperCase(); if (v && v !== App.region) { App.region = v; toast('Region Sales Report: ' + v + '. Pilih ulang file Sales Report bila sudah ada di daftar.'); try { await withRetry(() => metaDoc('stores').set({ list: App.stores, region: v })); } catch (er) { } } return; }
   if (t.id === 'typeSel') { App.ui.typeF = t.value; App.ui.more = {}; App.cache.tr = null; render(); return; }
   if (t.id === 'rpDate') { if (t.value) { App.ui.rpDate = t.value; render(); } return; }
   if (t.id === 'fileIn') { const fs = [...t.files]; t.value = ''; await addFiles(fs); return; }
@@ -1482,30 +1603,80 @@ document.addEventListener('change', async e => {
   if (t.id === 'tgtB') { saveBasis(t.value); return; }
   if (t.dataset && t.dataset.pdate !== undefined) { const p = App.pending[+t.dataset.pdate]; if (p && t.value) { p.date = t.value; p.dateFromName = true; } return; }
 });
-document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDrawer(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeDrawer(); closeLogin(); } });
 window.addEventListener('scroll', () => { const b = document.getElementById('brandbar'); if (b) b.classList.toggle('scrolled', window.scrollY > 8); }, { passive: true });
 document.addEventListener('dragover', e => { const d = e.target.closest && e.target.closest('#drop'); if (d) { e.preventDefault(); d.classList.add('over'); } });
 document.addEventListener('dragleave', e => { const d = e.target.closest && e.target.closest('#drop'); if (d) d.classList.remove('over'); });
 document.addEventListener('drop', async e => { const d = e.target.closest && e.target.closest('#drop'); if (!d) return; e.preventDefault(); d.classList.remove('over'); await addFiles([...e.dataTransfer.files]); });
 
 /* ================= mulai ================= */
+/* ================= Firebase: database & login ================= */
+function makeDb(fs) {
+  const wrap = sn => ({ id: sn.id, exists: sn.exists, data: () => { if (!sn.exists) return undefined; const r = sn.data(); return r && typeof r._j === 'string' ? JSON.parse(r._j) : r; } });
+  const enc = d => ({ _j: JSON.stringify(d), m: d && d.m != null ? String(d.m) : null, store: d && d.store != null ? String(d.store) : null });
+  const q = ref => ({ where: (k, op, v) => q(ref.where(k, op, v)), limit: n => q(ref.limit(n)), get: async () => { const sn = await ref.get(); return { docs: sn.docs.map(wrap), size: sn.size, empty: sn.empty }; } });
+  return {
+    doc: path => { const ref = fs.doc(path); return { get: async () => wrap(await ref.get()), set: async d => { await ref.set(enc(d)); }, delete: async () => { await ref.delete(); } }; },
+    collection: c => q(fs.collection(c))
+  };
+}
+const isAdminEmail = em => !!em && ADMIN_EMAILS.map(x => String(x).trim().toLowerCase()).includes(String(em).trim().toLowerCase());
+const loginForm = (id) => `<label for="lgEmail${id}">Email</label><input id="lgEmail${id}" class="inp" type="email" autocomplete="username">
+  <label for="lgPass${id}">Password</label><input id="lgPass${id}" class="inp" type="password" autocomplete="current-password">
+  <div class="err" id="lgErr${id}" role="alert"></div>`;
+function openLogin() {
+  closeLogin();
+  const ov = document.createElement('div'); ov.className = 'modal-ov'; ov.id = 'lgOv';
+  ov.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-labelledby="lgT"><h2 id="lgT">Masuk sebagai admin</h2><p class="small muted" style="margin:0">Gunakan akun admin yang didaftarkan di Firebase.</p>${loginForm('')}
+    <div class="row-act"><button class="btn" id="lgCancel">Batal</button><button class="btn primary" id="lgGo">Masuk</button></div></div>`;
+  document.body.appendChild(ov); $('#lgEmail').focus();
+}
+function closeLogin() { const o = $('#lgOv'); if (o) o.remove(); }
+async function doLogin(sfx = '') {
+  const em = ($('#lgEmail' + sfx) || {}).value || '', pw = ($('#lgPass' + sfx) || {}).value || '', er = $('#lgErr' + sfx), btn = $(sfx ? '#lgGo2' : '#lgGo');
+  if (!em || !pw) { er.textContent = 'Isi email dan password.'; return; }
+  btn.disabled = true; er.textContent = '';
+  try { await App.auth.signInWithEmailAndPassword(em.trim(), pw); closeLogin(); toast('Berhasil masuk'); }
+  catch (e) {
+    const c = e && e.code || '';
+    er.textContent = /invalid-credential|wrong-password|user-not-found|invalid-email|invalid-login/.test(c) ? 'Email atau password salah.' : /too-many-requests/.test(c) ? 'Terlalu banyak percobaan. Tunggu beberapa menit.' : /network/.test(c) ? 'Koneksi internet bermasalah.' : 'Gagal masuk: ' + (e.message || c);
+    btn.disabled = false;
+  }
+}
+function showLoginWall() {
+  setHead('Monitoring Penjualan Jateng 01', 'Masuk untuk melihat dashboard');
+  $('#periodBox').innerHTML = '';
+  $('#view').innerHTML = `<div class="login-card"><h2>Masuk dulu</h2><p class="small muted" style="margin:0">Dashboard ini hanya bisa dilihat oleh akun yang terdaftar.</p>${loginForm('2')}<div class="row-act"><button class="btn primary" id="lgGo2">Masuk</button></div></div>`;
+}
+async function boot() {
+  $('#view').innerHTML = '<div class="loading"><span class="spin"></span>Memuat data area…</div>';
+  try { await loadAll(); }
+  catch (e) {
+    console.error(e); renderNav();
+    if (e && e.code === 'permission-denied' && !App.authUser) { showLoginWall(); return; }
+    $('#view').innerHTML = `<div class="empty-state"><h2>Gagal memuat data</h2><p class="muted">${e && e.code === 'permission-denied' ? 'Akun ini tidak punya akses membaca data. Cek Firestore Rules.' : esc((e && (e.message || e.code)) || e)}</p><button class="btn" id="reloadBtn">Coba lagi</button></div>`;
+    return;
+  }
+  if (App.page === 'admin' && !App.admin) App.page = 'area';
+  if (!App.lastDate && !srLast() && App.admin) App.page = 'admin';
+  render();
+}
 async function init() {
   renderNav();
   if (typeof Chart !== 'undefined') { Chart.defaults.font.family = '"Plus Jakarta Sans", system-ui, sans-serif'; }
-  let db = null;
-  try { db = window.claude && window.claude.use ? await window.claude.use('db') : null; } catch (e) { db = null; }
-  if (!db) {
-    $('#view').innerHTML = `<div class="empty-state"><h2>Data tidak bisa dimuat di sini</h2><p class="muted">Buka dashboard ini dari link claude.ai dan pastikan kamu sudah masuk (login) ke akun Claude.</p></div>`;
-    return;
-  }
-  App.db = db;
-  try { App.user = await window.claude.use('user'); } catch (e) { App.user = null; }
-  try { App.admin = App.user ? !!(await App.user.canEdit()) : false; } catch (e) { App.admin = false; }
-  try { await loadAll(); }
-  catch (e) { console.error(e); $('#view').innerHTML = `<div class="empty-state"><h2>Gagal memuat data</h2><p class="muted">${esc(e.message || e.code || e)}</p><button class="btn" id="reloadBtn">Coba lagi</button></div>`; renderNav(); return; }
-  if (!App.lastDate && App.admin) App.page = 'admin';
-  render();
+  if (typeof firebase === 'undefined') { $('#view').innerHTML = '<div class="empty-state"><h2>Firebase tidak termuat</h2><p class="muted">Periksa koneksi internet lalu muat ulang halaman.</p></div>'; return; }
+  if (!FIREBASE_CONFIG.apiKey || /^ISI/.test(FIREBASE_CONFIG.apiKey)) { $('#view').innerHTML = '<div class="empty-state"><h2>Firebase belum diatur</h2><p class="muted">Isi FIREBASE_CONFIG dan ADMIN_EMAILS di bagian atas file index.html.</p></div>'; return; }
+  firebase.initializeApp(FIREBASE_CONFIG);
+  App.db = makeDb(firebase.firestore()); App.auth = firebase.auth();
+  let first = true;
+  App.auth.onAuthStateChanged(async u => {
+    const was = App.authUser ? App.authUser.uid : null;
+    App.authUser = u || null; App.admin = !!u && isAdminEmail(u.email);
+    if (first || was !== (u ? u.uid : null)) { first = false; await boot(); }
+  });
 }
+document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target && /^lgPass|^lgEmail/.test(e.target.id || '')) { doLogin(e.target.id.endsWith('2') ? '2' : ''); } });
+document.addEventListener('click', e => { if (e.target && e.target.id === 'lgGo2') doLogin('2'); });
 init();
 </script>
 </body>

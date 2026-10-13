@@ -631,6 +631,11 @@ function quantile(arr, p) { if (!arr.length) return 0; const pos = (arr.length -
 const clampN = (v, a, b) => Math.min(b, Math.max(a, v));
 const badge = k => k ? `<span class="badge b-${k}">${HEALTH[k].label}</span>` : '<span class="muted">–</span>';
 const SET = () => App.settings || DEFAULT_SETTINGS;
+/* nilai penjualan yang dipakai di seluruh dashboard: bruto (gross) sesuai standar Eigerindo, bisa diubah di Pengaturan */
+const isNet = () => SET().defaultValue === 'n';
+const VAL = l => isNet() ? l.n : l.g;
+const VL = () => isNet() ? 'Netto' : 'Bruto';
+const VLL = () => isNet() ? 'Net sales' : 'Gross sales';
 
 /* ================= database ================= */
 async function withRetry(fn) {
@@ -753,17 +758,17 @@ function srLast() { let L = null; for (const m in App.sr) { const M = App.sr[m];
 const repLast = () => { const a = App.lastDate, b = srLast(); return !a ? b : !b ? a : (a > b ? a : b); };
 const linesIn = (from, to, store) => App.lines.filter(l => l.d >= from && l.d <= to && (store ? l.s === store : typeOk(l.s)) && lineOk(l));
 function agg(lines) {
-  const mk = () => ({ n: 0, g: 0, q: 0, trx: new Set() });
+  const mk = () => ({ n: 0, g: 0, nn: 0, q: 0, trx: new Set() });
   const by = new Map(), tot = mk();
   for (const l of lines) {
     let s = by.get(l.s); if (!s) by.set(l.s, s = mk());
-    s.n += l.n; s.g += l.g; tot.n += l.n; tot.g += l.g;
+    const v = VAL(l); s.n += v; s.g += l.g; s.nn += l.n; tot.n += v; tot.g += l.g; tot.nn += l.n;
     if (!isPB(l.sku)) { s.q += l.q; tot.q += l.q; }
     if (l.q > 0) { s.trx.add(l.d + '|' + l.o); tot.trx.add(l.s + '|' + l.d + '|' + l.o); }
   }
   return { by, tot };
 }
-const statOf = a => ({ n: a ? a.n : 0, g: a ? a.g : 0, q: a ? a.q : 0, trx: a ? a.trx.size : 0, atv: a && a.trx.size ? a.n / a.trx.size : null, upt: a && a.trx.size ? a.q / a.trx.size : null });
+const statOf = a => ({ n: a ? a.n : 0, g: a ? a.g : 0, nn: a ? a.nn : 0, q: a ? a.q : 0, trx: a ? a.trx.size : 0, atv: a && a.trx.size ? a.n / a.trx.size : null, upt: a && a.trx.size ? a.q / a.trx.size : null });
 function stockByArt(c) {
   const k = 'sba' + c; if (App.cache[k]) return App.cache[k];
   const m = new Map(); const S = App.stock[c];
@@ -972,7 +977,7 @@ const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).
 function trendChart(canvas, R, cur, prev, store) {
   if (typeof Chart === 'undefined') { canvas.parentElement.innerHTML = '<p class="muted">Grafik tidak bisa dimuat.</p>'; return; }
   const n = dayDiff(R.from, R.to) + 1; const labels = [], a = [], b = [];
-  const sum = (lines) => { const m = new Map(); for (const l of lines) m.set(l.d, (m.get(l.d) || 0) + l.n); return m; };
+  const sum = (lines) => { const m = new Map(); for (const l of lines) m.set(l.d, (m.get(l.d) || 0) + VAL(l)); return m; };
   const A = sum(cur), B = sum(prev);
   const codes = store ? [store] : storeCodes(); const tg = []; let hasT = false;
   for (let i = 0; i < n; i++) { const d = addDays(R.from, i), dp = addDays(R.cfrom, i); labels.push(fmtDateS(d)); a.push(A.get(d) || 0); b.push(dp <= R.cto ? (B.get(dp) || 0) : null);
@@ -1020,15 +1025,15 @@ function pageArea(view) {
     <section class="hero">
       <svg class="ridge" viewBox="0 0 600 260" preserveAspectRatio="none" aria-hidden="true"><path d="M0 260 L90 150 L150 200 L250 60 L330 160 L400 110 L480 190 L560 120 L600 160 L600 260Z" fill="#fff"/></svg>
       <div class="hero-a">
-        <div class="lbl">Net sales area · ${esc(R.label)}</div>
+        <div class="lbl">${VLL()} area · ${esc(R.label)}</div>
         <div class="big">${fmtRp(T.n)}</div>
         <div class="meta"><span>${chipGrowth(TP.n ? T.n / TP.n - 1 : null)} vs ${esc(R.cmpLabel)} (${fmtRpS(TP.n)})</span></div>
       </div>
       <div class="hero-b">
         <div><span>Pencapaian target</span><b>${ach == null ? '–' : fmtPct(ach)}</b></div>
         <div><span>${R.monthMode ? 'Target bulan' : 'Target periode'} (${({ offline: 'Offline', eiger: 'Eiger', total: 'Total' })[App.tgtBasis]})</span><b>${tgtTot ? fmtRpS(tgtTot) : 'belum diisi'}</b></div>
-        <div><span>${proj ? 'Proyeksi akhir bulan' : 'Gross sales'}</span><b>${proj ? fmtRpS(proj) : fmtRpS(T.g)}</b></div>
-        <div><span>${R.monthMode && R.pace < 1 ? 'Seharusnya tercapai' : 'Diskon & promo'}</span><b>${R.monthMode && R.pace < 1 ? fmtPct(R.pace, 0) : fmtRpS(T.g - T.n)}</b></div>
+        <div><span>${proj ? 'Proyeksi akhir bulan' : (isNet() ? 'Gross sales' : 'Net sales')}</span><b>${proj ? fmtRpS(proj) : fmtRpS(isNet() ? T.g : T.nn)}</b></div>
+        <div><span>${R.monthMode && R.pace < 1 ? 'Seharusnya tercapai' : 'Diskon & promo'}</span><b>${R.monthMode && R.pace < 1 ? fmtPct(R.pace, 0) : fmtRpS(T.g - T.nn)}</b></div>
       </div>
     </section>
     <div class="kpis">
@@ -1043,7 +1048,7 @@ function pageArea(view) {
       <div id="summit"></div></section>
     <div class="grid g2">
       <section class="card"><div class="card-h"><h3>Penjualan harian area</h3></div><div class="chart-box"><canvas id="trend"></canvas></div></section>
-      <section class="card"><div class="card-h"><h3>Kategori</h3><p class="small muted">net sales</p></div><div id="cats"></div></section>
+      <section class="card"><div class="card-h"><h3>Kategori</h3><p class="small muted">${VLL().toLowerCase()}</p></div><div id="cats"></div></section>
     </div>
     <section class="card"><div class="card-h"><h3>Peringkat toko</h3><p class="small muted">Klik toko untuk detail</p></div><div id="rankT"></div></section>
   </div>`;
@@ -1060,13 +1065,13 @@ function pageArea(view) {
       <span class="sm-val">${hasT ? (r.tgt ? fmtPct(r.ach) : '–') : fmtRpS(r.n)}<small>${hasT ? fmtRpS(r.n) + (r.tgt ? '' : ', tanpa target') : (r.trx ? fmtN(r.trx) + ' trx' : 'belum ada')}</small></span></button>`;
   }).join('')}</div>${hasT ? `<div class="legend"><span><i style="background:var(--ok)"></i>Di atas posisi seharusnya</span><span><i style="background:var(--ochre)"></i>Sedikit di bawah (≥85%)</span><span><i style="background:var(--bad)"></i>Tertinggal</span></div>` : ''}`;
   trendChart($('#trend'), R, cur, prev);
-  const cm = new Map(); for (const l of cur) { const k = (App.sku[l.sku] || [])[1] || 'LAINNYA'; cm.set(k, (cm.get(k) || 0) + l.n); }
+  const cm = new Map(); for (const l of cur) { const k = (App.sku[l.sku] || [])[1] || 'LAINNYA'; cm.set(k, (cm.get(k) || 0) + VAL(l)); }
   $('#cats').innerHTML = cm.size ? barList([...cm].map(([k, v]) => ({ k, v })).sort((a, b) => b.v - a.v)) : '<p class="muted">Belum ada penjualan di periode ini.</p>';
   $('#rankT').innerHTML = tbl('rank', {
     rows, sort: { k: 'n', dir: 'desc' }, limit: 30, onRow: r => { App.ui.store = r.code; go('toko'); },
     cols: [
       { k: 'name', label: 'Toko', h: r => `<span class="nm">${esc(r.name)}</span><span class="sub">${esc(r.code)}${r.type === 'bz' ? ' · Bazaar' : ''}</span>` },
-      { k: 'n', label: 'Net sales', r: 1, h: r => fmtRp(r.n) },
+      { k: 'n', label: VLL(), r: 1, h: r => fmtRp(r.n) },
       { k: 'tgt', label: 'Target', r: 1, h: r => r.tgt ? fmtRpS(r.tgt) : '–' },
       { k: 'ach', label: 'Ach.', r: 1, h: r => r.ach == null ? '–' : `<b>${fmtPct(r.ach)}</b>` },
       { k: 'gr', label: 'vs pembanding', r: 1, h: r => chipGrowth(r.gr) },
@@ -1202,19 +1207,19 @@ function pageStore(view) {
   const last = lastDateOf(c), stk = App.stock[c];
   // produk
   const pm = new Map();
-  for (const l of cur) { if (isPB(l.sku)) continue; const ar = artOf(l.sku); const x = pm.get(ar) || { art: ar, q: 0, n: 0 }; x.q += l.q; x.n += l.n; pm.set(ar, x); }
+  for (const l of cur) { if (isPB(l.sku)) continue; const ar = artOf(l.sku); const x = pm.get(ar) || { art: ar, q: 0, n: 0 }; x.q += l.q; x.n += VAL(l); pm.set(ar, x); }
   const prods = [...pm.values()].map(x => { const inf = artInfo(x.art), h = H && H.items.get(x.art); return { ...x, name: inf.name, c3: inf.c3, c4: inf.c4, stock: h ? h.stock : null, k: h ? h.k : null }; });
   // sales person
   const spm = new Map();
-  for (const l of cur) { const k = l.sp || '(tanpa nama)'; const x = spm.get(k) || { sp: k, n: 0, q: 0, trx: new Set() }; x.n += l.n; if (!isPB(l.sku)) x.q += l.q; if (l.q > 0) x.trx.add(l.d + l.o); spm.set(k, x); }
+  for (const l of cur) { const k = l.sp || '(tanpa nama)'; const x = spm.get(k) || { sp: k, n: 0, q: 0, trx: new Set() }; x.n += VAL(l); if (!isPB(l.sku)) x.q += l.q; if (l.q > 0) x.trx.add(l.d + l.o); spm.set(k, x); }
   const sps = [...spm.values()].map(x => ({ sp: x.sp, n: x.n, q: x.q, trx: x.trx.size, atv: x.trx.size ? x.n / x.trx.size : null, upt: x.trx.size ? x.q / x.trx.size : null }));
   view.innerHTML = `<div class="stack">
     <div class="filters"><label class="small muted" for="stSel">Toko</label><select id="stSel" class="inp">${codes.map(x => `<option value="${esc(x)}" ${x === c ? 'selected' : ''}>${esc(sName(x))} (${esc(x)}${sType(x) === 'bz' ? ', bazaar' : ''})</option>`).join('')}</select>
       <span class="small muted">Penjualan s/d ${fmtDate(last)} · stok per ${stk ? fmtDate(stk.date) : 'belum ada'}</span></div>
     <div class="kpis">
-      <div class="kpi"><span>Net sales</span><b>${fmtRpS(a.n)}</b><small>${chipGrowth(p.n ? a.n / p.n - 1 : null)} vs ${fmtRpS(p.n)}</small></div>
+      <div class="kpi"><span>${VLL()}</span><b>${fmtRpS(a.n)}</b><small>${chipGrowth(p.n ? a.n / p.n - 1 : null)} vs ${fmtRpS(p.n)}</small></div>
       <div class="kpi"><span>Pencapaian target</span><b>${ach == null ? '–' : fmtPct(ach)}</b><small>${tgt ? 'target ' + fmtRpS(tgt) + (R.monthMode && R.pace < 1 ? ', seharusnya ' + fmtPct(R.pace, 0) : '') : 'target belum diisi'}</small></div>
-      <div class="kpi"><span>${proj ? 'Proyeksi akhir bulan' : 'Gross sales'}</span><b>${proj ? fmtRpS(proj) : fmtRpS(a.g)}</b><small>${proj && tgt ? fmtPct(proj / tgt, 0) + ' dari target' : ''}</small></div>
+      <div class="kpi"><span>${proj ? 'Proyeksi akhir bulan' : (isNet() ? 'Gross sales' : 'Net sales')}</span><b>${proj ? fmtRpS(proj) : fmtRpS(isNet() ? a.g : a.nn)}</b><small>${proj && tgt ? fmtPct(proj / tgt, 0) + ' dari target' : ''}</small></div>
       <div class="kpi"><span>Qty</span><b>${fmtN(a.q)}</b><small>${chipGrowth(p.q ? a.q / p.q - 1 : null)}</small></div>
       <div class="kpi"><span>Transaksi</span><b>${fmtN(a.trx)}</b><small>${chipGrowth(p.trx ? a.trx / p.trx - 1 : null)}</small></div>
       <div class="kpi"><span>ATV / UPT</span><b>${a.atv ? fmtRpS(a.atv) : '–'}</b><small>${a.upt ? fmtX(a.upt, 2) + ' item per transaksi' : ''}</small></div>
@@ -1240,15 +1245,15 @@ function pageStore(view) {
     rows: prods, sort: { k: 'n', dir: 'desc' }, limit: 15, onRow: r => openProduct(r.art, c),
     cols: [
       { k: 'name', label: 'Produk', h: r => `<span class="nm">${esc(r.name)}</span><span class="sub">${esc(r.art)} · ${esc(r.c3)} › ${esc(r.c4)}</span>` },
-      { k: 'q', label: 'Qty', r: 1, h: r => fmtN(r.q) }, { k: 'n', label: 'Net sales', r: 1, h: r => fmtRp(r.n) },
+      { k: 'q', label: 'Qty', r: 1, h: r => fmtN(r.q) }, { k: 'n', label: VLL(), r: 1, h: r => fmtRp(r.n) },
       { k: 'stock', label: 'Stok', r: 1, h: r => r.stock == null ? '–' : fmtN(r.stock) }, { k: 'k', label: 'Status', h: r => badge(r.k) }
     ]
   });
   $('#spT').innerHTML = tbl('sp', {
     rows: sps, sort: { k: 'n', dir: 'desc' }, limit: 15,
-    cols: [{ k: 'sp', label: 'Nama' }, { k: 'n', label: 'Net', r: 1, h: r => fmtRpS(r.n) }, { k: 'trx', label: 'Trx', r: 1, h: r => fmtN(r.trx) }, { k: 'q', label: 'Qty', r: 1, h: r => fmtN(r.q) }, { k: 'atv', label: 'ATV', r: 1, h: r => r.atv ? fmtRpS(r.atv) : '–' }, { k: 'upt', label: 'UPT', r: 1, h: r => r.upt ? fmtX(r.upt, 2) : '–' }]
+    cols: [{ k: 'sp', label: 'Nama' }, { k: 'n', label: VL(), r: 1, h: r => fmtRpS(r.n) }, { k: 'trx', label: 'Trx', r: 1, h: r => fmtN(r.trx) }, { k: 'q', label: 'Qty', r: 1, h: r => fmtN(r.q) }, { k: 'atv', label: 'ATV', r: 1, h: r => r.atv ? fmtRpS(r.atv) : '–' }, { k: 'upt', label: 'UPT', r: 1, h: r => r.upt ? fmtX(r.upt, 2) : '–' }]
   });
-  const cm = new Map(); for (const l of cur) { const k = (App.sku[l.sku] || [])[1] || 'LAINNYA'; cm.set(k, (cm.get(k) || 0) + l.n); }
+  const cm = new Map(); for (const l of cur) { const k = (App.sku[l.sku] || [])[1] || 'LAINNYA'; cm.set(k, (cm.get(k) || 0) + VAL(l)); }
   $('#cats').innerHTML = cm.size ? barList([...cm].map(([k, v]) => ({ k, v })).sort((x, y) => y.v - x.v)) : '<p class="muted">Belum ada penjualan di periode ini.</p>';
 }
 
@@ -1258,7 +1263,7 @@ function pageProduct(view) {
   setHead('Produk', R.label + (U.prodStore ? ' · ' + sName(U.prodStore) : ' · semua toko'));
   const cur = linesIn(R.from, R.to, U.prodStore || null);
   const m = new Map();
-  for (const l of cur) { if (isPB(l.sku)) continue; const a = artOf(l.sku); const x = m.get(a) || { art: a, q: 0, n: 0, st: new Set() }; x.q += l.q; x.n += l.n; if (l.q > 0) x.st.add(l.s); m.set(a, x); }
+  for (const l of cur) { if (isPB(l.sku)) continue; const a = artOf(l.sku); const x = m.get(a) || { art: a, q: 0, n: 0, st: new Set() }; x.q += l.q; x.n += VAL(l); if (l.q > 0) x.st.add(l.s); m.set(a, x); }
   const codes = U.prodStore ? [U.prodStore] : activeStores();
   const stockA = new Map(); for (const c of codes) for (const [a, s] of stockByArt(c)) stockA.set(a, (stockA.get(a) || 0) + s.t);
   const H = health();
@@ -1276,7 +1281,7 @@ function pageProduct(view) {
     rows, sort: { k: 'n', dir: 'desc' }, limit: 30, onRow: r => openProduct(r.art, U.prodStore || null),
     cols: [
       { k: 'name', label: 'Produk', h: r => `<span class="nm">${esc(r.name)}</span><span class="sub">${esc(r.art)} · ${esc(r.c3)} › ${esc(r.c4)}</span>` },
-      { k: 'q', label: 'Qty', r: 1, h: r => fmtN(r.q) }, { k: 'n', label: 'Net sales', r: 1, h: r => fmtRp(r.n) },
+      { k: 'q', label: 'Qty', r: 1, h: r => fmtN(r.q) }, { k: 'n', label: VLL(), r: 1, h: r => fmtRp(r.n) },
       ...(U.prodStore ? [] : [{ k: 'stores', label: 'Toko terjual', r: 1, h: r => r.stores + ' / ' + activeStores().length }]),
       { k: 'stock', label: 'Stok', r: 1, h: r => fmtN(r.stock) }, { k: 'cover', label: 'Cover (bln)', r: 1, h: r => r.cover == null ? '–' : fmtX(r.cover) }
     ]
@@ -1285,19 +1290,19 @@ function pageProduct(view) {
 function openProduct(art, store) {
   const R = periodRange(); const inf = artInfo(art); const H = health();
   const cur = linesIn(R.from, R.to).filter(l => artOf(l.sku) === art);
-  const per = storeCodes().map(c => { const ls = cur.filter(l => l.s === c); const h = H.stores[c] && H.stores[c].items.get(art); return { c, name: sName(c), q: ls.reduce((s, l) => s + l.q, 0), n: ls.reduce((s, l) => s + l.n, 0), stock: h ? h.stock : (stockByArt(c).get(art) || { t: 0 }).t, rate: h ? h.rate : 0, k: h ? h.k : null }; }).filter(r => r.q || r.stock);
+  const per = storeCodes().map(c => { const ls = cur.filter(l => l.s === c); const h = H.stores[c] && H.stores[c].items.get(art); return { c, name: sName(c), q: ls.reduce((s, l) => s + l.q, 0), n: ls.reduce((s, l) => s + VAL(l), 0), stock: h ? h.stock : (stockByArt(c).get(art) || { t: 0 }).t, rate: h ? h.rate : 0, k: h ? h.k : null }; }).filter(r => r.q || r.stock);
   // varian (sku)
   const vm = new Map();
-  for (const l of cur) { if (store && l.s !== store) continue; const x = vm.get(l.sku) || { sku: l.sku, q: 0, n: 0, stock: 0 }; x.q += l.q; x.n += l.n; vm.set(l.sku, x); }
+  for (const l of cur) { if (store && l.s !== store) continue; const x = vm.get(l.sku) || { sku: l.sku, q: 0, n: 0, stock: 0 }; x.q += l.q; x.n += VAL(l); vm.set(l.sku, x); }
   for (const c of (store ? [store] : storeCodes())) { const S = App.stock[c]; if (!S) continue; for (const sku in S.items) if (artOf(sku) === art) { const x = vm.get(sku) || { sku, q: 0, n: 0, stock: 0 }; x.stock += S.items[sku][0]; vm.set(sku, x); } }
   const vars = [...vm.values()].sort((a, b) => b.q - a.q || b.stock - a.stock);
   openDrawer(`<p class="muted small">${esc(inf.c2 ? inf.c2 + ' › ' : '')}${esc(inf.c3)} › ${esc(inf.c4)} · kode ${esc(art)}</p><h2>${esc(inf.name)}</h2><p class="muted small">${esc(R.label)}</p>
     <h3 style="font-family:var(--font-head);margin:18px 0 8px">Per toko</h3>
-    <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Toko</th><th class="r">Qty</th><th class="r">Net</th><th class="r">Stok</th><th class="r">Jual/bln</th><th>Status</th></tr></thead><tbody>
+    <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Toko</th><th class="r">Qty</th><th class="r">${VL()}</th><th class="r">Stok</th><th class="r">Jual/bln</th><th>Status</th></tr></thead><tbody>
     ${per.sort((a, b) => b.q - a.q || b.stock - a.stock).map(r => `<tr><td><span class="nm">${esc(r.name)}</span><span class="sub">${esc(r.c)}</span></td><td class="r">${fmtN(r.q)}</td><td class="r">${fmtRpS(r.n)}</td><td class="r">${fmtN(r.stock)}</td><td class="r">${fmtX(r.rate)}</td><td>${badge(r.k)}</td></tr>`).join('') || '<tr><td colspan="6" class="empty">Tidak ada penjualan atau stok.</td></tr>'}
     </tbody></table></div>
     <h3 style="font-family:var(--font-head);margin:18px 0 8px">Varian ${store ? 'di ' + esc(sName(store)) : 'se-area'}</h3>
-    <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Varian</th><th class="r">Qty</th><th class="r">Net</th><th class="r">Stok</th></tr></thead><tbody>
+    <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Varian</th><th class="r">Qty</th><th class="r">${VL()}</th><th class="r">Stok</th></tr></thead><tbody>
     ${vars.map(v => `<tr><td>${esc(varName((App.sku[v.sku] || [])[0]) || v.sku)}<span class="sub">${esc(v.sku)}</span></td><td class="r">${fmtN(v.q)}</td><td class="r">${fmtRpS(v.n)}</td><td class="r">${fmtN(v.stock)}</td></tr>`).join('') || '<tr><td colspan="4" class="empty">Tidak ada varian.</td></tr>'}
     </tbody></table></div>`);
 }
@@ -1428,8 +1433,8 @@ function renderPending() {
     const st = Object.values(p.stores);
     const names = st.map(s => shortName(s.name)).slice(0, 4).join(', ') + (st.length > 4 ? ' +' + (st.length - 4) : '');
     if (p.kind === 'DSR') {
-      const net = st.reduce((s, x) => s + x.lines.reduce((a, l) => a + l.n, 0), 0);
-      return `<div class="pend-i"><span class="k dsr">Penjualan</span><div><div class="f">${esc(p.file)}</div><div class="d">${esc(names)} · ${p.from === p.to ? fmtDate(p.from) : fmtDate(p.from) + ' – ' + fmtDate(p.to)} · ${fmtN(p.rows)} baris · net ${fmtRp(net)}</div></div><button class="btn sm" data-rmp="${i}">Hapus</button></div>`;
+      const net = st.reduce((s, x) => s + x.lines.reduce((a, l) => a + l.g, 0), 0);
+      return `<div class="pend-i"><span class="k dsr">Penjualan</span><div><div class="f">${esc(p.file)}</div><div class="d">${esc(names)} · ${p.from === p.to ? fmtDate(p.from) : fmtDate(p.from) + ' – ' + fmtDate(p.to)} · ${fmtN(p.rows)} baris · bruto ${fmtRp(net)}</div></div><button class="btn sm" data-rmp="${i}">Hapus</button></div>`;
     }
     const pcs = st.reduce((s, x) => s + x.pcs, 0);
     return `<div class="pend-i"><span class="k inv">Stok</span><div><div class="f">${esc(p.file)}</div><div class="d">${esc(names)} · ${fmtN(pcs)} pcs · ${fmtN(p.rows)} baris bin · tanggal stok <input type="date" class="inp sm" data-pdate="${i}" value="${esc(p.date)}">${p.dateFromName ? '' : ' <b style="color:var(--warn)">cek tanggal</b>'}</div></div><button class="btn sm" data-rmp="${i}">Hapus</button></div>`;
@@ -1483,8 +1488,8 @@ async function saveAll() {
           for (const l of byDay[d]) if (!seen.has(key(l))) M[dd].push(l);
         }
       }
-      const nets = Object.values(p.stores).reduce((s, x) => s + x.lines.reduce((a, l) => a + l.n, 0), 0);
-      log.push({ at: now, kind: 'DSR', file: p.file, stores: Object.keys(p.stores).length, info: (p.from === p.to ? fmtDate(p.from) : fmtDate(p.from) + ' – ' + fmtDate(p.to)) + ', net ' + fmtRpS(nets) });
+      const nets = Object.values(p.stores).reduce((s, x) => s + x.lines.reduce((a, l) => a + l.g, 0), 0);
+      log.push({ at: now, kind: 'DSR', file: p.file, stores: Object.keys(p.stores).length, info: (p.from === p.to ? fmtDate(p.from) : fmtDate(p.from) + ' – ' + fmtDate(p.to)) + ', bruto ' + fmtRpS(nets) });
     }
     const jobs = []; for (const c in pend) for (const m in pend[c]) jobs.push([c, m]);
     let k = 0;
@@ -1640,7 +1645,7 @@ function pageSettings(view) {
       <p class="small muted">Produk yang dikecualikan (juga SKU berawalan 81 atau ES) tidak dihitung di qty, UPT, produk, dan kesehatan stok, tapi nilai rupiahnya tetap masuk total penjualan.</p><div class="row-act"><button class="btn primary sSave">Simpan pengaturan</button></div></section>
     <section class="card"><div class="card-h"><h3>Monitoring sales</h3></div>
       <div class="grid3">${num('sGreen', 'Hijau jika %Ach ≥', S.achGreen, 50, 200)}${num('sYellow', 'Kuning jika %Ach ≥', S.achYellow, 0, 200)}
-      <div class="fld"><label for="sVal">Nilai sales default</label><select id="sVal" class="inp"><option value="g" ${S.defaultValue === 'g' ? 'selected' : ''}>Bruto (gross)</option><option value="n" ${S.defaultValue === 'n' ? 'selected' : ''}>Netto (net)</option></select></div></div>
+      <div class="fld"><label for="sVal">Nilai sales di seluruh dashboard</label><select id="sVal" class="inp"><option value="g" ${S.defaultValue === 'g' ? 'selected' : ''}>Bruto (gross)</option><option value="n" ${S.defaultValue === 'n' ? 'selected' : ''}>Netto (net)</option></select></div></div>
       <p class="small muted">Di bawah batas kuning = merah. Target yang dipakai (Offline / Eiger / Total) dan region Sales Report diatur di Kelola data.</p>
       <div class="row-act"><button class="btn primary sSave">Simpan pengaturan</button><button class="btn" id="sReset">Kembalikan ke default</button></div></section>
     <section class="card"><div class="card-h"><h3>Status bill yang dihitung</h3></div>

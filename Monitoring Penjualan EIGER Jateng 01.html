@@ -1,0 +1,1512 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Monitoring Penjualan EIGER Jateng 01</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --navy:#0F3192; --navy-deep:#0A2470; --navy-ink:#0B1B4A; --navy-tint:#EEF2FB;
+  --orange:#E46636; --orange-deep:#C9531F; --orange-tint:#FDF0EA;
+  --ink:#16213D; --muted:#5A6482; --bg:#F3F5FA; --surface:#FFFFFF; --surface-2:#F6F8FC; --line:#E1E6F0; --line-strong:#C8D0E0;
+  --ok:#13806F; --ok-bg:#E3F4F0; --bad:#C0392B; --bad-bg:#FDECEB; --warn:#C9531F; --info:#3553B8; --yellow:#E2A82B;
+  --pine:var(--navy); --pine-2:var(--navy); --ochre:var(--orange); --on-accent:#FFFFFF;
+  --font-head:"Plus Jakarta Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-body:"Plus Jakarta Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:"JetBrains Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  color-scheme:light only;
+}
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+html{scroll-padding-top:calc(env(safe-area-inset-top,0px) + 120px)}
+*,*::before,*::after{box-sizing:inherit}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:14.5px;line-height:1.5}
+body{min-height:100%;display:flex;flex-direction:column}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:3px solid var(--orange);outline-offset:2px}
+img,svg,canvas{max-width:100%}
+.muted{color:var(--muted)} .small{font-size:12.5px}
+.num,.tn{font-family:var(--font-mono);font-variant-numeric:tabular-nums}
+.wrap{max-width:1320px;margin:0 auto;padding:0 24px;width:100%}
+
+/* credit strip */
+.credit{background:#0B1B4A;color:#C9D3F0;font-size:12.5px}
+.credit .wrap{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-top:7px;padding-bottom:7px}
+.credit strong{color:#fff;font-weight:700}
+.credit .dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:#E46636;margin-right:8px;vertical-align:middle}
+.credit .ver{color:#8E9BC4}
+
+/* brand bar */
+.brandbar{background:#FFFFFF;border-bottom:1px solid #E1E6F0;position:sticky;top:0;z-index:40;transition:box-shadow .2s ease}
+.brandbar.scrolled{box-shadow:0 6px 18px rgba(11,27,74,.12)}
+.brandbar .row1{display:flex;align-items:center;gap:18px;padding-top:12px;padding-bottom:10px}
+.brandbar img{height:34px;width:auto;display:block}
+.brandbar .sep{width:1px;height:30px;background:#C8D0E0}
+.brandbar .app{font-weight:700;font-size:14px;color:#0F3192;line-height:1.2}
+.brandbar .app small{display:block;font-weight:500;font-size:12px;color:#5A6482}
+.data-chip{margin-left:auto;display:inline-flex;align-items:center;gap:10px;background:#EEF2FB;color:#0F3192;border-radius:999px;padding:5px 6px 5px 14px;font-size:12.5px;font-weight:600;white-space:nowrap}
+.data-chip button{border:0;background:#0F3192;color:#fff;border-radius:999px;padding:4px 12px;font-size:12px;font-weight:700}
+.data-chip button:hover{background:#0A2470}
+.nav{display:flex;gap:2px;overflow-x:auto;scrollbar-width:none;margin:0 -6px}
+.nav::-webkit-scrollbar{display:none}
+.nav button{display:flex;align-items:center;gap:8px;background:none;border:0;border-bottom:3px solid transparent;padding:9px 12px 10px;color:#5A6482;font-weight:600;font-size:13.5px;white-space:nowrap}
+.nav button:hover{color:#0F3192}
+.nav button.on{color:#0F3192;border-bottom-color:#E46636}
+.nav svg{width:17px;height:17px;flex:none;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+
+/* page head (navy band) */
+.phead{background:#0F3192;color:#fff;position:relative}
+.phead::after{content:"";position:absolute;left:0;right:0;bottom:0;height:4px;background:#E46636}
+.phead .wrap{display:flex;flex-wrap:wrap;gap:14px 24px;align-items:flex-end;justify-content:space-between;padding-top:24px;padding-bottom:28px}
+.phead h1{font-size:clamp(23px,2.6vw,30px);font-weight:800;letter-spacing:-.02em;line-height:1.15;margin:0}
+.phead p{margin:5px 0 0;color:#D3DBF3;font-size:14px}
+.period{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.phead .period label{color:#C9D3F0}
+.phead .inp{background:#fff;color:#16213D;border-color:transparent}
+main.wrap{flex:1;padding-top:24px;padding-bottom:44px}
+footer{border-top:1px solid var(--line);background:var(--surface);color:var(--muted);font-size:12px}
+footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;padding-top:14px;padding-bottom:16px}
+footer strong{color:var(--navy)}
+@media (max-width:640px){
+  .wrap{padding:0 14px}
+  .credit .ver{display:none}
+  .brandbar img{height:26px}
+  .brandbar .sep,.brandbar .app{display:none}
+  .data-chip span{display:none}
+  .phead .wrap{padding-top:18px;padding-bottom:22px}
+}
+
+.inp{background:var(--surface);border:1px solid var(--line-strong);border-radius:8px;padding:8px 11px;min-height:38px;max-width:100%;font-size:13.5px}
+.inp:focus{outline:none;border-color:var(--navy);box-shadow:0 0 0 3px var(--navy-tint)}
+.inp.sm{padding:5px 8px;min-height:32px;font-size:13px}
+
+/* cards */
+.grid{display:grid;gap:16px}
+.g2{grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr))}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px 20px;min-width:0}
+.card-h{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:baseline;justify-content:space-between;margin-bottom:12px}
+.card-h h3{margin:0;font-size:17px;font-weight:800;color:var(--ink);letter-spacing:-.01em}
+.card-h p{margin:0}
+.stack{display:flex;flex-direction:column;gap:18px}
+
+/* area hero (navy ink block) */
+.hero{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);background:#0B1B4A;color:#fff;border-radius:12px;overflow:hidden;position:relative}
+.hero-a{padding:22px 24px;position:relative;z-index:1}
+.hero-a .lbl{font-size:13px;font-weight:600;color:#9FB0E3}
+.hero-a .big{font-weight:800;font-size:clamp(32px,5vw,50px);letter-spacing:-.03em;line-height:1.05;margin:6px 0 10px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.hero-a .meta{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:13.5px;color:#C9D3F0}
+.hero-b{padding:22px 24px;background:rgba(255,255,255,.06);display:grid;grid-template-columns:1fr 1fr;gap:14px 18px;align-content:center;position:relative;z-index:1;border-left:1px solid rgba(255,255,255,.1)}
+.hero-b div span{display:block;font-size:12px;font-weight:600;color:#9FB0E3}
+.hero-b div b{font-size:22px;font-weight:800;letter-spacing:-.01em;font-variant-numeric:tabular-nums}
+.hero .ridge{position:absolute;right:0;bottom:0;width:62%;height:70%;opacity:.06;pointer-events:none}
+@media (max-width:760px){.hero{grid-template-columns:1fr}.hero-b{border-left:0;border-top:1px solid rgba(255,255,255,.1)}}
+.chip{display:inline-block;font-size:12px;font-weight:700;padding:1px 8px;border-radius:999px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.chip.up{background:var(--ok-bg);color:var(--ok)}
+.chip.down{background:var(--bad-bg);color:var(--bad)}
+.chip.flat{background:var(--surface-2);color:var(--muted)}
+.hero .chip.up{background:rgba(43,182,115,.2);color:#7FE0AE}
+.hero .chip.down{background:rgba(255,140,120,.2);color:#FFC2B6}
+.hero .chip.flat{background:rgba(255,255,255,.1);color:#C9D3F0}
+
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:15px 17px;min-width:0}
+.kpi span{font-size:12.5px;color:var(--muted);font-weight:500;display:block}
+.kpi b{display:block;font-size:25px;font-weight:800;letter-spacing:-.02em;color:var(--navy);line-height:1.15;font-variant-numeric:tabular-nums;overflow-wrap:anywhere;margin:3px 0 2px}
+.kpi small{color:var(--muted);font-size:12px}
+
+/* achievement bars */
+.summit{display:flex;flex-direction:column;gap:6px}
+.sm-row{display:grid;grid-template-columns:minmax(120px,210px) minmax(0,1fr) 96px;gap:14px;align-items:center;padding:5px 6px;border-radius:8px;cursor:pointer;background:none;border:0;text-align:left;width:100%}
+.sm-row:hover{background:var(--navy-tint)}
+.sm-name{font-weight:700;font-size:13.5px;line-height:1.2;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sm-name small{display:block;font-weight:500;color:var(--muted);font-size:11.5px;font-family:var(--font-mono)}
+.sm-track{position:relative;height:12px;background:var(--navy-tint);border-radius:999px}
+.sm-fill{position:absolute;left:0;top:0;bottom:0;border-radius:999px;min-width:3px}
+.sm-fill.ok{background:var(--ok)} .sm-fill.mid{background:var(--orange)} .sm-fill.low{background:var(--bad)} .sm-fill.neu{background:var(--navy)}
+.sm-pace{position:absolute;top:-4px;bottom:-4px;width:3px;margin-left:-1.5px;border-radius:2px;background:var(--navy-ink, #0B1B4A);box-shadow:0 0 0 2px var(--surface)}
+.sm-100{position:absolute;top:-3px;bottom:-3px;width:1px;background:var(--line-strong)}
+.sm-val{text-align:right;font-weight:800;font-size:16px;font-variant-numeric:tabular-nums;line-height:1.1;color:var(--ink)}
+.sm-val small{display:block;font-weight:500;font-size:11.5px;color:var(--muted);font-family:var(--font-mono)}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:12px;color:var(--muted);margin-top:12px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+@media (max-width:560px){.sm-row{grid-template-columns:minmax(0,1fr) 88px}.sm-track{grid-column:1 / -1;grid-row:2}}
+
+/* bar list */
+.bars{display:flex;flex-direction:column;gap:10px}
+.bar-r{display:grid;grid-template-columns:minmax(90px,130px) minmax(0,1fr) auto;gap:10px;align-items:center;font-size:13.5px}
+.bar-r .t{height:10px;background:var(--navy-tint);border-radius:999px;overflow:hidden}
+.bar-r .t i{display:block;height:100%;background:var(--navy);border-radius:999px}
+.bar-r b{font-family:var(--font-mono);font-size:12.5px;font-weight:600;text-align:right;white-space:nowrap}
+
+/* tables */
+.tbl-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+table.tbl{width:100%;border-collapse:collapse;font-size:13.5px}
+.tbl th{background:var(--navy-tint);color:var(--navy);text-align:left;font-weight:700;font-size:12px;padding:11px 12px;border-bottom:2px solid var(--navy);white-space:nowrap;position:sticky;top:0;user-select:none}
+.tbl th.s{cursor:pointer}.tbl th.s:hover{color:var(--orange-deep)}
+.tbl td{padding:9px 12px;border-top:1px solid var(--line);vertical-align:middle}
+.tbl tbody tr:first-child td{border-top:0}
+.tbl .r{text-align:right;white-space:nowrap}
+.tbl td.r{font-family:var(--font-mono);font-size:12.5px;font-weight:600}
+.tbl tr.clk{cursor:pointer}.tbl tr.clk:hover td{background:#F7F9FE}
+.tbl .nm{font-weight:700}.tbl .sub{display:block;color:var(--muted);font-size:11.5px;font-weight:500;font-family:var(--font-mono)}
+.tbl td.empty{text-align:center;color:var(--muted);padding:26px;font-family:var(--font-body)}
+.more{margin-top:10px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;font-size:12.5px;color:var(--muted)}
+
+.badge{display:inline-block;font-size:11.5px;font-weight:700;padding:2px 9px;border-radius:999px;white-space:nowrap}
+.b-LS{background:var(--ok);color:#fff}
+.b-LK{background:var(--ok-bg);color:var(--ok)}
+.b-CL{background:var(--navy-tint);color:var(--navy)}
+.b-SM{background:var(--orange-tint);color:var(--orange-deep)}
+.b-DS{background:var(--bad-bg);color:var(--bad)}
+.b-HB{background:var(--bad);color:#fff}
+
+.btn{border:1px solid var(--line-strong);background:var(--surface);color:var(--navy);border-radius:8px;padding:8px 16px;font-weight:700;font-size:13px;min-height:38px}
+.btn:hover{background:var(--navy-tint);border-color:var(--navy)}
+.btn.primary{background:#0F3192;border-color:#0F3192;color:#fff}
+.btn.primary:hover{background:#0A2470;border-color:#0A2470}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn.danger{color:var(--bad)}
+.btn.danger:hover{background:var(--bad-bg);border-color:var(--bad)}
+.btn.sm{padding:4px 11px;min-height:30px;font-size:12.5px}
+.seg{display:inline-flex;flex-wrap:wrap;gap:3px;background:var(--surface);border:1px solid var(--line-strong);border-radius:9px;padding:3px}
+.seg button{border:0;background:none;padding:6px 13px;border-radius:6px;font-weight:700;font-size:13px;color:var(--muted)}
+.seg button:hover{color:var(--navy)}
+.seg button.on{background:#0F3192;color:#fff}
+.filters{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:14px}
+.filters label{font-weight:700}
+.chart-box{position:relative;height:270px}
+
+.empty-state{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:46px 24px;text-align:center;max-width:640px;margin:20px auto}
+.empty-state h2{margin:0 0 6px;font-size:18px;color:var(--navy);font-weight:800}
+.note{display:flex;gap:10px;background:var(--navy-tint);border:1px solid var(--line-strong);border-left:4px solid var(--orange);border-radius:8px;padding:10px 14px;font-size:13px}
+
+/* admin */
+.drop{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;border:2px dashed var(--line-strong);border-radius:12px;padding:28px 18px;text-align:center;cursor:pointer;background:var(--surface);transition:border-color .15s ease,background .15s ease}
+.drop::before{content:"";width:50px;height:50px;border-radius:50%;margin-bottom:8px;background:var(--navy-tint) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%230F3192' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 16V4'/%3E%3Cpath d='M7 9l5-5 5 5'/%3E%3Cpath d='M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3'/%3E%3C/svg%3E") center/24px no-repeat}
+.drop:hover,.drop.over{border-color:var(--orange);background:var(--orange-tint)}
+.drop b{font-size:15px}
+.drop input{position:absolute;width:1px;height:1px;opacity:0}
+.pend{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+.pend-i{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:12px;align-items:center;border:1px solid var(--line);border-left:4px solid var(--navy);border-radius:8px;padding:10px 14px;background:var(--surface)}
+.pend-i .k{font-weight:700;font-size:11.5px;padding:3px 9px;border-radius:999px;background:var(--navy-tint);color:var(--navy);white-space:nowrap}
+.pend-i .k.dsr{background:var(--navy);color:#fff}
+.pend-i .k.inv{background:var(--orange-tint);color:var(--orange-deep)}
+.pend-i .k.err{background:var(--bad-bg);color:var(--bad)}
+.pend-i .f{font-weight:600;font-family:var(--font-mono);font-size:12.5px;color:var(--navy);overflow-wrap:anywhere}
+.pend-i .d{font-size:12.5px;color:var(--muted)}
+.cov{border-collapse:separate;border-spacing:3px;font-size:11.5px}
+.cov th{font-weight:600;color:var(--muted);text-align:center;padding:0 1px;min-width:20px;font-family:var(--font-mono)}
+.cov th.st{text-align:left;min-width:170px;padding-right:8px;color:var(--ink);font-weight:700;white-space:nowrap;font-family:var(--font-body);font-size:12.5px}
+.cov td{width:20px;height:20px;border-radius:5px;background:var(--navy-tint)}
+.cov td.y{background:var(--navy)}
+.cov td.fut{background:transparent;border:1px dashed var(--line-strong)}
+.cov td.stk{width:auto;background:none;padding-left:8px;white-space:nowrap;color:var(--muted);font-family:var(--font-mono)}
+.row-act{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:14px}
+.tinp{width:100%;min-width:130px;text-align:right;font-family:var(--font-mono)}
+
+/* drawer */
+.ov{position:fixed;inset:0;background:rgba(11,27,74,.45);z-index:60;display:flex;justify-content:flex-end}
+.drawer{background:var(--bg);width:min(740px,100%);height:100%;overflow:auto;padding:calc(18px + env(safe-area-inset-top,0px)) 22px calc(28px + env(safe-area-inset-bottom,0px));box-shadow:-12px 0 32px rgba(11,27,74,.2);border-left:4px solid var(--orange)}
+.drawer .x{float:right}
+.drawer h2{margin:4px 0 2px;font-size:22px;font-weight:800;color:var(--navy);letter-spacing:-.01em}
+.drawer h3{color:var(--ink)}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:#0B1B4A;color:#fff;border-left:4px solid #E46636;padding:10px 16px;border-radius:8px;font-size:13.5px;z-index:70;opacity:0;pointer-events:none;transition:opacity .2s;max-width:90vw}
+.toast.on{opacity:1}
+.loading{padding:60px 0;text-align:center;color:var(--muted)}
+.spin{display:inline-block;width:22px;height:22px;border:3px solid var(--navy-tint);border-top-color:var(--orange);border-radius:50%;animation:sp .9s linear infinite;vertical-align:middle;margin-right:8px}
+@keyframes sp{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.spin{animation-duration:3s}.toast,.brandbar{transition:none}}
+
+/* daily report */
+.rp-top{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.rp-tile{display:flex;align-items:stretch;border-radius:10px;overflow:hidden;border:1px solid var(--line);background:var(--surface)}
+.rp-tile span{background:#0B1B4A;color:#fff;font-weight:700;font-size:13px;line-height:1.25;padding:12px 14px;display:flex;align-items:center;width:46%}
+.rp-tile b{flex:1;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:clamp(26px,3.2vw,36px);letter-spacing:-.02em;font-variant-numeric:tabular-nums;color:var(--orange)}
+.rp-tile b.g{color:var(--ok)} .rp-tile b.y{color:var(--orange)} .rp-tile b.r{color:var(--bad)}
+@media (max-width:760px){.rp-top{grid-template-columns:1fr}}
+.rp-wrap{overflow:auto;border:1px solid var(--line);border-radius:10px;max-height:78vh;background:var(--surface)}
+table.rp{border-collapse:separate;border-spacing:0;font-size:13px;width:100%;min-width:1180px}
+.rp th{background:#0F3192;color:#fff;font-weight:700;font-size:13px;padding:8px 10px;text-align:center;border-right:1px solid rgba(255,255,255,.16);border-bottom:1px solid rgba(255,255,255,.16);position:sticky;top:0;z-index:2;white-space:nowrap}
+.rp thead tr:first-child th{background:#0B1B4A;font-size:13.5px}
+.rp thead tr:nth-child(2) th{top:35px;font-size:12.5px}
+.rp th.s{cursor:pointer}.rp th.s:hover{color:#FFC9B2}
+.rp td{padding:7px 10px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums;white-space:nowrap}
+.rp td.r{text-align:right;font-family:var(--font-mono);font-size:12.5px;font-weight:600}
+.rp td.site{text-align:center;color:var(--muted);font-family:var(--font-mono);font-size:12.5px}
+.rp td.nm{font-weight:700;position:sticky;left:0;background:var(--surface);z-index:1;min-width:240px;white-space:normal}
+.rp th.nmh{position:sticky;left:0;z-index:3}
+.rp td.nm small{display:block;font-weight:600;color:var(--bad);font-size:11px}
+.rp td.st{width:12px;padding:0;border-left:3px solid var(--surface);border-right:3px solid var(--surface)}
+.rp td.st.g{background:var(--ok)} .rp td.st.y{background:var(--yellow)} .rp td.st.r{background:var(--bad)}
+.rp td.dneg{background:var(--bad-bg);color:var(--bad)}
+.rp td.dpos{background:var(--ok-bg);color:var(--ok)}
+.rp td.sep{border-left:2px solid var(--line)}
+.rp tfoot td{background:#0B1B4A;color:#fff;font-weight:800;position:sticky;bottom:0;border-bottom:0}
+.rp tfoot td.dneg,.rp tfoot td.dpos{color:#fff}
+.rp tbody tr:hover td{background:#F7F9FE}
+.rp tr.grp td{background:var(--navy-tint);color:var(--navy);font-weight:800;font-size:13.5px;padding:8px 12px;border-bottom:2px solid var(--navy)}
+.rp tr.grp td span{font-weight:500;color:var(--muted);font-size:12px;margin-left:6px}
+.rp tr.subt td{font-weight:800;background:var(--orange-tint);border-bottom:2px solid var(--line-strong)}
+.rp tr.subt td.nm{background:var(--orange-tint)}
+.rp tr.subt td.dneg{background:var(--bad-bg)}.rp tr.subt td.dpos{background:var(--ok-bg)}
+</style>
+</head>
+<body>
+<div class="credit"><div class="wrap"><span><span class="dot"></span>Monitoring Penjualan <strong>Area Jateng 01</strong></span><span class="ver">PT. Eigerindo MPI &middot; Regional 3</span></div></div>
+<header class="brandbar" id="brandbar">
+  <div class="wrap">
+    <div class="row1">
+      <img src="data:image/png;base64,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" alt="Eigerindo MPI">
+      <span class="sep"></span>
+      <span class="app">Monitoring Penjualan<small>Area Jateng 01, Regional 3</small></span>
+      <span class="data-chip" id="sideFoot"></span>
+    </div>
+    <nav class="nav" id="nav" aria-label="Menu"></nav>
+  </div>
+</header>
+<section class="phead"><div class="wrap">
+  <div><h1 id="pageTitle">Monitoring Penjualan</h1><p id="pageSub"></p></div>
+  <div class="period" id="periodBox"></div>
+</div></section>
+<main class="wrap"><div id="view"><div class="loading"><span class="spin"></span>Memuat data area…</div></div></main>
+<footer><div class="wrap"><span><strong>Monitoring Penjualan Jateng 01</strong> &middot; PT. Eigerindo MPI</span><span>Data diperbarui setiap admin mengunggah Item DSR</span></div></footer>
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script>
+'use strict';
+/* ================= utilitas ================= */
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const nf = new Intl.NumberFormat('id-ID');
+const fmtN = n => nf.format(Math.round(n || 0));
+const fmtRp = n => 'Rp ' + nf.format(Math.round(n || 0));
+function fmtRpS(n) {
+  n = n || 0; const a = Math.abs(n), s = n < 0 ? '-' : '';
+  if (a >= 1e9) return s + 'Rp ' + (a / 1e9).toLocaleString('id-ID', { maximumFractionDigits: 2 }) + ' M';
+  if (a >= 1e6) return s + 'Rp ' + (a / 1e6).toLocaleString('id-ID', { maximumFractionDigits: 1 }) + ' jt';
+  if (a >= 1e3) return s + 'Rp ' + Math.round(a / 1e3).toLocaleString('id-ID') + ' rb';
+  return s + 'Rp ' + nf.format(Math.round(a));
+}
+const fmtPct = (x, d = 1) => (x == null || !isFinite(x)) ? '–' : (x * 100).toLocaleString('id-ID', { maximumFractionDigits: d, minimumFractionDigits: d }) + '%';
+const fmtX = (x, d = 1) => (x == null || !isFinite(x)) ? '–' : x.toLocaleString('id-ID', { maximumFractionDigits: d, minimumFractionDigits: d });
+const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+const MONL = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+const pad = n => String(n).padStart(2, '0');
+const isoOf = dt => dt.getFullYear() + '-' + pad(dt.getMonth() + 1) + '-' + pad(dt.getDate());
+const todayISO = () => isoOf(new Date());
+function addDays(iso, k) { const [y, m, d] = iso.split('-').map(Number); return isoOf(new Date(y, m - 1, d + k)); }
+function addMonths(m, k) { const [y, mm] = m.split('-').map(Number); const dt = new Date(y, mm - 1 + k, 1); return dt.getFullYear() + '-' + pad(dt.getMonth() + 1); }
+function dim(m) { const [y, mm] = m.split('-').map(Number); return new Date(y, mm, 0).getDate(); }
+function dayDiff(a, b) { const p = a.split('-').map(Number), q = b.split('-').map(Number); return Math.round((Date.UTC(q[0], q[1] - 1, q[2]) - Date.UTC(p[0], p[1] - 1, p[2])) / 864e5); }
+const fmtDate = iso => { if (!iso) return '–'; const [y, m, d] = iso.split('-'); return +d + ' ' + MON[+m - 1] + ' ' + y; };
+const fmtDateS = iso => { if (!iso) return '–'; const [, m, d] = iso.split('-'); return +d + ' ' + MON[+m - 1]; };
+const fmtMonth = m => { const [y, mm] = m.split('-'); return MONL[+mm - 1] + ' ' + y; };
+const longer = (a, b) => (!a ? b : !b ? a : (b.length > a.length ? b : a));
+const clone = o => JSON.parse(JSON.stringify(o ?? null));
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+function toast(msg, ms = 2600) { const t = $('#toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('on'), ms); }
+function chipGrowth(x, suffix = '') {
+  if (x == null || !isFinite(x)) return '<span class="chip flat">tanpa pembanding</span>';
+  const cls = x > 0.005 ? 'up' : x < -0.005 ? 'down' : 'flat';
+  return `<span class="chip ${cls}">${x > 0 ? '+' : ''}${fmtPct(x)}${suffix}</span>`;
+}
+const artOf = sku => (/^\d{12}$/.test(sku) ? sku.slice(0, 9) : sku);
+const artName = n => String(n || '').split(',')[0].trim();
+const varName = n => String(n || '').split(',').slice(1).join(',').trim();
+
+/* ================= parser file (Item DSR & Export by Bin) ================= */
+/*PARSE-START*/
+const isDate = v => Object.prototype.toString.call(v) === '[object Date]' && !isNaN(v.getTime());
+const normH = v => String(v ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
+const numV = v => typeof v === 'number' ? v : (v == null || v === '') ? 0 : (Number(String(v).replace(/,/g, '').replace(/[^0-9.\-]/g, '')) || 0);
+function colIdx(h, ...names) { for (const n of names) { const i = h.indexOf(n); if (i >= 0) return i; } return -1; }
+function parseLoc(s) {
+  s = String(s || '').replace(/\s+/g, ' ').trim(); if (!s) return null;
+  const m = s.match(/^(\d{3,6})\s*-\s*(.+)$/);
+  return m ? { code: m[1], name: m[2].trim() } : { code: s.replace(/[^A-Za-z0-9]/g, '').slice(0, 24) || 'X', name: s };
+}
+function parseDateTime(v) {
+  if (isDate(v)) return { d: isoOf(v), t: v.getHours() * 100 + v.getMinutes() };
+  if (typeof v === 'number' && typeof XLSX !== 'undefined') { const p = XLSX.SSF.parse_date_code(v); if (p) return { d: p.y + '-' + pad(p.m) + '-' + pad(p.d), t: (p.H || 0) * 100 + (p.M || 0) }; }
+  const s = String(v ?? '').trim();
+  let m = s.match(/(\d{4})-(\d{1,2})-(\d{1,2})(?:[ T](\d{1,2}):(\d{2}))?/);
+  if (m) return { d: m[1] + '-' + pad(m[2]) + '-' + pad(m[3]), t: m[4] ? (+m[4]) * 100 + (+m[5]) : 0 };
+  m = s.match(/(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})(?:[ T](\d{1,2}):(\d{2}))?/);
+  if (m) return { d: m[3] + '-' + pad(m[2]) + '-' + pad(m[1]), t: m[4] ? (+m[4]) * 100 + (+m[5]) : 0 };
+  return null;
+}
+function dateFromFilename(name) {
+  const m = String(name).match(/(\d{2})(\d{2})(20\d{2})[_\-]\d{4,6}/) || String(name).match(/(\d{2})(\d{2})(20\d{2})/);
+  if (!m) return null; const d = +m[1], mo = +m[2];
+  if (d < 1 || d > 31 || mo < 1 || mo > 12) return null;
+  return m[3] + '-' + pad(mo) + '-' + pad(d);
+}
+function parseWorkbook(buf, fileName) {
+  const wb = XLSX.read(buf, { type: 'array', cellDates: true });
+  for (const sn of wb.SheetNames) {
+    const rows = XLSX.utils.sheet_to_json(wb.Sheets[sn], { header: 1, raw: true, defval: null, blankrows: false });
+    for (let i = 0; i < Math.min(rows.length, 25); i++) {
+      const h = (rows[i] || []).map(normH);
+      if (h.includes('dailyratio') || (h.some(x => x === 'date' || x === 'tanggal') && h.some(x => /ratio|bobot|weight/.test(x)) && !h.includes('orderno'))) return parseWeights(rows, i, h, fileName);
+      if (h.includes('sitecode')) return parseTarget(rows, i, h, fileName);
+      if (h.includes('orderno') && h.includes('skucode')) return parseDSR(rows, i, h, fileName);
+      if (h.includes('bincode') && h.includes('skucode') && h.includes('totalqty')) return parseInv(rows, i, h, fileName);
+    }
+  }
+  throw new Error('Bukan file Item DSR Report, Export by Bin, atau Target (kolom Order No / Bin Code / Site Code tidak ditemukan).');
+}
+function parseDSR(rows, hi, h, fileName) {
+  const C = {
+    o: colIdx(h, 'orderno', 'ordernumber'), dt: colIdx(h, 'orderdate', 'transactiondate'), sku: colIdx(h, 'skucode', 'sku'),
+    name: colIdx(h, 'skuname', 'itemname'), c3: colIdx(h, 'categorylv3', 'categorylevel3'), c4: colIdx(h, 'categorylv4', 'categorylevel4'),
+    loc: colIdx(h, 'location'), q: colIdx(h, 'quantity', 'qty'), sp: colIdx(h, 'salesperson', 'salesman'),
+    g: colIdx(h, 'grossamount', 'grosssales'), n: colIdx(h, 'netamount', 'netsales'), st: colIdx(h, 'billstatus', 'status'), ty: colIdx(h, 'transactiontype', 'type')
+  };
+  if (C.o < 0 || C.dt < 0 || C.sku < 0 || C.q < 0 || (C.n < 0 && C.g < 0)) throw new Error('Kolom wajib Item DSR tidak lengkap (Order No, Order Date, SKU Code, Quantity, Net Amount).');
+  let headLoc = null;
+  for (let i = 0; i < hi; i++) for (const c of rows[i] || []) { const m = String(c ?? '').match(/^\s*Location\s*:\s*(.+)$/i); if (m) headLoc = parseLoc(m[1]); }
+  const stores = {}; let n = 0, skipped = 0, from = null, to = null;
+  for (let i = hi + 1; i < rows.length; i++) {
+    const r = rows[i]; if (!r) continue;
+    const o = r[C.o]; if (o == null || String(o).trim() === '') continue;
+    const st = C.st >= 0 ? String(r[C.st] ?? '') : '';
+    if (/cancel|void|batal/i.test(st)) { skipped++; continue; }
+    const dt = parseDateTime(r[C.dt]); if (!dt) { skipped++; continue; }
+    const loc = (C.loc >= 0 ? parseLoc(r[C.loc]) : null) || headLoc;
+    if (!loc) { skipped++; continue; }
+    const sku = String(r[C.sku] ?? '').trim(); if (!sku) { skipped++; continue; }
+    const S = stores[loc.code] || (stores[loc.code] = { code: loc.code, name: loc.name, lines: [], meta: {} });
+    const g = C.g >= 0 ? numV(r[C.g]) : numV(r[C.n]);
+    const net = C.n >= 0 ? numV(r[C.n]) : g;
+    S.lines.push({ d: dt.d, o: String(o).trim(), t: dt.t, sku, q: numV(r[C.q]), g, n: net, sp: C.sp >= 0 ? String(r[C.sp] ?? '').trim() : '', ty: C.ty >= 0 ? String(r[C.ty] ?? '').trim() : '' });
+    if (!S.meta[sku]) S.meta[sku] = [String(r[C.name] ?? '').trim(), C.c3 >= 0 ? String(r[C.c3] ?? '').trim() : '', C.c4 >= 0 ? String(r[C.c4] ?? '').trim() : ''];
+    if (!from || dt.d < from) from = dt.d; if (!to || dt.d > to) to = dt.d; n++;
+  }
+  if (!n) throw new Error('Tidak ada baris transaksi yang bisa dibaca di file ini.');
+  return { kind: 'DSR', file: fileName, stores, rows: n, skipped, from, to };
+}
+function parseInv(rows, hi, h, fileName) {
+  const C = {
+    name: colIdx(h, 'skuname', 'itemname'), sku: colIdx(h, 'skucode', 'sku'), zone: colIdx(h, 'zonecode', 'zone'),
+    c2: colIdx(h, 'mclv2'), c3: colIdx(h, 'mclv3', 'categorylv3'), c4: colIdx(h, 'mclv4', 'categorylv4'),
+    cat: colIdx(h, 'bincategory'), tq: colIdx(h, 'totalqty', 'totalquantity'), loc: colIdx(h, 'location')
+  };
+  if (C.sku < 0 || C.tq < 0 || C.loc < 0) throw new Error('Kolom wajib Export by Bin tidak lengkap (SKU Code, Total Qty, Location).');
+  const clean = v => { const s = String(v ?? '').trim(); return /^\d+$/.test(s) ? '' : s; };
+  const stores = {}; let n = 0, damaged = 0;
+  for (let i = hi + 1; i < rows.length; i++) {
+    const r = rows[i]; if (!r) continue;
+    const sku = String(r[C.sku] ?? '').trim(); if (!sku) continue;
+    const zone = C.zone >= 0 ? String(r[C.zone] ?? '') : '';
+    const cat = C.cat >= 0 ? String(r[C.cat] ?? '') : '';
+    if (/damage/i.test(cat) || /damage/i.test(zone)) { damaged++; continue; }
+    const loc = parseLoc(r[C.loc]); if (!loc) continue;
+    const S = stores[loc.code] || (stores[loc.code] = { code: loc.code, name: loc.name, items: {}, meta: {}, pcs: 0 });
+    const q = numV(r[C.tq]);
+    const e = S.items[sku] || (S.items[sku] = [0, 0, 0]);
+    e[0] += q; if (/sales|pos|display/i.test(zone)) e[1] += q; else e[2] += q;
+    S.pcs += q;
+    if (!S.meta[sku]) S.meta[sku] = [String(r[C.name] ?? '').trim(), clean(r[C.c3]), clean(r[C.c4]), clean(r[C.c2])];
+    n++;
+  }
+  if (!n) throw new Error('Tidak ada baris stok yang bisa dibaca di file ini.');
+  return { kind: 'INV', file: fileName, stores, rows: n, damaged, date: dateFromFilename(fileName) || todayISO(), dateFromName: !!dateFromFilename(fileName) };
+}
+const MON_KEY = { jan: 1, feb: 2, mar: 3, apr: 4, may: 5, mei: 5, jun: 6, jul: 7, aug: 8, agu: 8, agt: 8, sep: 9, oct: 10, okt: 10, nov: 11, dec: 12, des: 12 };
+function parseMonthCell(v) {
+  if (isDate(v)) { const d = new Date(v.getTime() + 12 * 3600e3); return d.getFullYear() + '-' + pad(d.getMonth() + 1); }
+  if (typeof v === 'number' && v > 20000 && v < 80000 && typeof XLSX !== 'undefined') { const p = XLSX.SSF.parse_date_code(v); if (p) return p.y + '-' + pad(p.m); }
+  const s = String(v ?? '').trim().toLowerCase();
+  let m = s.match(/^([a-z]{3})[a-z]*[\s\-'\/.]*(\d{2}|\d{4})$/);
+  if (m && MON_KEY[m[1]]) { let y = +m[2]; if (y < 100) y += 2000; return y + '-' + pad(MON_KEY[m[1]]); }
+  m = s.match(/^(\d{4})-(\d{1,2})(-\d{1,2})?/); if (m && +m[2] >= 1 && +m[2] <= 12) return m[1] + '-' + pad(m[2]);
+  return null;
+}
+const TGT_COLS = ['offline', 'ea', 'wab', 'eiger', 'outlive', 'total'];
+const TGT_LABEL = { offline: 'Offline', ea: 'EA', wab: 'WAB', eiger: 'Eiger', outlive: 'Outlive', total: 'Total' };
+function parseTarget(rows, hi, h, fileName) {
+  const cCode = h.indexOf('sitecode'), cName = h.indexOf('sitename');
+  let sr = -1;
+  for (let i = hi; i <= Math.min(hi + 3, rows.length - 1); i++) { const hh = (rows[i] || []).map(normH); if (hh.some(x => TGT_COLS.includes(x))) { sr = i; break; } }
+  if (sr < 0) throw new Error('Kolom target (Offline / EA / Eiger / Total) tidak ditemukan.');
+  const sub = (rows[sr] || []).map(normH);
+  const top = Math.max(0, hi - 3);
+  const width = Math.max(sub.length, ...rows.slice(top, sr + 1).map(r => (r || []).length));
+  const monthAt = new Array(width).fill(null);
+  for (let i = top; i <= sr; i++) { let cur = null; const r = rows[i] || []; for (let c = 0; c < width; c++) { const m = parseMonthCell(r[c]); if (m) cur = m; if (cur && !monthAt[c] && c > cCode) monthAt[c] = cur; } }
+  const cols = []; sub.forEach((x, c) => { if (TGT_COLS.includes(x)) cols.push({ c, k: x, m: monthAt[c] || '?' }); });
+  const data = {}, names = {}; let n = 0;
+  for (let i = sr + 1; i < rows.length; i++) {
+    const r = rows[i] || []; const code = String(r[cCode] ?? '').trim();
+    if (!/^\d{3,6}$/.test(code)) continue;
+    names[code] = cName >= 0 ? String(r[cName] ?? '').replace(/\s+/g, ' ').trim() : '';
+    for (const x of cols) { const md = data[x.m] || (data[x.m] = {}); const o = md[code] || (md[code] = {}); o[x.k] = (o[x.k] || 0) + numV(r[x.c]); }
+    n++;
+  }
+  if (!n) throw new Error('Tidak ada baris toko (Site Code) di file target.');
+  return { kind: 'TGT', file: fileName, data, names, rows: n, needMonth: !!data['?'] };
+}
+function parseWeights(rows, hi, h, fileName) {
+  const cD = h.findIndex(x => x === 'date' || x === 'tanggal');
+  let cR = h.indexOf('dailyratio'); if (cR < 0) cR = h.findIndex(x => /ratio|bobot|weight/.test(x) && !/cum/.test(x));
+  if (cD < 0 || cR < 0) throw new Error('Kolom Date dan Daily Ratio tidak ditemukan.');
+  const raw = [];
+  for (let i = hi + 1; i < rows.length; i++) { const r = rows[i] || []; const v = r[cD], x = r[cR]; if (v == null || v === '' || x == null || x === '') continue; raw.push([v, x]); }
+  const toD = (v, mdy) => {
+    if (isDate(v)) { const d = new Date(v.getTime() + 12 * 3600e3); return [d.getFullYear(), d.getMonth() + 1, d.getDate()]; }
+    if (typeof v === 'number' && v > 20000 && typeof XLSX !== 'undefined') { const p = XLSX.SSF.parse_date_code(v); return p ? [p.y, p.m, p.d] : null; }
+    const s = String(v).trim(); let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/); if (m) return [+m[1], +m[2], +m[3]];
+    m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})/); if (m) return mdy ? [+m[3], +m[1], +m[2]] : [+m[3], +m[2], +m[1]];
+    return null;
+  };
+  const tryFmt = mdy => {
+    const out = []; for (const [v, x] of raw) { if (typeof v === 'string' && !/\d/.test(v)) continue; const d = toD(v, mdy); if (!d || d[1] < 1 || d[1] > 12 || d[2] < 1 || d[2] > 31) return null; out.push([d, x]); }
+    if (!out.length) return null;
+    const ms = new Set(out.map(([d]) => d[0] + '-' + pad(d[1]))); if (ms.size !== 1) return null;
+    const m = [...ms][0]; if (out.some(([d]) => d[2] > dim(m))) return null;
+    if (new Set(out.map(([d]) => d[2])).size !== out.length) return null;
+    return { m, out };
+  };
+  const res = tryFmt(true) || tryFmt(false);
+  if (!res) throw new Error('Tanggal di file bobot harus berada dalam satu bulan yang sama.');
+  const val = x => typeof x === 'number' ? x : /%/.test(String(x)) ? numV(x) / 100 : numV(x);
+  const w = {}; let sum = 0; for (const [d, x] of res.out) { const v = Math.max(0, val(x)); w[d[2]] = v; sum += v; }
+  if (!sum) throw new Error('Nilai Daily Ratio kosong.');
+  const scale = sum > 1.5 ? 100 : 1; const rawSum = sum / scale;
+  for (const k in w) w[k] = w[k] / sum;
+  return { kind: 'WGT', file: fileName, month: res.m, w, days: res.out.length, rawSum };
+}
+function basisVal(o, b) {
+  if (!o) return 0;
+  const eiger = o.eiger != null ? o.eiger : (o.offline || 0) + (o.ea || 0) + (o.wab || 0);
+  if (b === 'eiger') return eiger;
+  if (b === 'total') return o.total != null ? o.total : eiger + (o.outlive || 0);
+  return o.offline || 0;
+}
+/* encode penjualan satu toko-bulan ke beberapa dokumen (maks ~200 KB) */
+function encodeSalesParts(code, month, days, meta) {
+  const parts = []; let cur, size, spM, tyM;
+  const start = () => { cur = { store: code, m: month, p: parts.length, days: {}, sku: {}, sp: [], ty: [] }; spM = new Map(); tyM = new Map(); size = 300; parts.push(cur); };
+  const ix = (map, arr, v) => { let i = map.get(v); if (i == null) { i = arr.length; arr.push(v); map.set(v, i); size += JSON.stringify(v).length + 1; } return i; };
+  start();
+  for (const dd of Object.keys(days).map(Number).sort((a, b) => a - b)) {
+    for (const l of days[dd]) {
+      const est = 70 + (cur.sku[l.sku] ? 0 : 90);
+      if (size + est > 190000 && Object.keys(cur.days).length) start();
+      if (!cur.sku[l.sku]) { const mt = meta[l.sku] || ['', '', '']; cur.sku[l.sku] = mt; size += JSON.stringify(mt).length + l.sku.length + 4; }
+      const row = [l.o, l.t, l.sku, l.q, l.g, l.n, ix(spM, cur.sp, l.sp || ''), ix(tyM, cur.ty, l.ty || '')];
+      (cur.days[dd] || (cur.days[dd] = [])).push(row);
+      size += JSON.stringify(row).length + 1;
+    }
+  }
+  return parts;
+}
+function decodeSalesPart(b) {
+  const out = [];
+  for (const dd in b.days) {
+    const d = b.m + '-' + pad(+dd);
+    for (const r of b.days[dd]) out.push({ s: b.store, d, o: r[0], t: r[1], sku: r[2], q: r[3], g: r[4], n: r[5], sp: b.sp[r[6]] || '', ty: b.ty[r[7]] || '' });
+  }
+  return out;
+}
+function encodeStockParts(code, date, items, meta) {
+  const parts = []; let cur, size;
+  const start = () => { cur = { store: code, date, p: parts.length, items: {}, sku: {} }; size = 200; parts.push(cur); };
+  start();
+  for (const sku of Object.keys(items)) {
+    const e = items[sku], mt = meta[sku] || ['', '', '', ''];
+    const add = JSON.stringify(e).length + JSON.stringify(mt).length + sku.length * 2 + 10;
+    if (size + add > 190000) start();
+    cur.items[sku] = e; cur.sku[sku] = mt; size += add;
+  }
+  return parts;
+}
+/*PARSE-END*/
+
+/* ================= state ================= */
+const App = {
+  db: null, user: null, admin: false,
+  index: { sales: {}, stock: {} }, stores: {}, targets: {}, tgtDetail: {}, tgtBasis: 'total', weights: {}, log: [],
+  lines: [], loaded: new Set(), sku: {}, stock: {}, lastDate: null, cache: {},
+  page: 'area', period: { mode: 'mtd' },
+  ui: { store: '', sorts: {}, more: {}, prodQ: '', prodC3: '', prodStore: '', stTab: 'sum', stStore: '', stStatus: '', stQ: '', trQ: '', trStore: '', admMonth: '', tgtMonth: '' },
+  pending: [], charts: [], tables: {}
+};
+const HEALTH = {
+  LS: { label: 'Laku sekali', desc: 'stok cukup ≤ 1 bulan' },
+  LK: { label: 'Laku', desc: 'stok cukup 1–2 bulan' },
+  CL: { label: 'Cukup laku', desc: 'stok cukup 2–4 bulan' },
+  SM: { label: 'Slow moving', desc: 'stok cukup > 4 bulan' },
+  DS: { label: 'Dead stock', desc: 'ada stok, tidak terjual 90 hari' },
+  HB: { label: 'Stok habis', desc: 'terjual 90 hari, stok 0' }
+};
+const HKEYS = ['LS', 'LK', 'CL', 'SM', 'DS', 'HB'];
+const badge = k => k ? `<span class="badge b-${k}">${HEALTH[k].label}</span>` : '<span class="muted">–</span>';
+const WINDOW = 90, TARGET_COVER = 2;
+
+/* ================= database ================= */
+async function withRetry(fn) {
+  for (let i = 0; ; i++) {
+    try { return await fn(); }
+    catch (e) {
+      if (i >= 3 || !['unavailable', 'resource_exhausted'].includes(e && e.code)) throw e;
+      await sleep(900 * (i + 1) + Math.random() * 500);
+    }
+  }
+}
+const metaDoc = id => App.db.doc('meta/' + id);
+async function loadAll() {
+  const g = id => withRetry(() => metaDoc(id).get());
+  const [ix, st, tg, lg, wg] = await Promise.all(['index', 'stores', 'targets', 'log', 'weights'].map(g));
+  App.weights = wg.exists ? (clone(wg.data()).byMonth || {}) : {};
+  App.index = ix.exists ? clone(ix.data()) : {}; App.index.sales = App.index.sales || {}; App.index.stock = App.index.stock || {};
+  App.stores = st.exists ? (clone(st.data()).list || {}) : {};
+  const TG = tg.exists ? clone(tg.data()) : {};
+  App.targets = TG.byMonth || {}; App.tgtDetail = TG.detail || {}; App.tgtBasis = TG.basis || 'total';
+  App.log = lg.exists ? (clone(lg.data()).items || []) : [];
+  App.lines = []; App.loaded = new Set(); App.sku = {}; App.stock = {}; App.cache = {};
+  computeLastDate();
+  await loadStock();
+  const months = Object.keys(App.index.sales).sort();
+  if (months.length) { const last = months[months.length - 1]; for (const m of months.filter(m => m >= addMonths(last, -3))) await loadMonth(m); }
+}
+function computeLastDate() {
+  let L = null;
+  for (const m in App.index.sales) for (const c in App.index.sales[m]) { const d = App.index.sales[m][c].d || []; if (d.length) { const iso = m + '-' + pad(Math.max(...d)); if (!L || iso > L) L = iso; } }
+  App.lastDate = L;
+}
+function mergeSku(dict) { for (const k in dict) { const v = dict[k]; const o = App.sku[k]; if (!o || (o.length < v.length) || (!o[0] && v[0])) App.sku[k] = v; } }
+async function loadStock() {
+  const snap = await withRetry(() => App.db.collection('stock').limit(1000).get());
+  for (const d of snap.docs) {
+    const b = d.data(); const ix = App.index.stock[b.store];
+    if (!ix || b.date !== ix.date || b.p >= ix.p) continue;
+    const S = App.stock[b.store] || (App.stock[b.store] = { date: b.date, items: {} });
+    Object.assign(S.items, b.items); mergeSku(b.sku);
+  }
+}
+async function loadMonth(m) {
+  if (App.loaded.has(m) || !App.index.sales[m]) return;
+  const snap = await withRetry(() => App.db.collection('sales').where('m', '==', m).limit(1000).get());
+  for (const d of snap.docs) {
+    const b = d.data(); const ix = App.index.sales[m][b.store];
+    if (!ix || b.p >= ix.p) continue;
+    mergeSku(b.sku);
+    for (const l of decodeSalesPart(b)) App.lines.push(l);
+  }
+  App.loaded.add(m); App.cache = {};
+}
+async function ensureMonths(from, to) {
+  if (!from || !to) return;
+  let m = from.slice(0, 7); const end = to.slice(0, 7); const need = [];
+  while (m <= end) { if (App.index.sales[m] && !App.loaded.has(m)) need.push(m); m = addMonths(m, 1); }
+  for (const x of need) await loadMonth(x);
+}
+
+/* ================= turunan data ================= */
+const isPB = sku => /PAPER\s*BAG|SHOPPING\s*BAG|TAS\s*BELANJA/i.test((App.sku[sku] || [''])[0]);
+function storeCodes() {
+  const set = new Set(Object.keys(App.stores));
+  for (const m in App.index.sales) for (const c in App.index.sales[m]) set.add(c);
+  for (const c in App.index.stock) set.add(c);
+  return [...set].sort((a, b) => sName(a).localeCompare(sName(b), 'id'));
+}
+const shortName = n => String(n || '').replace(/\s+/g, ' ').replace(/^EIGER\s+((Adventure|Adv\.?)\s+)?Store\s*/i, '').replace(/^EIGER\s+/i, '').trim() || n;
+const sName = c => { const s = App.stores[c]; return (s && s.alias) || shortName(s && s.name) || c; };
+function lastDateOf(c) {
+  let L = null;
+  for (const m in App.index.sales) { const x = App.index.sales[m][c]; if (x && x.d && x.d.length) { const iso = m + '-' + pad(Math.max(...x.d)); if (!L || iso > L) L = iso; } }
+  return L;
+}
+function coverDays(c, from, to) {
+  let n = 0;
+  for (const m in App.index.sales) { const x = App.index.sales[m][c]; if (!x) continue; for (const d of x.d || []) { const iso = m + '-' + pad(d); if (iso >= from && iso <= to) n++; } }
+  return n;
+}
+const autoType = c => /^9/.test(c) ? 'bz' : /^[257]/.test(c) ? 'rg' : 'ot';
+const sType = c => (App.stores[c] && App.stores[c].type) || autoType(c);
+const TYPE_LABEL = { rg: 'Reguler', bz: 'Bazaar', ot: 'Lainnya' };
+const typeOk = c => !App.ui.typeF || sType(c) === App.ui.typeF;
+const activeStores = () => storeCodes().filter(typeOk);
+const hasTypes = () => new Set(storeCodes().map(sType)).size > 1;
+const linesIn = (from, to, store) => App.lines.filter(l => l.d >= from && l.d <= to && (store ? l.s === store : typeOk(l.s)));
+function agg(lines) {
+  const mk = () => ({ n: 0, g: 0, q: 0, trx: new Set() });
+  const by = new Map(), tot = mk();
+  for (const l of lines) {
+    let s = by.get(l.s); if (!s) by.set(l.s, s = mk());
+    s.n += l.n; s.g += l.g; tot.n += l.n; tot.g += l.g;
+    if (!isPB(l.sku)) { s.q += l.q; tot.q += l.q; }
+    if (l.q > 0) { s.trx.add(l.d + '|' + l.o); tot.trx.add(l.s + '|' + l.d + '|' + l.o); }
+  }
+  return { by, tot };
+}
+const statOf = a => ({ n: a ? a.n : 0, g: a ? a.g : 0, q: a ? a.q : 0, trx: a ? a.trx.size : 0, atv: a && a.trx.size ? a.n / a.trx.size : null, upt: a && a.trx.size ? a.q / a.trx.size : null });
+function stockByArt(c) {
+  const k = 'sba' + c; if (App.cache[k]) return App.cache[k];
+  const m = new Map(); const S = App.stock[c];
+  if (S) for (const sku in S.items) { if (isPB(sku)) continue; const e = S.items[sku], a = artOf(sku); const x = m.get(a) || { t: 0, sa: 0, wh: 0 }; x.t += e[0]; x.sa += e[1]; x.wh += e[2]; m.set(a, x); }
+  return (App.cache[k] = m);
+}
+const stockPcs = c => { const S = App.stock[c]; if (!S) return null; let t = 0; for (const k in S.items) if (!isPB(k)) t += S.items[k][0]; return t; };
+function artInfo(a) {
+  const k = 'ai'; if (!App.cache[k]) {
+    const m = new Map();
+    for (const sku in App.sku) { const v = App.sku[sku]; const ar = artOf(sku); const o = m.get(ar); if (!o || (!o.c2 && v[3])) m.set(ar, { name: artName(v[0]) || ar, c3: v[1] || 'LAINNYA', c4: v[2] || '', c2: v[3] || '' }); }
+    App.cache[k] = m;
+  }
+  return App.cache[k].get(a) || { name: a, c3: 'LAINNYA', c4: '', c2: '' };
+}
+/* target */
+const monthTarget = (c, m) => (App.targets[m] && +App.targets[m][c]) || 0;
+const wOf = m => { const W = App.weights[m]; return W && Object.keys(W).length ? W : null; };
+function dayWeight(iso) { const m = iso.slice(0, 7), W = wOf(m); return W ? (W[+iso.slice(8)] || 0) : 1 / dim(m); }
+function cumWeight(m, day) { let t = 0; for (let d = 1; d <= day; d++) t += dayWeight(m + '-' + pad(d)); return Math.min(1, t); }
+function proratedTarget(c, from, to) {
+  let t = 0;
+  for (let d = from; d <= to; d = addDays(d, 1)) t += monthTarget(c, d.slice(0, 7)) * dayWeight(d);
+  return t;
+}
+/* kesehatan stok per toko per artikel */
+function health() {
+  if (App.cache.health) return App.cache.health;
+  const L = App.lastDate; const res = { from: L ? addDays(L, -(WINDOW - 1)) : null, to: L, stores: {} };
+  if (!L) return (App.cache.health = res);
+  const qty = new Map();
+  for (const l of App.lines) { if (l.d < res.from || l.d > L || isPB(l.sku)) continue; const k = l.s + '|' + artOf(l.sku); qty.set(k, (qty.get(k) || 0) + l.q); }
+  for (const c of storeCodes()) {
+    const days = coverDays(c, res.from, L);
+    const H = { days, items: new Map(), count: {}, stock: {}, hasStock: !!App.stock[c] };
+    HKEYS.forEach(k => { H.count[k] = 0; H.stock[k] = 0; });
+    const st = stockByArt(c); const arts = new Set(st.keys());
+    for (const k of qty.keys()) if (k.startsWith(c + '|')) arts.add(k.slice(c.length + 1));
+    for (const a of arts) {
+      const q = qty.get(c + '|' + a) || 0; const s = st.get(a) || { t: 0, sa: 0, wh: 0 };
+      const rate = days > 0 ? q / days * 30 : 0;
+      let k = null, cover = null;
+      if (!H.hasStock) { k = null; }
+      else if (s.t <= 0) { if (q > 0) k = 'HB'; }
+      else if (q <= 0) k = 'DS';
+      else { cover = s.t / rate; k = cover <= 1 ? 'LS' : cover <= 2 ? 'LK' : cover <= 4 ? 'CL' : 'SM'; }
+      const it = { art: a, q, rate, stock: s.t, sa: s.sa, wh: s.wh, cover, k };
+      H.items.set(a, it);
+      if (k) { H.count[k]++; H.stock[k] += Math.max(0, s.t); }
+    }
+    res.stores[c] = H;
+  }
+  return (App.cache.health = res);
+}
+function transfers() {
+  if (App.cache.tr) return App.cache.tr;
+  const H = health(); const byArt = new Map();
+  for (const c in H.stores) { const S = H.stores[c]; if (!S.hasStock || S.days < 14) continue; for (const it of S.items.values()) { if (!byArt.has(it.art)) byArt.set(it.art, []); byArt.get(it.art).push({ c, ...it }); } }
+  const out = [];
+  for (const [a, list] of byArt) {
+    const need = list.filter(x => (x.k === 'HB' || x.k === 'LS') && x.rate >= 0.5).map(x => ({ ...x, want: Math.ceil(TARGET_COVER * x.rate - Math.max(0, x.stock)) })).filter(x => x.want > 0).sort((p, q) => q.rate - p.rate);
+    if (!need.length) continue;
+    const give = list.filter(x => x.stock > 1 && (x.k === 'DS' || x.k === 'SM')).map(x => ({ ...x, ex: Math.floor(x.stock - TARGET_COVER * x.rate - 1) })).filter(x => x.ex > 0).sort((p, q) => q.ex - p.ex);
+    for (const n of need) for (const g of give) {
+      if (n.want <= 0) break; if (g.ex <= 0 || g.c === n.c) continue;
+      const qty = Math.min(n.want, g.ex); n.want -= qty; g.ex -= qty;
+      out.push({ art: a, name: artInfo(a).name, c3: artInfo(a).c3, from: g.c, fromK: g.k, fromStock: g.stock, to: n.c, toK: n.k, toStock: n.stock, toRate: n.rate, qty });
+    }
+  }
+  out.sort((p, q) => q.qty - p.qty);
+  return (App.cache.tr = out);
+}
+
+/* ================= periode ================= */
+function periodRange() {
+  const L = App.lastDate, p = App.period; let r;
+  if (p.mode === 'day') { const d = p.day || L; r = { from: d, to: d, cfrom: addDays(d, -7), cto: addDays(d, -7), label: fmtDate(d), cmpLabel: 'hari yang sama minggu lalu', monthMode: false }; }
+  else if (p.mode === 'month' && p.month && p.month !== L.slice(0, 7)) {
+    const m = p.month; const pm = addMonths(m, -1);
+    r = { from: m + '-01', to: m + '-' + pad(dim(m)), cfrom: pm + '-01', cto: pm + '-' + pad(dim(pm)), label: fmtMonth(m), cmpLabel: 'bulan sebelumnya', monthMode: true, month: m, pace: 1, elapsed: dim(m) };
+  } else if (p.mode === 'range' && p.from && p.to) {
+    const a = p.from <= p.to ? p.from : p.to, b = p.from <= p.to ? p.to : p.from; const n = dayDiff(a, b) + 1;
+    r = { from: a, to: b, cfrom: addDays(a, -n), cto: addDays(a, -1), label: fmtDate(a) + ' – ' + fmtDate(b), cmpLabel: n + ' hari sebelumnya', monthMode: false };
+  } else {
+    const m = L.slice(0, 7), day = +L.slice(8), pm = addMonths(m, -1);
+    r = { from: m + '-01', to: L, cfrom: pm + '-01', cto: pm + '-' + pad(Math.min(day, dim(pm))), label: 'Bulan berjalan, ' + fmtMonth(m), cmpLabel: 'tanggal yang sama bulan lalu', monthMode: true, month: m, pace: cumWeight(m, day), elapsed: day };
+  }
+  return r;
+}
+const targetFor = (c, R) => R.monthMode ? monthTarget(c, R.month) : proratedTarget(c, R.from, R.to);
+
+/* ================= shell ================= */
+const ICON = {
+  area: '<path d="M3 20h18M5 20V10m5 10V4m5 16v-7m5 7V8"/>',
+  report: '<path d="M6 3h9l4 4v14H6zM14 3v5h5M9 12h7M9 16h7M9 8h3"/>',
+  toko: '<path d="M4 10h16l-1.5-5h-13zM5 10v10h14V10M9 20v-5h6v5"/>',
+  produk: '<path d="M4 8l8-4 8 4-8 4zM4 8v8l8 4 8-4V8M12 12v8"/>',
+  stok: '<path d="M12 21s-7-4.5-7-10.5A4.5 4.5 0 0 1 12 7a4.5 4.5 0 0 1 7 3.5C19 16.5 12 21 12 21z"/>',
+  admin: '<path d="M12 3v12m0-12l-4 4m4-4l4 4M4 17v3h16v-3"/>'
+};
+const PAGES = [['area', 'Ringkasan area'], ['report', 'Monitoring sales'], ['toko', 'Per toko'], ['produk', 'Produk'], ['stok', 'Kesehatan stok'], ['admin', 'Kelola data']];
+function renderNav() {
+  $('#nav').innerHTML = PAGES.filter(p => p[0] !== 'admin' || App.admin).map(([k, l]) => `<button data-go="${k}" class="${App.page === k ? 'on' : ''}"><svg viewBox="0 0 24 24" aria-hidden="true">${ICON[k]}</svg>${l}</button>`).join('');
+  const L = App.lastDate;
+  $('#sideFoot').innerHTML = `<span>${storeCodes().length} site · data s/d ${L ? fmtDate(L) : '–'}</span><button id="reloadBtn">Muat ulang</button>`;
+}
+function renderPeriod() {
+  const box = $('#periodBox');
+  const tsel = hasTypes() && App.page !== 'toko' ? `<label class="small muted" for="typeSel">Jenis toko</label><select id="typeSel" class="inp"><option value="">Semua toko</option>${['rg', 'bz', 'ot'].filter(t => storeCodes().some(c => sType(c) === t)).map(t => `<option value="${t}" ${App.ui.typeF === t ? 'selected' : ''}>${TYPE_LABEL[t]}</option>`).join('')}</select>` : '';
+  if (!App.lastDate || App.page === 'admin') { box.innerHTML = ''; return; }
+  if (App.page === 'report') { box.innerHTML = tsel; return; }
+  const L = App.lastDate, cm = L.slice(0, 7);
+  const months = Object.keys(App.index.sales).sort().reverse().filter(m => m !== cm);
+  const p = App.period;
+  const val = p.mode === 'day' ? 'day' : p.mode === 'month' && p.month !== cm ? 'month:' + p.month : p.mode === 'range' ? 'range' : 'mtd';
+  box.innerHTML = `<label class="small muted" for="perSel">Periode</label>
+    <select id="perSel" class="inp">
+      <option value="day" ${val === 'day' ? 'selected' : ''}>Hari terakhir (${fmtDateS(L)})</option>
+      <option value="mtd" ${val === 'mtd' ? 'selected' : ''}>Bulan berjalan (${fmtMonth(cm)})</option>
+      ${months.map(m => `<option value="month:${m}" ${val === 'month:' + m ? 'selected' : ''}>${fmtMonth(m)}</option>`).join('')}
+      <option value="range" ${val === 'range' ? 'selected' : ''}>Rentang tanggal…</option>
+    </select>
+    ${val === 'range' ? `<input type="date" id="rFrom" class="inp" value="${esc(p.from || cm + '-01')}"><input type="date" id="rTo" class="inp" value="${esc(p.to || L)}">` : ''}${tsel}`;
+}
+async function onPeriodChange() {
+  const v = $('#perSel').value;
+  if (v === 'day') App.period = { mode: 'day', day: App.lastDate };
+  else if (v === 'mtd') App.period = { mode: 'mtd' };
+  else if (v.startsWith('month:')) App.period = { mode: 'month', month: v.slice(6) };
+  else App.period = { mode: 'range', from: ($('#rFrom') || {}).value || App.lastDate.slice(0, 7) + '-01', to: ($('#rTo') || {}).value || App.lastDate };
+  await refreshForPeriod();
+}
+async function refreshForPeriod() {
+  const R = periodRange();
+  $('#view').innerHTML = '<div class="loading"><span class="spin"></span>Mengambil data periode…</div>';
+  try { await ensureMonths(R.cfrom, R.to); } catch (e) { toast('Gagal memuat sebagian data: ' + (e.message || e.code)); }
+  render();
+}
+
+function destroyCharts() { App.charts.forEach(c => { try { c.destroy(); } catch (e) { } }); App.charts = []; }
+function setHead(t, sub) { $('#pageTitle').textContent = t; $('#pageSub').textContent = sub || ''; }
+function render() {
+  destroyCharts(); App.tables = {};
+  renderNav(); renderPeriod();
+  const view = $('#view');
+  if (!App.lastDate && App.page !== 'admin' && !Object.keys(App.index.stock).length) {
+    setHead('Monitoring Penjualan Jateng 01', '');
+    view.innerHTML = `<div class="empty-state"><h2>Belum ada data di dashboard</h2><p class="muted">${App.admin ? 'Upload file Item DSR Report dan Export by Bin dari semua toko di halaman Kelola data. Setelah tersimpan, semua orang yang membuka link ini langsung melihat datanya tanpa upload.' : 'Admin area belum mengunggah data. Coba buka lagi nanti.'}</p>${App.admin ? '<button class="btn primary" data-go="admin">Buka Kelola data</button>' : ''}</div>`;
+    return;
+  }
+  if (!App.lastDate && App.page !== 'admin' && App.page !== 'stok') { App.page = 'stok'; }
+  const fn = { area: pageArea, report: pageReport, toko: pageStore, produk: pageProduct, stok: pageStock, admin: pageAdmin }[App.page] || pageArea;
+  try { fn(view); } catch (e) { console.error(e); view.innerHTML = `<div class="empty-state"><h2>Halaman gagal ditampilkan</h2><p class="muted">${esc(e.message)}</p></div>`; }
+}
+
+/* ================= komponen ================= */
+function tbl(id, o) {
+  const st = App.ui.sorts[id] || (App.ui.sorts[id] = o.sort ? { ...o.sort } : null);
+  let rs = o.rows.slice();
+  if (st) {
+    const c = o.cols.find(c => c.k === st.k); const get = (c && c.v) || (r => r[st.k]);
+    rs.sort((a, b) => { const x = get(a), y = get(b); let r; if (typeof x === 'string' || typeof y === 'string') r = String(x ?? '').localeCompare(String(y ?? ''), 'id'); else r = (x ?? -Infinity) - (y ?? -Infinity); return st.dir === 'asc' ? r : -r; });
+  }
+  const lim = App.ui.more[id] || o.limit || 25; const shown = rs.slice(0, lim);
+  App.tables[id] = { rows: shown, onRow: o.onRow };
+  const head = o.cols.map(c => `<th class="${c.r ? 'r' : ''} ${c.ns ? '' : 's'}" ${c.ns ? '' : `data-sort="${id}|${c.k}"`}>${esc(c.label)}${st && st.k === c.k ? (st.dir === 'asc' ? ' ▲' : ' ▼') : ''}</th>`).join('');
+  const body = shown.length ? shown.map((r, i) => `<tr data-row="${id}|${i}" class="${o.onRow ? 'clk' : ''}">${o.cols.map(c => `<td class="${c.r ? 'r' : ''}">${c.h ? c.h(r) : esc(r[c.k])}</td>`).join('')}</tr>`).join('') : `<tr><td class="empty" colspan="${o.cols.length}">${esc(o.empty || 'Tidak ada data untuk periode ini.')}</td></tr>`;
+  const more = rs.length > lim ? `<div class="more">Menampilkan ${fmtN(lim)} dari ${fmtN(rs.length)} baris <button class="btn sm" data-more="${id}|${lim + 50}">Tampilkan 50 lagi</button><button class="btn sm" data-more="${id}|${rs.length}">Tampilkan semua</button></div>` : (rs.length > 8 ? `<div class="more">${fmtN(rs.length)} baris</div>` : '');
+  return `<div class="tbl-wrap"><table class="tbl"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div>${more}`;
+}
+function barList(items, fmt = fmtRpS) {
+  const max = Math.max(...items.map(x => x.v), 1); const tot = items.reduce((s, x) => s + Math.max(0, x.v), 0) || 1;
+  return `<div class="bars">${items.map(x => `<div class="bar-r"><span title="${esc(x.k)}">${esc(x.k)}</span><span class="t"><i style="width:${Math.max(0, x.v) / max * 100}%"></i></span><b>${fmt(x.v)} <span class="muted small">${fmtPct(Math.max(0, x.v) / tot, 0)}</span></b></div>`).join('')}</div>`;
+}
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+function trendChart(canvas, R, cur, prev, store) {
+  if (typeof Chart === 'undefined') { canvas.parentElement.innerHTML = '<p class="muted">Grafik tidak bisa dimuat.</p>'; return; }
+  const n = dayDiff(R.from, R.to) + 1; const labels = [], a = [], b = [];
+  const sum = (lines) => { const m = new Map(); for (const l of lines) m.set(l.d, (m.get(l.d) || 0) + l.n); return m; };
+  const A = sum(cur), B = sum(prev);
+  const codes = store ? [store] : storeCodes(); const tg = []; let hasT = false;
+  for (let i = 0; i < n; i++) { const d = addDays(R.from, i), dp = addDays(R.cfrom, i); labels.push(fmtDateS(d)); a.push(A.get(d) || 0); b.push(dp <= R.cto ? (B.get(dp) || 0) : null);
+    const tv = codes.reduce((s, c) => s + monthTarget(c, d.slice(0, 7)), 0) * dayWeight(d); tg.push(tv || null); if (tv) hasT = true; }
+  const ink = css('--muted'), line = css('--line');
+  App.charts.push(new Chart(canvas, {
+    type: 'bar',
+    data: { labels, datasets: [
+      { type: 'bar', label: 'Periode ini', data: a, backgroundColor: css('--pine-2'), borderRadius: 3, order: 2 },
+      ...(hasT ? [{ type: 'line', label: 'Target harian', data: tg, borderColor: css('--ink'), backgroundColor: css('--ink'), borderWidth: 1.5, pointRadius: 0, stepped: 'middle', order: 0 }] : []),
+      { type: 'line', label: 'Pembanding (' + R.cmpLabel + ')', data: b, borderColor: css('--ochre'), backgroundColor: css('--ochre'), borderDash: [5, 4], pointRadius: n > 20 ? 0 : 2, tension: .25, order: 1, spanGaps: true }
+    ] },
+    options: { maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { labels: { color: ink, boxWidth: 12, font: { family: '"Plus Jakarta Sans", system-ui, sans-serif' } } }, tooltip: { callbacks: { label: c => c.dataset.label + ': ' + fmtRp(c.parsed.y) } } },
+      scales: { x: { ticks: { color: ink, maxRotation: 0, autoSkip: true, font: { family: '"Plus Jakarta Sans", system-ui, sans-serif' } }, grid: { display: false } }, y: { ticks: { color: ink, callback: v => fmtRpS(v), font: { family: '"Plus Jakarta Sans", system-ui, sans-serif' } }, grid: { color: line } } } }
+  }));
+}
+function openDrawer(html) {
+  closeDrawer();
+  const ov = document.createElement('div'); ov.className = 'ov'; ov.id = 'ov';
+  ov.innerHTML = `<div class="drawer" role="dialog" aria-modal="true"><button class="btn sm x" data-close>Tutup</button>${html}</div>`;
+  document.body.appendChild(ov); ov.querySelector('[data-close]').focus();
+}
+function closeDrawer() { const o = $('#ov'); if (o) o.remove(); }
+
+/* ================= halaman: ringkasan area ================= */
+function pageArea(view) {
+  const R = periodRange();
+  setHead('Ringkasan area Jateng 01', R.label + ' · dibanding ' + R.cmpLabel);
+  const cur = linesIn(R.from, R.to), prev = linesIn(R.cfrom, R.cto);
+  const A = agg(cur), P = agg(prev);
+  const T = statOf(A.tot), TP = statOf(P.tot);
+  const rows = activeStores().map(c => {
+    const a = statOf(A.by.get(c)), p = statOf(P.by.get(c)); const tgt = targetFor(c, R);
+    return { code: c, name: sName(c), type: sType(c), ...a, tgt, ach: tgt ? a.n / tgt : null, gr: p.n ? a.n / p.n - 1 : null, pn: p.n, stock: stockPcs(c), last: lastDateOf(c) };
+  }).filter(r => r.tgt || r.n || r.trx || r.pn || (r.type !== 'bz' && r.stock != null && (!r.last || r.last >= R.cfrom)));
+  const codes = rows.map(r => r.code);
+  const tgtTot = rows.reduce((s, r) => s + r.tgt, 0);
+  const ach = tgtTot ? T.n / tgtTot : null;
+  const reporting = rows.filter(r => r.trx > 0 || r.n !== 0).length;
+  const proj = R.monthMode && R.pace < 1 && R.pace > 0 ? T.n / R.pace : null;
+  const stockTot = rows.reduce((s, r) => s + (r.stock || 0), 0);
+  const stale = rows.filter(r => !r.last || r.last < App.lastDate);
+  view.innerHTML = `<div class="stack">
+    <section class="hero">
+      <svg class="ridge" viewBox="0 0 600 260" preserveAspectRatio="none" aria-hidden="true"><path d="M0 260 L90 150 L150 200 L250 60 L330 160 L400 110 L480 190 L560 120 L600 160 L600 260Z" fill="#fff"/></svg>
+      <div class="hero-a">
+        <div class="lbl">Net sales area · ${esc(R.label)}</div>
+        <div class="big">${fmtRp(T.n)}</div>
+        <div class="meta"><span>${chipGrowth(TP.n ? T.n / TP.n - 1 : null)} vs ${esc(R.cmpLabel)} (${fmtRpS(TP.n)})</span></div>
+      </div>
+      <div class="hero-b">
+        <div><span>Pencapaian target</span><b>${ach == null ? '–' : fmtPct(ach)}</b></div>
+        <div><span>${R.monthMode ? 'Target bulan' : 'Target periode'} (${({ offline: 'Offline', eiger: 'Eiger', total: 'Total' })[App.tgtBasis]})</span><b>${tgtTot ? fmtRpS(tgtTot) : 'belum diisi'}</b></div>
+        <div><span>${proj ? 'Proyeksi akhir bulan' : 'Gross sales'}</span><b>${proj ? fmtRpS(proj) : fmtRpS(T.g)}</b></div>
+        <div><span>${R.monthMode && R.pace < 1 ? 'Seharusnya tercapai' : 'Diskon & promo'}</span><b>${R.monthMode && R.pace < 1 ? fmtPct(R.pace, 0) : fmtRpS(T.g - T.n)}</b></div>
+      </div>
+    </section>
+    <div class="kpis">
+      <div class="kpi"><span>Qty terjual</span><b>${fmtN(T.q)}</b><small>${chipGrowth(TP.q ? T.q / TP.q - 1 : null)}</small></div>
+      <div class="kpi"><span>Transaksi</span><b>${fmtN(T.trx)}</b><small>${chipGrowth(TP.trx ? T.trx / TP.trx - 1 : null)}</small></div>
+      <div class="kpi"><span>Rata-rata per transaksi</span><b>${T.atv ? fmtRpS(T.atv) : '–'}</b><small>${chipGrowth(TP.atv && T.atv ? T.atv / TP.atv - 1 : null)}</small></div>
+      <div class="kpi"><span>Item per transaksi</span><b>${T.upt ? fmtX(T.upt, 2) : '–'}</b><small>${chipGrowth(TP.upt && T.upt ? T.upt / TP.upt - 1 : null)}</small></div>
+      <div class="kpi"><span>Toko ada penjualan</span><b>${reporting} / ${codes.length}</b><small>${stale.length ? stale.length + ' toko data belum s/d ' + fmtDateS(App.lastDate) : 'semua toko up to date'}</small></div>
+      <div class="kpi"><span>Stok area</span><b>${stockTot ? fmtN(stockTot) : '–'}</b><small>pcs, dari stok terakhir tiap toko</small></div>
+    </div>
+    <section class="card"><div class="card-h"><h3>Pencapaian per toko</h3><p class="small muted">${tgtTot ? (R.monthMode && R.pace < 1 ? 'Penanda gelap = posisi yang seharusnya hari ini (' + fmtPct(R.pace, 0) + ')' : 'Garis tipis = 100% target') : 'Target belum diisi, bar menunjukkan net sales. Isi target di Kelola data.'}</p></div>
+      <div id="summit"></div></section>
+    <div class="grid g2">
+      <section class="card"><div class="card-h"><h3>Penjualan harian area</h3></div><div class="chart-box"><canvas id="trend"></canvas></div></section>
+      <section class="card"><div class="card-h"><h3>Kategori</h3><p class="small muted">net sales</p></div><div id="cats"></div></section>
+    </div>
+    <section class="card"><div class="card-h"><h3>Peringkat toko</h3><p class="small muted">Klik toko untuk detail</p></div><div id="rankT"></div></section>
+  </div>`;
+  // summit
+  const hasT = rows.some(r => r.tgt);
+  const sr = rows.slice().sort((a, b) => hasT ? ((b.ach ?? -1) - (a.ach ?? -1)) : b.n - a.n);
+  const scale = hasT ? Math.max(1.1, ...sr.map(r => r.ach || 0)) : Math.max(...sr.map(r => r.n), 1);
+  const pace = R.monthMode ? R.pace : 1;
+  $('#summit').innerHTML = `<div class="summit">${sr.map(r => {
+    const v = hasT ? (r.ach || 0) : r.n; const w = Math.max(0, v) / scale * 100;
+    const cls = !hasT || !r.tgt ? 'neu' : (r.ach >= pace ? 'ok' : r.ach >= pace * 0.85 ? 'mid' : 'low');
+    return `<button class="sm-row" data-store="${esc(r.code)}"><span class="sm-name">${esc(r.name)}<small>${esc(r.code)}${r.type === 'bz' ? ' · Bazaar' : ''}${r.last && r.last < App.lastDate ? ' · data s/d ' + fmtDateS(r.last) : ''}</small></span>
+      <span class="sm-track"><span class="sm-fill ${cls}" style="width:${w}%"></span>${hasT ? `<span class="sm-100" style="left:${1 / scale * 100}%"></span>${pace < 1 ? `<span class="sm-pace" style="left:${pace / scale * 100}%"></span>` : ''}` : ''}</span>
+      <span class="sm-val">${hasT ? (r.tgt ? fmtPct(r.ach) : '–') : fmtRpS(r.n)}<small>${hasT ? fmtRpS(r.n) + (r.tgt ? '' : ', tanpa target') : (r.trx ? fmtN(r.trx) + ' trx' : 'belum ada')}</small></span></button>`;
+  }).join('')}</div>${hasT ? `<div class="legend"><span><i style="background:var(--ok)"></i>Di atas posisi seharusnya</span><span><i style="background:var(--ochre)"></i>Sedikit di bawah (≥85%)</span><span><i style="background:var(--bad)"></i>Tertinggal</span></div>` : ''}`;
+  trendChart($('#trend'), R, cur, prev);
+  const cm = new Map(); for (const l of cur) { const k = (App.sku[l.sku] || [])[1] || 'LAINNYA'; cm.set(k, (cm.get(k) || 0) + l.n); }
+  $('#cats').innerHTML = cm.size ? barList([...cm].map(([k, v]) => ({ k, v })).sort((a, b) => b.v - a.v)) : '<p class="muted">Belum ada penjualan di periode ini.</p>';
+  $('#rankT').innerHTML = tbl('rank', {
+    rows, sort: { k: 'n', dir: 'desc' }, limit: 30, onRow: r => { App.ui.store = r.code; go('toko'); },
+    cols: [
+      { k: 'name', label: 'Toko', h: r => `<span class="nm">${esc(r.name)}</span><span class="sub">${esc(r.code)}${r.type === 'bz' ? ' · Bazaar' : ''}</span>` },
+      { k: 'n', label: 'Net sales', r: 1, h: r => fmtRp(r.n) },
+      { k: 'tgt', label: 'Target', r: 1, h: r => r.tgt ? fmtRpS(r.tgt) : '–' },
+      { k: 'ach', label: 'Ach.', r: 1, h: r => r.ach == null ? '–' : `<b>${fmtPct(r.ach)}</b>` },
+      { k: 'gr', label: 'vs pembanding', r: 1, h: r => chipGrowth(r.gr) },
+      { k: 'q', label: 'Qty', r: 1, h: r => fmtN(r.q) },
+      { k: 'trx', label: 'Trx', r: 1, h: r => fmtN(r.trx) },
+      { k: 'atv', label: 'ATV', r: 1, h: r => r.atv ? fmtRpS(r.atv) : '–' },
+      { k: 'upt', label: 'UPT', r: 1, h: r => r.upt ? fmtX(r.upt, 2) : '–' },
+      { k: 'stock', label: 'Stok (pcs)', r: 1, h: r => r.stock == null ? '–' : fmtN(r.stock) },
+      { k: 'last', label: 'Data s/d', r: 1, h: r => r.last ? (r.last < App.lastDate ? `<span style="color:var(--bad)">${fmtDateS(r.last)}</span>` : fmtDateS(r.last)) : '–' }
+    ]
+  });
+}
+
+/* ================= halaman: monitoring sales (daily report) ================= */
+function reportData(D, val) {
+  const m = D.slice(0, 7), day = +D.slice(8), from = m + '-01';
+  const cw = cumWeight(m, day), dw = dayWeight(D);
+  const cum = new Map(), dd = new Map();
+  for (const l of App.lines) { if (l.d < from || l.d > D) continue; const v = val === 'g' ? l.g : l.n; cum.set(l.s, (cum.get(l.s) || 0) + v); if (l.d === D) dd.set(l.s, (dd.get(l.s) || 0) + v); }
+  const rows = activeStores().map(c => {
+    const T = monthTarget(c, m), cs = cum.get(c) || 0, ds = dd.get(c) || 0, cT = T * cw, dT = T * dw, last = lastDateOf(c);
+    return { c, type: sType(c), name: (App.stores[c] && (App.stores[c].alias ? App.stores[c].alias : App.stores[c].name)) || c, T, mAch: T ? cs / T : null, cT, cs, cAch: cT ? cs / cT : null, cDiff: cs - cT, dT, ds, dAch: dT ? ds / dT : null, dDiff: ds - dT, last, late: !last || last < D };
+  }).filter(r => r.T || r.cs);
+  const t = sumRows(rows);
+  return { D, m, cw, dw, rows, t, hasW: !!wOf(m) };
+}
+function sumRows(rows) {
+  const t = rows.reduce((a, r) => { a.T += r.T; a.cT += r.cT; a.cs += r.cs; a.dT += r.dT; a.ds += r.ds; return a; }, { T: 0, cT: 0, cs: 0, dT: 0, ds: 0 });
+  t.mAch = t.T ? t.cs / t.T : null; t.cAch = t.cT ? t.cs / t.cT : null; t.dAch = t.dT ? t.ds / t.dT : null; t.cDiff = t.cs - t.cT; t.dDiff = t.ds - t.dT; t.n = rows.length;
+  return t;
+}
+const sortRp = rows => { const st = App.ui.rpSort || { k: 'mAch', dir: 'desc' }; return rows.slice().sort((a, b) => { const x = a[st.k], y = b[st.k]; const r = typeof x === 'string' ? String(x).localeCompare(String(y), 'id') : (x ?? -Infinity) - (y ?? -Infinity); return st.dir === 'asc' ? r : -r; }); };
+/* kelompok baris laporan: reguler, bazaar, lainnya (subtotal bila lebih dari satu jenis) */
+function rpGroups(rows) {
+  const types = ['rg', 'bz', 'ot'].filter(t => rows.some(r => r.type === t));
+  if (types.length <= 1) return [{ label: null, rows: sortRp(rows) }];
+  return types.map(t => { const rs = rows.filter(r => r.type === t); return { label: t === 'rg' ? 'Toko reguler' : t === 'bz' ? 'Bazaar' : 'Lainnya', rows: sortRp(rs), sub: sumRows(rs) }; });
+}
+const stCls = a => a == null ? '' : a >= 1 ? 'g' : a >= 0.95 ? 'y' : 'r';
+const pct2 = a => a == null ? '–' : fmtPct(a, 2);
+const pct2s = a => a == null ? '–' : fmtPct(a, 2);
+function rpDiff(v) { return `<td class="r ${v < -0.5 ? 'dneg' : v > 0.5 ? 'dpos' : ''}">${fmtN(v)}</td>`; }
+function rpRow(r) {
+  return `<tr data-store="${esc(r.c)}" style="cursor:pointer">
+        <td class="site">${esc(r.c)}</td><td class="nm">${esc(r.name)}${r.late ? `<small>${r.last ? 'data penjualan s/d ' + fmtDateS(r.last) : 'belum ada data penjualan'}</small>` : ''}</td>
+        <td class="r sep">${r.T ? fmtN(r.T) : '–'}</td><td class="r">${pct2s(r.mAch)}</td>
+        <td class="r sep">${r.T ? fmtN(r.cT) : '–'}</td><td class="r">${fmtN(r.cs)}</td><td class="st ${stCls(r.cAch)}"></td><td class="r">${pct2s(r.cAch)}</td>${r.T ? rpDiff(r.cDiff) : '<td class="r">–</td>'}
+        <td class="r sep">${r.T ? fmtN(r.dT) : '–'}</td><td class="r">${fmtN(r.ds)}</td><td class="st ${stCls(r.dAch)}"></td><td class="r">${pct2s(r.dAch)}</td>${r.T ? rpDiff(r.dDiff) : '<td class="r">–</td>'}
+      </tr>`;
+}
+function rpSub(label, t) {
+  return `<tr class="subt"><td></td><td class="nm">Subtotal ${esc(label.toLowerCase())}</td><td class="r sep">${fmtN(t.T)}</td><td class="r">${pct2s(t.mAch)}</td><td class="r sep">${fmtN(t.cT)}</td><td class="r">${fmtN(t.cs)}</td><td class="st ${stCls(t.cAch)}"></td><td class="r">${pct2s(t.cAch)}</td>${rpDiff(t.cDiff)}<td class="r sep">${fmtN(t.dT)}</td><td class="r">${fmtN(t.ds)}</td><td class="st ${stCls(t.dAch)}"></td><td class="r">${pct2s(t.dAch)}</td>${rpDiff(t.dDiff)}</tr>`;
+}
+function pageReport(view) {
+  const U = App.ui; const maxD = App.lastDate;
+  let D = U.rpDate && U.rpDate <= maxD ? U.rpDate : maxD; U.rpDate = D;
+  const val = U.rpVal || 'g';
+  if (!App.loaded.has(D.slice(0, 7)) && App.index.sales[D.slice(0, 7)]) { view.innerHTML = '<div class="loading"><span class="spin"></span>Mengambil data…</div>'; ensureMonths(D, D).then(render); return; }
+  const R = reportData(D, val);
+  setHead('Daily report Jateng 01' + (App.ui.typeF ? ' · ' + TYPE_LABEL[App.ui.typeF] : ''), R.rows.length + ' site · tanggal ' + fmtDate(D) + ' · kumulatif 1–' + (+D.slice(8)) + ' ' + fmtMonth(R.m) + (R.hasW ? ' · bobot harian ' + fmtPct(R.cw, 1) : ' · bobot harian belum diupload, target dibagi rata'));
+  const st = U.rpSort || { k: 'mAch', dir: 'desc' };
+  const groups = rpGroups(R.rows);
+  const sh = (k, l) => `<th class="s" data-rps="${k}">${l}${st.k === k ? (st.dir === 'asc' ? ' ▲' : ' ▼') : ''}</th>`;
+  const diff = v => `<td class="r ${v < -0.5 ? 'dneg' : v > 0.5 ? 'dpos' : ''}">${fmtN(v)}</td>`;
+  const noT = !R.rows.some(r => r.T);
+  view.innerHTML = `<div class="stack">
+    <div class="filters" style="margin:0">
+      <label class="small muted" for="rpDate">Tanggal laporan</label><input type="date" id="rpDate" class="inp" value="${D}" max="${maxD}">
+      <div class="seg" role="group" aria-label="Nilai sales"><button data-rpv="n" class="${val === 'n' ? 'on' : ''}">Net sales</button><button data-rpv="g" class="${val === 'g' ? 'on' : ''}">Gross sales</button></div>
+      <span style="flex:1"></span>
+      <button class="btn" id="rpXls" hidden>Download Excel</button>
+    </div>
+    ${noT ? '<div class="note">Target bulan ' + esc(fmtMonth(R.m)) + ' belum diupload. Upload file target di Kelola data agar Target, %Ach dan Diff terisi.</div>' : ''}
+    <div class="rp-top">
+      <div class="rp-tile"><span>Monthly Sales Achievement</span><b class="${stCls(R.t.mAch == null ? null : R.t.mAch / (R.cw || 1))}">${fmtPct(R.t.mAch, 1)}</b></div>
+      <div class="rp-tile"><span>Cumulative Sales Achievement</span><b class="${stCls(R.t.cAch)}">${fmtPct(R.t.cAch, 1)}</b></div>
+      <div class="rp-tile"><span>Daily Sales Achievement</span><b class="${stCls(R.t.dAch)}">${fmtPct(R.t.dAch, 1)}</b></div>
+    </div>
+    <div class="rp-wrap"><table class="rp">
+      <thead><tr><th rowspan="2" class="s" data-rps="c">Site</th><th rowspan="2" class="nmh s" data-rps="name">Store</th><th colspan="2">Monthly Sales</th><th colspan="5">Kumulatif Sales</th><th colspan="5">Daily Sales</th></tr>
+      <tr>${sh('T', 'Target')}${sh('mAch', '%Ach')}${sh('cT', 'Target')}${sh('cs', 'Sales')}<th></th>${sh('cAch', '%Ach')}${sh('cDiff', 'Diff')}${sh('dT', 'Target')}${sh('ds', 'Sales')}<th></th>${sh('dAch', '%Ach')}${sh('dDiff', 'Diff')}</tr></thead>
+      <tbody>${groups.map(g => (g.label ? `<tr class="grp"><td colspan="14">${esc(g.label)} <span>${g.rows.length} site</span></td></tr>` : '') + g.rows.map(rpRow).join('') + (g.sub ? rpSub(g.label, g.sub) : '')).join('') || '<tr><td colspan="14" class="r" style="text-align:center;padding:24px">Belum ada data.</td></tr>'}</tbody>
+      <tfoot><tr><td></td><td class="nm" style="background:#0B1B4A;color:#fff">TOTAL</td>
+        <td class="r">${fmtN(R.t.T)}</td><td class="r">${pct2(R.t.mAch)}</td><td class="r">${fmtN(R.t.cT)}</td><td class="r">${fmtN(R.t.cs)}</td><td class="st ${stCls(R.t.cAch)}"></td><td class="r">${pct2(R.t.cAch)}</td><td class="r">${fmtN(R.t.cDiff)}</td>
+        <td class="r">${fmtN(R.t.dT)}</td><td class="r">${fmtN(R.t.ds)}</td><td class="st ${stCls(R.t.dAch)}"></td><td class="r">${pct2(R.t.dAch)}</td><td class="r">${fmtN(R.t.dDiff)}</td></tr></tfoot>
+    </table></div>
+    <div class="legend"><span><i style="background:var(--ok)"></i>≥ 100%</span><span><i style="background:#E2B93B"></i>95–99,99%</span><span><i style="background:var(--bad)"></i>&lt; 95%</span>
+      <span>Target kumulatif = target bulan × bobot kumulatif s/d tanggal laporan. Target harian = target bulan × bobot hari itu. Target memakai kolom ${({ offline: 'Offline', eiger: 'Eiger', total: 'Total' })[App.tgtBasis]}.</span></div>
+  </div>`;
+  App.ui.rpLast = R;
+  getDownloads().then(dl => { const b = $('#rpXls'); if (b && dl && typeof XLSX !== 'undefined') b.hidden = false; });
+}
+let _dl;
+function getDownloads() { if (!_dl) _dl = (window.claude && window.claude.use ? window.claude.use('downloads') : Promise.resolve(null)).catch(() => null); return _dl; }
+async function exportReport() {
+  const R = App.ui.rpLast; if (!R) return; const dl = await getDownloads(); if (!dl) { toast('Download tidak tersedia di tampilan ini'); return; }
+  const r4 = x => x == null ? null : Math.round(x * 10000) / 10000;
+  const line = (c, n, r) => [c, n, Math.round(r.T), r4(r.mAch), Math.round(r.cT), Math.round(r.cs), r4(r.cAch), Math.round(r.cDiff), Math.round(r.dT), Math.round(r.ds), r4(r.dAch), Math.round(r.dDiff)];
+  const body = []; for (const g of rpGroups(R.rows)) { if (g.label) body.push(['', g.label.toUpperCase()]); for (const r of g.rows) body.push(line(r.c, r.name, r)); if (g.sub) body.push(line('', 'SUBTOTAL ' + g.label.toUpperCase(), g.sub)); }
+  const aoa = [
+    ['DAILY REPORT REGIONAL 3'], ['BRANCH :', 'JATENG 01' + (App.ui.typeF ? ' (' + TYPE_LABEL[App.ui.typeF] + ')' : '')], ['Date :', fmtDate(R.D)],
+    ['Monthly Sales Achievement', r4(R.t.mAch), '', 'Cumulative Sales Achievement', r4(R.t.cAch), '', 'Daily Sales Achievement', r4(R.t.dAch)], [],
+    ['Site', 'Store', 'Monthly Sales', '', 'Kumulatif Sales', '', '', '', 'Daily Sales'],
+    ['', '', 'Target', '%Ach', 'Target', 'Sales', '%Ach', 'Diff', 'Target', 'Sales', '%Ach', 'Diff'],
+    ...body,
+    ['', 'TOTAL', Math.round(R.t.T), r4(R.t.mAch), Math.round(R.t.cT), Math.round(R.t.cs), r4(R.t.cAch), Math.round(R.t.cDiff), Math.round(R.t.dT), Math.round(R.t.ds), r4(R.t.dAch), Math.round(R.t.dDiff)]
+  ];
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!merges'] = [{ s: { r: 5, c: 2 }, e: { r: 5, c: 3 } }, { s: { r: 5, c: 4 }, e: { r: 5, c: 7 } }, { s: { r: 5, c: 8 }, e: { r: 5, c: 11 } }];
+  ws['!cols'] = [{ wch: 7 }, { wch: 40 }, ...Array(10).fill({ wch: 15 })];
+  const pctCells = [[3, 1], [3, 4], [3, 7]]; for (let i = 7; i < aoa.length; i++) { pctCells.push([i, 3], [i, 6], [i, 10]); }
+  for (const [r, c] of pctCells) { const a = XLSX.utils.encode_cell({ r, c }); if (ws[a] && typeof ws[a].v === 'number') ws[a].z = '0.00%'; }
+  for (let i = 7; i < aoa.length; i++) for (const c of [2, 4, 5, 7, 8, 9, 11]) { const a = XLSX.utils.encode_cell({ r: i, c }); if (ws[a] && typeof ws[a].v === 'number') ws[a].z = '#,##0'; }
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Daily Report');
+  const out = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+  try { await dl.save({ filename: `Daily_Report_Jateng01_${R.D.replace(/-/g, '')}.xlsx`, data: new Blob([out]) }); }
+  catch (e) { if (e && e.code !== 'declined') toast('Gagal download: ' + (e.message || e.code)); }
+}
+
+/* ================= halaman: per toko ================= */
+function pageStore(view) {
+  const codes = storeCodes(); if (!App.ui.store || !codes.includes(App.ui.store)) App.ui.store = codes[0];
+  const c = App.ui.store, R = periodRange();
+  setHead(sName(c), 'Toko ' + c + ' · ' + R.label + ' · dibanding ' + R.cmpLabel);
+  const cur = linesIn(R.from, R.to, c), prev = linesIn(R.cfrom, R.cto, c);
+  const a = statOf(agg(cur).by.get(c)), p = statOf(agg(prev).by.get(c));
+  const tgt = targetFor(c, R), ach = tgt ? a.n / tgt : null;
+  const proj = R.monthMode && R.pace < 1 && R.pace > 0 ? a.n / R.pace : null;
+  const H = health().stores[c];
+  const last = lastDateOf(c), stk = App.stock[c];
+  // produk
+  const pm = new Map();
+  for (const l of cur) { if (isPB(l.sku)) continue; const ar = artOf(l.sku); const x = pm.get(ar) || { art: ar, q: 0, n: 0 }; x.q += l.q; x.n += l.n; pm.set(ar, x); }
+  const prods = [...pm.values()].map(x => { const inf = artInfo(x.art), h = H && H.items.get(x.art); return { ...x, name: inf.name, c3: inf.c3, c4: inf.c4, stock: h ? h.stock : null, k: h ? h.k : null }; });
+  // sales person
+  const spm = new Map();
+  for (const l of cur) { const k = l.sp || '(tanpa nama)'; const x = spm.get(k) || { sp: k, n: 0, q: 0, trx: new Set() }; x.n += l.n; if (!isPB(l.sku)) x.q += l.q; if (l.q > 0) x.trx.add(l.d + l.o); spm.set(k, x); }
+  const sps = [...spm.values()].map(x => ({ sp: x.sp, n: x.n, q: x.q, trx: x.trx.size, atv: x.trx.size ? x.n / x.trx.size : null, upt: x.trx.size ? x.q / x.trx.size : null }));
+  view.innerHTML = `<div class="stack">
+    <div class="filters"><label class="small muted" for="stSel">Toko</label><select id="stSel" class="inp">${codes.map(x => `<option value="${esc(x)}" ${x === c ? 'selected' : ''}>${esc(sName(x))} (${esc(x)}${sType(x) === 'bz' ? ', bazaar' : ''})</option>`).join('')}</select>
+      <span class="small muted">Penjualan s/d ${fmtDate(last)} · stok per ${stk ? fmtDate(stk.date) : 'belum ada'}</span></div>
+    <div class="kpis">
+      <div class="kpi"><span>Net sales</span><b>${fmtRpS(a.n)}</b><small>${chipGrowth(p.n ? a.n / p.n - 1 : null)} vs ${fmtRpS(p.n)}</small></div>
+      <div class="kpi"><span>Pencapaian target</span><b>${ach == null ? '–' : fmtPct(ach)}</b><small>${tgt ? 'target ' + fmtRpS(tgt) + (R.monthMode && R.pace < 1 ? ', seharusnya ' + fmtPct(R.pace, 0) : '') : 'target belum diisi'}</small></div>
+      <div class="kpi"><span>${proj ? 'Proyeksi akhir bulan' : 'Gross sales'}</span><b>${proj ? fmtRpS(proj) : fmtRpS(a.g)}</b><small>${proj && tgt ? fmtPct(proj / tgt, 0) + ' dari target' : ''}</small></div>
+      <div class="kpi"><span>Qty</span><b>${fmtN(a.q)}</b><small>${chipGrowth(p.q ? a.q / p.q - 1 : null)}</small></div>
+      <div class="kpi"><span>Transaksi</span><b>${fmtN(a.trx)}</b><small>${chipGrowth(p.trx ? a.trx / p.trx - 1 : null)}</small></div>
+      <div class="kpi"><span>ATV / UPT</span><b>${a.atv ? fmtRpS(a.atv) : '–'}</b><small>${a.upt ? fmtX(a.upt, 2) + ' item per transaksi' : ''}</small></div>
+    </div>
+    <div class="grid g2">
+      <section class="card"><div class="card-h"><h3>Penjualan harian</h3></div><div class="chart-box"><canvas id="trend"></canvas></div></section>
+      <section class="card"><div class="card-h"><h3>Kesehatan stok</h3><p class="small muted">${H && H.hasStock ? 'penjualan ' + H.days + ' hari data terakhir vs stok' : 'stok toko ini belum diupload'}</p></div><div id="hl"></div></section>
+    </div>
+    <section class="card"><div class="card-h"><h3>Produk terlaris</h3><p class="small muted">per artikel, klik untuk detail</p></div><div id="prodT"></div></section>
+    <div class="grid g2">
+      <section class="card"><div class="card-h"><h3>Sales person</h3></div><div id="spT"></div></section>
+      <section class="card"><div class="card-h"><h3>Kategori</h3></div><div id="cats"></div></section>
+    </div>
+  </div>`;
+  trendChart($('#trend'), R, cur, prev, c);
+  if (H && H.hasStock) {
+    const tot = HKEYS.reduce((s, k) => s + H.stock[k], 0) || 1;
+    $('#hl').innerHTML = `<div class="bars">${HKEYS.map(k => `<div class="bar-r"><span>${badge(k)}</span><span class="t"><i style="width:${H.stock[k] / tot * 100}%;background:${k === 'LS' || k === 'LK' ? 'var(--ok)' : k === 'CL' ? 'var(--info)' : k === 'SM' ? 'var(--warn)' : 'var(--bad)'}"></i></span><b>${fmtN(H.count[k])} art. <span class="muted small">${k === 'HB' ? '' : fmtN(H.stock[k]) + ' pcs'}</span></b></div>`).join('')}</div>
+      ${H.days < 30 ? `<p class="note small" style="margin-top:12px">Data penjualan toko ini baru ${H.days} hari, jadi status dead stock & slow moving belum akurat.</p>` : ''}
+      <div class="row-act"><button class="btn sm" data-hgo="${esc(c)}">Lihat daftar artikel</button></div>`;
+  } else $('#hl').innerHTML = '<p class="muted">Upload Export by Bin untuk toko ini agar status stok terlihat.</p>';
+  $('#prodT').innerHTML = tbl('sprod', {
+    rows: prods, sort: { k: 'n', dir: 'desc' }, limit: 15, onRow: r => openProduct(r.art, c),
+    cols: [
+      { k: 'name', label: 'Produk', h: r => `<span class="nm">${esc(r.name)}</span><span class="sub">${esc(r.art)} · ${esc(r.c3)} › ${esc(r.c4)}</span>` },
+      { k: 'q', label: 'Qty', r: 1, h: r => fmtN(r.q) }, { k: 'n', label: 'Net sales', r: 1, h: r => fmtRp(r.n) },
+      { k: 'stock', label: 'Stok', r: 1, h: r => r.stock == null ? '–' : fmtN(r.stock) }, { k: 'k', label: 'Status', h: r => badge(r.k) }
+    ]
+  });
+  $('#spT').innerHTML = tbl('sp', {
+    rows: sps, sort: { k: 'n', dir: 'desc' }, limit: 15,
+    cols: [{ k: 'sp', label: 'Nama' }, { k: 'n', label: 'Net', r: 1, h: r => fmtRpS(r.n) }, { k: 'trx', label: 'Trx', r: 1, h: r => fmtN(r.trx) }, { k: 'q', label: 'Qty', r: 1, h: r => fmtN(r.q) }, { k: 'atv', label: 'ATV', r: 1, h: r => r.atv ? fmtRpS(r.atv) : '–' }, { k: 'upt', label: 'UPT', r: 1, h: r => r.upt ? fmtX(r.upt, 2) : '–' }]
+  });
+  const cm = new Map(); for (const l of cur) { const k = (App.sku[l.sku] || [])[1] || 'LAINNYA'; cm.set(k, (cm.get(k) || 0) + l.n); }
+  $('#cats').innerHTML = cm.size ? barList([...cm].map(([k, v]) => ({ k, v })).sort((x, y) => y.v - x.v)) : '<p class="muted">Belum ada penjualan di periode ini.</p>';
+}
+
+/* ================= halaman: produk ================= */
+function pageProduct(view) {
+  const R = periodRange(); const U = App.ui;
+  setHead('Produk', R.label + (U.prodStore ? ' · ' + sName(U.prodStore) : ' · semua toko'));
+  const cur = linesIn(R.from, R.to, U.prodStore || null);
+  const m = new Map();
+  for (const l of cur) { if (isPB(l.sku)) continue; const a = artOf(l.sku); const x = m.get(a) || { art: a, q: 0, n: 0, st: new Set() }; x.q += l.q; x.n += l.n; if (l.q > 0) x.st.add(l.s); m.set(a, x); }
+  const codes = U.prodStore ? [U.prodStore] : activeStores();
+  const stockA = new Map(); for (const c of codes) for (const [a, s] of stockByArt(c)) stockA.set(a, (stockA.get(a) || 0) + s.t);
+  const H = health();
+  const q90 = new Map(); for (const c of codes) { const S = H.stores[c]; if (S) for (const it of S.items.values()) q90.set(it.art, (q90.get(it.art) || 0) + it.rate); }
+  let rows = [...m.values()].map(x => { const inf = artInfo(x.art); const st = stockA.get(x.art) || 0, rate = q90.get(x.art) || 0; return { art: x.art, name: inf.name, c3: inf.c3, c4: inf.c4, q: x.q, n: x.n, stores: x.st.size, stock: st, cover: rate > 0 ? st / rate : null }; });
+  const c3s = [...new Set(rows.map(r => r.c3))].sort();
+  if (U.prodC3) rows = rows.filter(r => r.c3 === U.prodC3);
+  if (U.prodQ) { const q = U.prodQ.toLowerCase(); rows = rows.filter(r => (r.name + ' ' + r.art + ' ' + r.c4).toLowerCase().includes(q)); }
+  view.innerHTML = `<section class="card"><div class="filters">
+      <input id="pq" class="inp" type="search" placeholder="Cari nama atau kode artikel" value="${esc(U.prodQ)}" style="flex:1 1 220px">
+      <select id="pc3" class="inp"><option value="">Semua kategori</option>${c3s.map(c => `<option ${c === U.prodC3 ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select>
+      <select id="pst" class="inp"><option value="">Semua toko</option>${storeCodes().map(c => `<option value="${esc(c)}" ${c === U.prodStore ? 'selected' : ''}>${esc(sName(c))}</option>`).join('')}</select>
+    </div><div id="pT"></div><p class="small muted" style="margin-top:10px">Cover = stok ÷ rata-rata penjualan per bulan (90 hari terakhir). Paper bag tidak dihitung.</p></section>`;
+  $('#pT').innerHTML = tbl('prod', {
+    rows, sort: { k: 'n', dir: 'desc' }, limit: 30, onRow: r => openProduct(r.art, U.prodStore || null),
+    cols: [
+      { k: 'name', label: 'Produk', h: r => `<span class="nm">${esc(r.name)}</span><span class="sub">${esc(r.art)} · ${esc(r.c3)} › ${esc(r.c4)}</span>` },
+      { k: 'q', label: 'Qty', r: 1, h: r => fmtN(r.q) }, { k: 'n', label: 'Net sales', r: 1, h: r => fmtRp(r.n) },
+      ...(U.prodStore ? [] : [{ k: 'stores', label: 'Toko terjual', r: 1, h: r => r.stores + ' / ' + activeStores().length }]),
+      { k: 'stock', label: 'Stok', r: 1, h: r => fmtN(r.stock) }, { k: 'cover', label: 'Cover (bln)', r: 1, h: r => r.cover == null ? '–' : fmtX(r.cover) }
+    ]
+  });
+}
+function openProduct(art, store) {
+  const R = periodRange(); const inf = artInfo(art); const H = health();
+  const cur = linesIn(R.from, R.to).filter(l => artOf(l.sku) === art);
+  const per = storeCodes().map(c => { const ls = cur.filter(l => l.s === c); const h = H.stores[c] && H.stores[c].items.get(art); return { c, name: sName(c), q: ls.reduce((s, l) => s + l.q, 0), n: ls.reduce((s, l) => s + l.n, 0), stock: h ? h.stock : (stockByArt(c).get(art) || { t: 0 }).t, rate: h ? h.rate : 0, k: h ? h.k : null }; }).filter(r => r.q || r.stock);
+  // varian (sku)
+  const vm = new Map();
+  for (const l of cur) { if (store && l.s !== store) continue; const x = vm.get(l.sku) || { sku: l.sku, q: 0, n: 0, stock: 0 }; x.q += l.q; x.n += l.n; vm.set(l.sku, x); }
+  for (const c of (store ? [store] : storeCodes())) { const S = App.stock[c]; if (!S) continue; for (const sku in S.items) if (artOf(sku) === art) { const x = vm.get(sku) || { sku, q: 0, n: 0, stock: 0 }; x.stock += S.items[sku][0]; vm.set(sku, x); } }
+  const vars = [...vm.values()].sort((a, b) => b.q - a.q || b.stock - a.stock);
+  openDrawer(`<p class="muted small">${esc(inf.c2 ? inf.c2 + ' › ' : '')}${esc(inf.c3)} › ${esc(inf.c4)} · kode ${esc(art)}</p><h2>${esc(inf.name)}</h2><p class="muted small">${esc(R.label)}</p>
+    <h3 style="font-family:var(--font-head);margin:18px 0 8px">Per toko</h3>
+    <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Toko</th><th class="r">Qty</th><th class="r">Net</th><th class="r">Stok</th><th class="r">Jual/bln</th><th>Status</th></tr></thead><tbody>
+    ${per.sort((a, b) => b.q - a.q || b.stock - a.stock).map(r => `<tr><td><span class="nm">${esc(r.name)}</span><span class="sub">${esc(r.c)}</span></td><td class="r">${fmtN(r.q)}</td><td class="r">${fmtRpS(r.n)}</td><td class="r">${fmtN(r.stock)}</td><td class="r">${fmtX(r.rate)}</td><td>${badge(r.k)}</td></tr>`).join('') || '<tr><td colspan="6" class="empty">Tidak ada penjualan atau stok.</td></tr>'}
+    </tbody></table></div>
+    <h3 style="font-family:var(--font-head);margin:18px 0 8px">Varian ${store ? 'di ' + esc(sName(store)) : 'se-area'}</h3>
+    <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Varian</th><th class="r">Qty</th><th class="r">Net</th><th class="r">Stok</th></tr></thead><tbody>
+    ${vars.map(v => `<tr><td>${esc(varName((App.sku[v.sku] || [])[0]) || v.sku)}<span class="sub">${esc(v.sku)}</span></td><td class="r">${fmtN(v.q)}</td><td class="r">${fmtRpS(v.n)}</td><td class="r">${fmtN(v.stock)}</td></tr>`).join('') || '<tr><td colspan="4" class="empty">Tidak ada varian.</td></tr>'}
+    </tbody></table></div>`);
+}
+
+/* ================= halaman: kesehatan stok ================= */
+function pageStock(view) {
+  const H = health(); const U = App.ui;
+  setHead('Kesehatan stok', H.to ? 'Penjualan ' + fmtDate(H.from) + ' – ' + fmtDate(H.to) + ' dibanding stok terakhir tiap toko' : 'Stok terakhir tiap toko');
+  const tabs = [['sum', 'Ringkasan toko'], ['list', 'Daftar artikel'], ['tr', 'Saran transfer antar toko']];
+  view.innerHTML = `<div class="stack"><div class="seg" role="tablist">${tabs.map(([k, l]) => `<button data-sttab="${k}" class="${U.stTab === k ? 'on' : ''}">${l}</button>`).join('')}</div><div id="stBody"></div>
+    <p class="small muted">Status dihitung dari cover stok = stok ÷ rata-rata jual per bulan: laku sekali ≤ 1 bln, laku 1–2 bln, cukup laku 2–4 bln, slow moving &gt; 4 bln. Dead stock = ada stok tanpa penjualan ${WINDOW} hari. Dihitung per artikel (semua size & warna).</p></div>`;
+  const body = $('#stBody');
+  if (U.stTab === 'sum') {
+    const rows = activeStores().filter(c => App.stock[c] || sType(c) !== 'bz').map(c => { const S = H.stores[c] || { count: {}, stock: {}, days: 0 }; const tot = HKEYS.filter(k => k !== 'HB').reduce((s, k) => s + (S.stock[k] || 0), 0); const sehat = (S.stock.LS || 0) + (S.stock.LK || 0) + (S.stock.CL || 0); return { c, name: sName(c), has: S.hasStock, date: App.stock[c] && App.stock[c].date, days: S.days, tot, sehat: tot ? sehat / tot : null, ...Object.fromEntries(HKEYS.map(k => ['n' + k, S.count[k] || 0])), dsP: S.stock.DS || 0 }; });
+    body.innerHTML = `<section class="card">${tbl('hsum', {
+      rows, sort: { k: 'sehat', dir: 'asc' }, limit: 30, onRow: r => { U.stTab = 'list'; U.stStore = r.c; U.stStatus = ''; render(); },
+      cols: [
+        { k: 'name', label: 'Toko', h: r => `<span class="nm">${esc(r.name)}</span><span class="sub">${r.has ? 'stok per ' + fmtDateS(r.date) : 'stok belum diupload'}${r.days < 30 && r.has ? ' · jual ' + r.days + ' hari' : ''}</span>` },
+        { k: 'tot', label: 'Stok (pcs)', r: 1, h: r => r.has ? fmtN(r.tot) : '–' },
+        { k: 'sehat', label: '% stok sehat', r: 1, h: r => r.sehat == null ? '–' : `<b style="color:${r.sehat >= .7 ? 'var(--ok)' : r.sehat >= .5 ? 'var(--warn)' : 'var(--bad)'}">${fmtPct(r.sehat, 0)}</b>` },
+        ...HKEYS.map(k => ({ k: 'n' + k, label: HEALTH[k].label, r: 1, h: r => r.has ? fmtN(r['n' + k]) : '–' })),
+        { k: 'dsP', label: 'Pcs dead stock', r: 1, h: r => r.has ? fmtN(r.dsP) : '–' }
+      ]
+    })}<p class="small muted" style="margin-top:8px">% stok sehat = pcs laku sekali + laku + cukup laku dibagi total pcs. Klik toko untuk melihat artikelnya.</p></section>`;
+  } else if (U.stTab === 'list') {
+    const codes = storeCodes(); if (!U.stStore || !codes.includes(U.stStore)) U.stStore = codes[0];
+    const S = H.stores[U.stStore];
+    let rows = S ? [...S.items.values()].filter(x => x.k).map(x => ({ ...x, ...artInfo(x.art), art: x.art })) : [];
+    if (U.stStatus) rows = rows.filter(r => r.k === U.stStatus);
+    if (U.stQ) { const q = U.stQ.toLowerCase(); rows = rows.filter(r => (r.name + ' ' + r.art).toLowerCase().includes(q)); }
+    body.innerHTML = `<section class="card"><div class="filters">
+      <select id="hst" class="inp">${codes.map(c => `<option value="${esc(c)}" ${c === U.stStore ? 'selected' : ''}>${esc(sName(c))}</option>`).join('')}</select>
+      <select id="hss" class="inp"><option value="">Semua status</option>${HKEYS.map(k => `<option value="${k}" ${k === U.stStatus ? 'selected' : ''}>${HEALTH[k].label} (${S ? S.count[k] : 0})</option>`).join('')}</select>
+      <input id="hq" class="inp" type="search" placeholder="Cari artikel" value="${esc(U.stQ)}" style="flex:1 1 200px"></div>
+      ${S && S.hasStock ? tbl('hlist', {
+        rows, sort: { k: 'stock', dir: 'desc' }, limit: 40, onRow: r => openProduct(r.art, U.stStore),
+        cols: [
+          { k: 'name', label: 'Produk', h: r => `<span class="nm">${esc(r.name)}</span><span class="sub">${esc(r.art)} · ${esc(r.c3)} › ${esc(r.c4)}</span>` },
+          { k: 'k', label: 'Status', v: r => HKEYS.indexOf(r.k), h: r => badge(r.k) },
+          { k: 'q', label: `Jual ${S.days} hr`, r: 1, h: r => fmtN(r.q) }, { k: 'rate', label: 'Jual/bln', r: 1, h: r => fmtX(r.rate) },
+          { k: 'stock', label: 'Stok', r: 1, h: r => fmtN(r.stock) }, { k: 'sa', label: 'Display', r: 1, h: r => fmtN(r.sa) }, { k: 'wh', label: 'Gudang', r: 1, h: r => fmtN(r.wh) },
+          { k: 'cover', label: 'Cover (bln)', r: 1, v: r => r.cover ?? (r.k === 'DS' ? 999 : -1), h: r => r.k === 'DS' ? '∞' : r.cover == null ? '–' : fmtX(r.cover) }
+        ]
+      }) : '<p class="muted">Stok toko ini belum diupload.</p>'}</section>`;
+  } else {
+    let rows = transfers();
+    if (U.trStore) rows = rows.filter(r => r.from === U.trStore || r.to === U.trStore);
+    if (U.trQ) { const q = U.trQ.toLowerCase(); rows = rows.filter(r => (r.name + ' ' + r.art).toLowerCase().includes(q)); }
+    body.innerHTML = `<section class="card"><div class="card-h"><h3>Saran transfer</h3><p class="small muted">Dari toko yang stoknya menumpuk (dead stock / slow moving) ke toko yang laku sekali atau sudah habis. Target cover ${TARGET_COVER} bulan.</p></div>
+      <div class="filters"><select id="trs" class="inp"><option value="">Semua toko</option>${storeCodes().map(c => `<option value="${esc(c)}" ${c === U.trStore ? 'selected' : ''}>${esc(sName(c))}</option>`).join('')}</select>
+      <input id="trq" class="inp" type="search" placeholder="Cari artikel" value="${esc(U.trQ)}" style="flex:1 1 200px"></div>
+      ${tbl('trans', {
+        rows, sort: { k: 'qty', dir: 'desc' }, limit: 40, onRow: r => openProduct(r.art, null), empty: 'Belum ada saran transfer. Perlu stok dan minimal 14 hari data penjualan per toko.',
+        cols: [
+          { k: 'name', label: 'Produk', h: r => `<span class="nm">${esc(r.name)}</span><span class="sub">${esc(r.art)} · ${esc(r.c3)}</span>` },
+          { k: 'from', label: 'Dari', v: r => sName(r.from), h: r => `${esc(sName(r.from))}<span class="sub">stok ${fmtN(r.fromStock)} · ${HEALTH[r.fromK].label.toLowerCase()}</span>` },
+          { k: 'to', label: 'Ke', v: r => sName(r.to), h: r => `${esc(sName(r.to))}<span class="sub">stok ${fmtN(r.toStock)} · jual ${fmtX(r.toRate)}/bln</span>` },
+          { k: 'qty', label: 'Saran qty', r: 1, h: r => `<b>${fmtN(r.qty)}</b>` }
+        ]
+      })}<p class="small muted" style="margin-top:8px">Saran per artikel. Cek size & warna yang tersedia di toko asal sebelum transfer.</p></section>`;
+  }
+}
+
+/* ================= halaman: kelola data (admin) ================= */
+function pageAdmin(view) {
+  if (!App.admin) { App.page = 'area'; return render(); }
+  setHead('Kelola data', 'Upload sekali di sini, semua yang membuka link langsung melihat data terbaru');
+  const months = Object.keys(App.index.sales).sort().reverse();
+  const cm = App.ui.admMonth && months.includes(App.ui.admMonth) ? App.ui.admMonth : (months[0] || todayISO().slice(0, 7));
+  const tm = App.ui.tgtMonth || (App.lastDate ? App.lastDate.slice(0, 7) : todayISO().slice(0, 7));
+  const wm = App.ui.wgtMonth || tm;
+  const tmOpts = [...new Set([addMonths(tm, -1), tm, addMonths(tm, 1), ...Object.keys(App.targets), ...months])].sort().reverse();
+  const codes = storeCodes().filter(c => sType(c) !== 'bz' || monthTarget(c, tm) || (App.index.sales[tm] || {})[c] || (App.tgtDetail[tm] || {})[c]);
+  const allCodes = storeCodes();
+  view.innerHTML = `<div class="stack">
+    <section class="card"><div class="card-h"><h3>Upload data</h3><p class="small muted">Item DSR Report (penjualan), Export by Bin (stok), file target bulanan, dan bobot target harian. Bisa banyak file & banyak toko sekaligus.</p></div>
+      <label class="drop" id="drop"><input type="file" id="fileIn" multiple accept=".xlsx,.xls,.csv"><b>Pilih file</b><span class="small muted">atau seret file ke sini. Toko dikenali otomatis dari kolom Location.</span></label>
+      <div class="pend" id="pend"></div>
+      <div class="row-act"><button class="btn primary" id="saveBtn" ${App.pending.some(p => !p.err) ? '' : 'disabled'}>Simpan ke database</button><button class="btn" id="clrBtn" ${App.pending.length ? '' : 'disabled'}>Kosongkan daftar</button><span id="saveMsg" class="small muted"></span></div>
+      <p class="small muted" style="margin-top:10px">Tanggal yang sama untuk toko yang sama akan diganti dengan data baru, jadi aman upload ulang. Untuk stok, yang disimpan hanya snapshot terbaru tiap toko.</p></section>
+    <section class="card"><div class="card-h"><h3>Kelengkapan data</h3><select id="covM" class="inp sm">${months.map(m => `<option value="${m}" ${m === cm ? 'selected' : ''}>${fmtMonth(m)}</option>`).join('') || '<option>Belum ada</option>'}</select></div><div id="cov" style="overflow-x:auto"></div></section>
+    <section class="card"><div class="card-h"><h3>Target & nama toko</h3><div class="filters" style="margin:0"><select id="tgtM" class="inp sm">${tmOpts.map(m => `<option value="${m}" ${m === tm ? 'selected' : ''}>${fmtMonth(m)}</option>`).join('')}</select>
+      <label class="small muted" for="tgtB">Target yang dipakai</label><select id="tgtB" class="inp sm">${[['offline', 'Offline'], ['eiger', 'Eiger (Offline + EA + WAB)'], ['total', 'Total (Eiger + Outlive)']].map(([k, l]) => `<option value="${k}" ${App.tgtBasis === k ? 'selected' : ''}>${l}</option>`).join('')}</select></div></div>
+      <p class="small muted" style="margin:-4px 0 12px">Toko baru otomatis terdaftar dari file target, DSR, atau stok. Jenis toko ditentukan dari digit pertama site code (2, 5, 7 = reguler; 9 = bazaar) dan bisa diubah manual. Upload file target bulanan (format Site Code, Site Name, Offline, EA, WAB, Eiger, Outlive, Total) lewat kotak Upload di atas. Kolom terakhir bisa diubah manual bila perlu.</p>
+      ${codes.length ? (() => { const D = App.tgtDetail[tm] || {}; const hasD = Object.keys(D).length > 0; const dc = hasD ? TGT_COLS : [];
+        return `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Kode</th><th>Jenis</th><th>Nama di sistem</th><th>Nama tampil</th>${dc.map(k => `<th class="r">${TGT_LABEL[k]}</th>`).join('')}<th class="r">Target dipakai ${esc(fmtMonth(tm))}</th></tr></thead><tbody>
+      ${codes.map(c => `<tr><td class="tn">${esc(c)}</td><td><select class="inp sm" data-type="${esc(c)}">${['rg', 'bz', 'ot'].map(t => `<option value="${t}" ${sType(c) === t ? 'selected' : ''}>${TYPE_LABEL[t]}${t === autoType(c) ? ' (otomatis)' : ''}</option>`).join('')}</select></td><td class="small">${esc((App.stores[c] || {}).name || '')}</td><td><input class="inp sm" data-alias="${esc(c)}" value="${esc((App.stores[c] || {}).alias || '')}" placeholder="${esc(shortName((App.stores[c] || {}).name || c))}"></td>${dc.map(k => `<td class="r small">${D[c] && D[c][k] ? fmtN(D[c][k]) : '–'}</td>`).join('')}<td class="r"><input class="inp sm tinp" inputmode="numeric" data-tgt="${esc(c)}" value="${monthTarget(c, tm) ? fmtN(monthTarget(c, tm)) : ''}" placeholder="0"></td></tr>`).join('')}
+      <tr><td></td><td></td><td></td><td class="r"><b>Total area</b></td>${dc.map(k => `<td class="r small"><b>${fmtN(codes.reduce((s, c) => s + ((D[c] || {})[k] || 0), 0))}</b></td>`).join('')}<td class="r"><b id="tgtSum">${fmtRp(codes.reduce((s, c) => s + monthTarget(c, tm), 0))}</b></td></tr></tbody></table></div>
+      <div class="row-act"><button class="btn primary" id="tgtSave">Simpan target & nama</button></div>`; })() : '<p class="muted">Toko muncul di sini setelah file pertama diupload.</p>'}</section>
+    <section class="card"><div class="card-h"><h3>Bobot target harian</h3><select id="wgtM" class="inp sm">${[...new Set([tm, ...Object.keys(App.weights)])].sort().reverse().map(m => `<option value="${m}" ${m === wm ? 'selected' : ''}>${fmtMonth(m)}</option>`).join('')}</select></div>
+      ${(() => { const W = wOf(wm); const n = dim(wm); const vals = Array.from({ length: n }, (_, i) => W ? (W[i + 1] || 0) : 1 / n); const mx = Math.max(...vals, 1e-9); const today = App.lastDate || todayISO();
+        return `<p class="small muted" style="margin:-4px 0 12px">${W ? 'Target harian & posisi seharusnya mengikuti bobot ini.' : 'Belum ada bobot untuk bulan ini, target dibagi rata per hari. Upload file bobot (kolom Date & Daily Ratio) lewat kotak Upload di atas.'}</p>
+        <div style="overflow-x:auto"><div style="display:flex;gap:3px;align-items:flex-end;height:120px;min-width:${n * 22}px">${vals.map((v, i) => { const iso = wm + '-' + pad(i + 1); const wd = new Date(+wm.slice(0, 4), +wm.slice(5) - 1, i + 1).getDay(); return `<div title="${fmtDate(iso)}: ${fmtPct(v, 2)}" style="flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;height:100%;gap:3px"><span style="display:block;width:100%;height:${v / mx * 82}%;border-radius:3px 3px 0 0;background:${W ? (wd === 0 || wd === 6 ? 'var(--ochre)' : 'var(--pine-2)') : 'var(--line)'};opacity:${iso <= today ? 1 : .55}"></span><span class="small muted" style="font-size:11px">${i + 1}</span></div>`; }).join('')}</div></div>
+        ${W ? `<div class="legend"><span><i style="background:var(--pine-2)"></i>Hari kerja</span><span><i style="background:var(--ochre)"></i>Sabtu & Minggu</span><span>Kumulatif s/d ${fmtDateS(today.slice(0, 7) === wm ? today : wm + '-' + pad(n))}: ${fmtPct(cumWeight(wm, today.slice(0, 7) === wm ? +today.slice(8) : n), 1)}</span></div>` : ''}`; })()}</section>
+    <section class="card"><div class="card-h"><h3>Riwayat upload</h3></div><div id="logT"></div></section>
+    <section class="card"><div class="card-h"><h3>Hapus data</h3><p class="small muted">Untuk data yang salah upload</p></div>
+      <div class="filters"><select id="delS" class="inp">${allCodes.map(c => `<option value="${esc(c)}">${esc(sName(c))} (${esc(c)})</option>`).join('')}</select>
+      <select id="delM" class="inp">${months.map(m => `<option value="${m}">${fmtMonth(m)}</option>`).join('')}</select>
+      <button class="btn danger" id="delBtn" ${codes.length && months.length ? '' : 'disabled'}>Hapus penjualan toko di bulan ini</button></div></section>
+  </div>`;
+  renderPending(); renderCoverage(cm);
+  $('#logT').innerHTML = tbl('log', { rows: App.log.slice().reverse(), limit: 15, empty: 'Belum ada upload.', cols: [
+    { k: 'at', label: 'Waktu', h: r => esc(new Date(r.at).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })) },
+    { k: 'kind', label: 'Jenis', h: r => ({ DSR: 'Penjualan', INV: 'Stok', TGT: 'Target', WGT: 'Bobot harian', DEL: 'Hapus' }[r.kind] || r.kind) }, { k: 'file', label: 'File', h: r => `<span class="small">${esc(r.file)}</span>` },
+    { k: 'stores', label: 'Toko', r: 1 }, { k: 'info', label: 'Isi', h: r => esc(r.info) }] });
+}
+function renderPending() {
+  const el = $('#pend'); if (!el) return;
+  el.innerHTML = App.pending.map((p, i) => {
+    if (p.err) return `<div class="pend-i"><span class="k err">Gagal</span><div><div class="f">${esc(p.file)}</div><div class="d">${esc(p.err)}</div></div><button class="btn sm" data-rmp="${i}">Hapus</button></div>`;
+    if (p.kind === 'WGT') {
+      const warn = p.days !== dim(p.month) ? ` <b style="color:var(--warn)">hanya ${p.days} dari ${dim(p.month)} hari</b>` : '';
+      return `<div class="pend-i"><span class="k">Bobot harian</span><div><div class="f">${esc(p.file)}</div><div class="d">${fmtMonth(p.month)} · ${p.days} hari · total ${fmtPct(p.rawSum, 2)}${warn}</div></div><button class="btn sm" data-rmp="${i}">Hapus</button></div>`;
+    }
+    if (p.kind === 'TGT') {
+      const ms = Object.keys(p.data);
+      const sumBy = k => ms.reduce((s, m) => s + Object.values(p.data[m]).reduce((a, o) => a + (o[k] || 0), 0), 0);
+      const mOpt = p.needMonth ? ` · bulan <input type="month" class="inp sm" data-pmonth="${i}" value="${esc(p.month || '')}"> <b style="color:var(--warn)">pilih bulan</b>` : ' · ' + ms.map(fmtMonth).join(', ');
+      return `<div class="pend-i"><span class="k">Target</span><div><div class="f">${esc(p.file)}</div><div class="d">${p.rows} toko${mOpt} · Offline ${fmtRp(sumBy('offline'))} · Total ${fmtRp(sumBy('total'))}</div></div><button class="btn sm" data-rmp="${i}">Hapus</button></div>`;
+    }
+    const st = Object.values(p.stores);
+    const names = st.map(s => shortName(s.name)).slice(0, 4).join(', ') + (st.length > 4 ? ' +' + (st.length - 4) : '');
+    if (p.kind === 'DSR') {
+      const net = st.reduce((s, x) => s + x.lines.reduce((a, l) => a + l.n, 0), 0);
+      return `<div class="pend-i"><span class="k dsr">Penjualan</span><div><div class="f">${esc(p.file)}</div><div class="d">${esc(names)} · ${p.from === p.to ? fmtDate(p.from) : fmtDate(p.from) + ' – ' + fmtDate(p.to)} · ${fmtN(p.rows)} baris · net ${fmtRp(net)}</div></div><button class="btn sm" data-rmp="${i}">Hapus</button></div>`;
+    }
+    const pcs = st.reduce((s, x) => s + x.pcs, 0);
+    return `<div class="pend-i"><span class="k inv">Stok</span><div><div class="f">${esc(p.file)}</div><div class="d">${esc(names)} · ${fmtN(pcs)} pcs · ${fmtN(p.rows)} baris bin · tanggal stok <input type="date" class="inp sm" data-pdate="${i}" value="${esc(p.date)}">${p.dateFromName ? '' : ' <b style="color:var(--warn)">cek tanggal</b>'}</div></div><button class="btn sm" data-rmp="${i}">Hapus</button></div>`;
+  }).join('');
+  const sb = $('#saveBtn'); if (sb) sb.disabled = !App.pending.some(p => !p.err);
+  const cb = $('#clrBtn'); if (cb) cb.disabled = !App.pending.length;
+}
+function renderCoverage(m) {
+  const el = $('#cov'); if (!el) return;
+  const codes = storeCodes().filter(c => (App.index.sales[m] || {})[c] || monthTarget(c, m) || (sType(c) !== 'bz' && App.index.stock[c])); if (!codes.length || !App.index.sales[m]) { el.innerHTML = '<p class="muted">Belum ada data penjualan.</p>'; return; }
+  const n = dim(m), today = todayISO();
+  el.innerHTML = `<table class="cov"><thead><tr><th class="st">Toko</th>${Array.from({ length: n }, (_, i) => `<th>${i + 1}</th>`).join('')}<th class="st" style="padding-left:8px">Stok per</th></tr></thead><tbody>
+    ${codes.map(c => { const d = new Set(((App.index.sales[m] || {})[c] || {}).d || []); return `<tr><th class="st">${esc(sName(c))}${sType(c) === 'bz' ? ' <span class="muted small">bazaar</span>' : ''}</th>${Array.from({ length: n }, (_, i) => { const iso = m + '-' + pad(i + 1); return `<td class="${d.has(i + 1) ? 'y' : iso > today ? 'fut' : ''}" title="${esc(sName(c))} ${fmtDate(iso)}: ${d.has(i + 1) ? 'ada data' : 'belum ada'}"></td>`; }).join('')}<td class="stk">${App.index.stock[c] ? fmtDateS(App.index.stock[c].date) : '–'}</td></tr>`; }).join('')}
+  </tbody></table><div class="legend"><span><i style="background:var(--pine-2)"></i>Ada data penjualan</span><span><i style="background:var(--surface-2);border:1px solid var(--line)"></i>Belum ada / tidak ada transaksi</span></div>`;
+}
+async function addFiles(files) {
+  if (typeof XLSX === 'undefined') { toast('Pembaca Excel belum termuat. Muat ulang halaman.'); return; }
+  $('#saveMsg').textContent = 'Membaca file…';
+  for (const f of files) {
+    try { const buf = await f.arrayBuffer(); const p = parseWorkbook(buf, f.name); App.pending.push(p); }
+    catch (e) { App.pending.push({ file: f.name, err: e.message || String(e) }); }
+    renderPending();
+  }
+  $('#saveMsg').textContent = '';
+}
+async function saveAll() {
+  const items = App.pending.filter(p => !p.err); if (!items.length) return;
+  const btn = $('#saveBtn'), msg = $('#saveMsg');
+  const noMonth = items.find(p => p.kind === 'TGT' && p.needMonth && !p.month);
+  if (noMonth) { msg.textContent = 'Pilih bulan untuk file target ' + noMonth.file + ' dulu.'; return; }
+  btn.disabled = true;
+  const say = t => { msg.textContent = t; };
+  try {
+    say('Membaca data tersimpan…');
+    const fresh = await withRetry(() => metaDoc('index').get());
+    const idx = fresh.exists ? clone(fresh.data()) : {}; idx.sales = idx.sales || {}; idx.stock = idx.stock || {};
+    const stores = clone(App.stores); const log = clone(App.log);
+    const now = new Date().toISOString();
+    // gabung penjualan per toko-bulan-hari
+    const pend = {}; const metaAll = {};
+    for (const p of items.filter(p => p.kind === 'DSR')) {
+      for (const S of Object.values(p.stores)) {
+        stores[S.code] = { ...(stores[S.code] || {}), name: longer((stores[S.code] || {}).name, S.name) };
+        Object.assign(metaAll, S.meta);
+        const byDay = {}; for (const l of S.lines) (byDay[l.d] || (byDay[l.d] = [])).push(l);
+        for (const d in byDay) { const m = d.slice(0, 7), dd = +d.slice(8); ((pend[S.code] || (pend[S.code] = {}))[m] || (pend[S.code][m] = {}))[dd] = byDay[d]; }
+      }
+      const nets = Object.values(p.stores).reduce((s, x) => s + x.lines.reduce((a, l) => a + l.n, 0), 0);
+      log.push({ at: now, kind: 'DSR', file: p.file, stores: Object.keys(p.stores).length, info: (p.from === p.to ? fmtDate(p.from) : fmtDate(p.from) + ' – ' + fmtDate(p.to)) + ', net ' + fmtRpS(nets) });
+    }
+    const jobs = []; for (const c in pend) for (const m in pend[c]) jobs.push([c, m]);
+    let k = 0;
+    for (const [c, m] of jobs) {
+      k++; say(`Menyimpan penjualan ${shortName(stores[c].name)} ${fmtMonth(m)} (${k}/${jobs.length})…`);
+      const old = (idx.sales[m] || {})[c]; const days = {}; const meta = {};
+      if (old && old.p) {
+        for (let p = 0; p < old.p; p++) {
+          const s = await withRetry(() => App.db.doc(`sales/${c}_${m}_${p}`).get());
+          if (s.exists) { const b = s.data(); Object.assign(meta, b.sku); for (const l of decodeSalesPart(b)) { const dd = +l.d.slice(8); (days[dd] || (days[dd] = [])).push(l); } }
+        }
+      }
+      for (const dd in pend[c][m]) days[dd] = pend[c][m][dd];
+      for (const dd in days) for (const l of days[dd]) if (metaAll[l.sku]) meta[l.sku] = metaAll[l.sku];
+      const parts = encodeSalesParts(c, m, days, meta);
+      for (const part of parts) await withRetry(() => App.db.doc(`sales/${c}_${m}_${part.p}`).set(part));
+      if (old && old.p > parts.length) for (let p = parts.length; p < old.p; p++) await withRetry(() => App.db.doc(`sales/${c}_${m}_${p}`).delete());
+      (idx.sales[m] || (idx.sales[m] = {}))[c] = { d: Object.keys(days).map(Number).sort((a, b) => a - b), p: parts.length };
+    }
+    // stok
+    const invs = items.filter(p => p.kind === 'INV');
+    for (const p of invs) {
+      let saved = 0, skipped = 0;
+      for (const S of Object.values(p.stores)) {
+        stores[S.code] = { ...(stores[S.code] || {}), name: longer((stores[S.code] || {}).name, S.name) };
+        const old = idx.stock[S.code];
+        if (old && old.date > p.date) { skipped++; continue; }
+        say(`Menyimpan stok ${shortName(S.name)}…`);
+        const parts = encodeStockParts(S.code, p.date, S.items, S.meta);
+        for (const part of parts) await withRetry(() => App.db.doc(`stock/${S.code}_${part.p}`).set(part));
+        if (old && old.p > parts.length) for (let q = parts.length; q < old.p; q++) await withRetry(() => App.db.doc(`stock/${S.code}_${q}`).delete());
+        idx.stock[S.code] = { date: p.date, p: parts.length, pcs: S.pcs }; saved++;
+      }
+      log.push({ at: now, kind: 'INV', file: p.file, stores: Object.keys(p.stores).length, info: 'stok per ' + fmtDate(p.date) + (skipped ? `, ${skipped} toko dilewati (sudah ada stok lebih baru)` : '') });
+    }
+    const tgts = items.filter(p => p.kind === 'TGT');
+    if (tgts.length) {
+      say('Menyimpan target…');
+      const fr = await withRetry(() => metaDoc('targets').get());
+      const T = fr.exists ? clone(fr.data()) : {}; T.byMonth = T.byMonth || {}; T.detail = T.detail || {}; T.basis = T.basis || 'total';
+      for (const p of tgts) {
+        const ms = [];
+        for (const m0 in p.data) {
+          const m = m0 === '?' ? p.month : m0; ms.push(m);
+          T.detail[m] = T.detail[m] || {}; T.byMonth[m] = T.byMonth[m] || {};
+          for (const c in p.data[m0]) { T.detail[m][c] = p.data[m0][c]; const v = basisVal(p.data[m0][c], T.basis); if (v) T.byMonth[m][c] = v; else delete T.byMonth[m][c]; }
+        }
+        for (const c in p.names) if (p.names[c]) stores[c] = { ...(stores[c] || {}), name: longer((stores[c] || {}).name, p.names[c]) };
+        log.push({ at: now, kind: 'TGT', file: p.file, stores: p.rows, info: 'target ' + ms.map(fmtMonth).join(', ') });
+      }
+      await withRetry(() => metaDoc('targets').set(T));
+    }
+    const wgts = items.filter(p => p.kind === 'WGT');
+    if (wgts.length) {
+      say('Menyimpan bobot harian…');
+      const fr = await withRetry(() => metaDoc('weights').get());
+      const W = fr.exists ? clone(fr.data()) : {}; W.byMonth = W.byMonth || {};
+      for (const p of wgts) { W.byMonth[p.month] = p.w; log.push({ at: now, kind: 'WGT', file: p.file, stores: '–', info: 'bobot harian ' + fmtMonth(p.month) + ', ' + p.days + ' hari' }); }
+      await withRetry(() => metaDoc('weights').set(W));
+    }
+    say('Menyimpan ringkasan…');
+    await withRetry(() => metaDoc('index').set(idx));
+    await withRetry(() => metaDoc('stores').set({ list: stores }));
+    await withRetry(() => metaDoc('log').set({ items: log.slice(-80) }));
+    App.pending = [];
+    say('Memuat ulang dashboard…');
+    await loadAll();
+    toast('Data tersimpan. Semua yang membuka link sekarang melihat data ini.');
+    render();
+  } catch (e) {
+    console.error(e);
+    const why = e && e.code === 'invalid_argument' ? 'Akun ini tidak punya izin menulis data (hanya pemilik/editor).' : e && e.code === 'quota_exceeded' ? 'Kapasitas database penuh. Hapus data bulan lama dulu.' : (e && (e.message || e.code)) || String(e);
+    say('Gagal menyimpan: ' + why); btn.disabled = false;
+  }
+}
+async function saveTargets() {
+  const m = $('#tgtM').value; const t = clone(App.targets); t[m] = t[m] || {};
+  $$('[data-tgt]').forEach(i => { const v = Number(String(i.value).replace(/[^0-9]/g, '')) || 0; if (v) t[m][i.dataset.tgt] = v; else delete t[m][i.dataset.tgt]; });
+  const st = clone(App.stores);
+  $$('[data-alias]').forEach(i => { const c = i.dataset.alias; st[c] = st[c] || { name: c }; const v = i.value.trim(); if (v) st[c].alias = v; else delete st[c].alias; });
+  $$('[data-type]').forEach(i => { const c = i.dataset.type; st[c] = st[c] || { name: c }; if (i.value !== autoType(c)) st[c].type = i.value; else delete st[c].type; });
+  try {
+    await withRetry(() => metaDoc('targets').set({ byMonth: t, detail: App.tgtDetail, basis: App.tgtBasis }));
+    await withRetry(() => metaDoc('stores').set({ list: st }));
+    App.targets = t; App.stores = st; App.cache = {}; toast('Target & nama toko tersimpan'); render();
+  } catch (e) { toast('Gagal menyimpan: ' + (e.code === 'invalid_argument' ? 'tidak ada izin menulis' : (e.message || e.code))); }
+}
+async function saveBasis(b) {
+  const t = clone(App.targets);
+  for (const m in App.tgtDetail) { t[m] = t[m] || {}; for (const c in App.tgtDetail[m]) { const v = basisVal(App.tgtDetail[m][c], b); if (v) t[m][c] = v; else delete t[m][c]; } }
+  try {
+    await withRetry(() => metaDoc('targets').set({ byMonth: t, detail: App.tgtDetail, basis: b }));
+    App.targets = t; App.tgtBasis = b; App.cache = {}; toast('Target sekarang memakai kolom ' + ({ offline: 'Offline', eiger: 'Eiger', total: 'Total' }[b])); render();
+  } catch (e) { toast('Gagal menyimpan: ' + (e.message || e.code)); }
+}
+async function deleteStoreMonth() {
+  const c = $('#delS').value, m = $('#delM').value;
+  if (!c || !m) return;
+  if (!confirm(`Hapus semua data penjualan ${sName(c)} di ${fmtMonth(m)}? Tidak bisa dibatalkan.`)) return;
+  try {
+    const fresh = await withRetry(() => metaDoc('index').get()); const idx = fresh.exists ? clone(fresh.data()) : { sales: {}, stock: {} };
+    const ix = (idx.sales[m] || {})[c]; if (!ix) { toast('Tidak ada data untuk toko & bulan itu'); return; }
+    for (let p = 0; p < ix.p; p++) await withRetry(() => App.db.doc(`sales/${c}_${m}_${p}`).delete());
+    delete idx.sales[m][c]; if (!Object.keys(idx.sales[m]).length) delete idx.sales[m];
+    await withRetry(() => metaDoc('index').set(idx));
+    const log = clone(App.log); log.push({ at: new Date().toISOString(), kind: 'DEL', file: 'Hapus manual', stores: 1, info: sName(c) + ' ' + fmtMonth(m) });
+    await withRetry(() => metaDoc('log').set({ items: log.slice(-80) }));
+    await loadAll(); toast('Data dihapus'); render();
+  } catch (e) { toast('Gagal menghapus: ' + (e.message || e.code)); }
+}
+
+/* ================= navigasi & event ================= */
+function go(page) { App.page = page; closeDrawer(); render(); window.scrollTo(0, 0); }
+document.addEventListener('click', async e => {
+  const t = e.target;
+  const g = t.closest('[data-go]'); if (g) { go(g.dataset.go); return; }
+  if (t.closest('[data-close]') || t.id === 'ov') { closeDrawer(); return; }
+  const srt = t.closest('[data-sort]'); if (srt) { const [id, k] = srt.dataset.sort.split('|'); const s = App.ui.sorts[id]; App.ui.sorts[id] = s && s.k === k ? { k, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { k, dir: 'desc' }; render(); return; }
+  const mr = t.closest('[data-more]'); if (mr) { const [id, n] = mr.dataset.more.split('|'); App.ui.more[id] = +n; render(); return; }
+  const row = t.closest('[data-row]'); if (row) { const [id, i] = row.dataset.row.split('|'); const T = App.tables[id]; if (T && T.onRow) T.onRow(T.rows[+i]); return; }
+  const sm = t.closest('[data-store]'); if (sm) { App.ui.store = sm.dataset.store; go('toko'); return; }
+  const hg = t.closest('[data-hgo]'); if (hg) { App.ui.stTab = 'list'; App.ui.stStore = hg.dataset.hgo; App.ui.stStatus = ''; go('stok'); return; }
+  const rps = t.closest('[data-rps]'); if (rps) { const k = rps.dataset.rps; const s0 = App.ui.rpSort || { k: 'mAch', dir: 'desc' }; App.ui.rpSort = s0.k === k ? { k, dir: s0.dir === 'asc' ? 'desc' : 'asc' } : { k, dir: (k === 'c' || k === 'name') ? 'asc' : 'desc' }; render(); return; }
+  const rpv = t.closest('[data-rpv]'); if (rpv) { App.ui.rpVal = rpv.dataset.rpv; render(); return; }
+  if (t.id === 'rpXls') { exportReport(); return; }
+  const tb = t.closest('[data-sttab]'); if (tb) { App.ui.stTab = tb.dataset.sttab; render(); return; }
+  const rp = t.closest('[data-rmp]'); if (rp) { App.pending.splice(+rp.dataset.rmp, 1); renderPending(); return; }
+  if (t.id === 'saveBtn') { saveAll(); return; }
+  if (t.id === 'clrBtn') { App.pending = []; renderPending(); return; }
+  if (t.id === 'tgtSave') { saveTargets(); return; }
+  if (t.id === 'delBtn') { deleteStoreMonth(); return; }
+  if (t.id === 'reloadBtn') { t.disabled = true; t.textContent = 'Memuat…'; try { await loadAll(); toast('Data terbaru dimuat'); } catch (er) { toast('Gagal memuat: ' + (er.message || er.code)); } render(); return; }
+});
+let qTimer;
+document.addEventListener('input', e => {
+  const t = e.target;
+  const deb = (key) => { App.ui[key] = t.value; App.ui.more = {}; clearTimeout(qTimer); qTimer = setTimeout(() => { const pos = t.selectionStart; const id = t.id; render(); const n = document.getElementById(id); if (n) { n.focus(); try { n.setSelectionRange(pos, pos); } catch (er) { } } }, 300); };
+  if (t.id === 'pq') deb('prodQ'); else if (t.id === 'hq') deb('stQ'); else if (t.id === 'trq') deb('trQ');
+  else if (t.dataset && t.dataset.tgt !== undefined) { const sum = $$('[data-tgt]').reduce((s, i) => s + (Number(String(i.value).replace(/[^0-9]/g, '')) || 0), 0); const el = $('#tgtSum'); if (el) el.textContent = fmtRp(sum); }
+});
+document.addEventListener('change', async e => {
+  const t = e.target;
+  if (t.id === 'perSel' || t.id === 'rFrom' || t.id === 'rTo') { await onPeriodChange(); return; }
+  if (t.id === 'stSel') { App.ui.store = t.value; App.ui.more = {}; render(); return; }
+  if (t.id === 'pc3') { App.ui.prodC3 = t.value; render(); return; }
+  if (t.id === 'pst') { App.ui.prodStore = t.value; render(); return; }
+  if (t.id === 'hst') { App.ui.stStore = t.value; App.ui.more = {}; render(); return; }
+  if (t.id === 'hss') { App.ui.stStatus = t.value; render(); return; }
+  if (t.id === 'trs') { App.ui.trStore = t.value; render(); return; }
+  if (t.id === 'covM') { App.ui.admMonth = t.value; renderCoverage(t.value); return; }
+  if (t.id === 'tgtM') { App.ui.tgtMonth = t.value; render(); return; }
+  if (t.id === 'wgtM') { App.ui.wgtMonth = t.value; render(); return; }
+  if (t.id === 'typeSel') { App.ui.typeF = t.value; App.ui.more = {}; App.cache.tr = null; render(); return; }
+  if (t.id === 'rpDate') { if (t.value) { App.ui.rpDate = t.value; render(); } return; }
+  if (t.id === 'fileIn') { const fs = [...t.files]; t.value = ''; await addFiles(fs); return; }
+  if (t.dataset && t.dataset.pmonth !== undefined) { const p = App.pending[+t.dataset.pmonth]; if (p) p.month = t.value; return; }
+  if (t.id === 'tgtB') { saveBasis(t.value); return; }
+  if (t.dataset && t.dataset.pdate !== undefined) { const p = App.pending[+t.dataset.pdate]; if (p && t.value) { p.date = t.value; p.dateFromName = true; } return; }
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDrawer(); });
+window.addEventListener('scroll', () => { const b = document.getElementById('brandbar'); if (b) b.classList.toggle('scrolled', window.scrollY > 8); }, { passive: true });
+document.addEventListener('dragover', e => { const d = e.target.closest && e.target.closest('#drop'); if (d) { e.preventDefault(); d.classList.add('over'); } });
+document.addEventListener('dragleave', e => { const d = e.target.closest && e.target.closest('#drop'); if (d) d.classList.remove('over'); });
+document.addEventListener('drop', async e => { const d = e.target.closest && e.target.closest('#drop'); if (!d) return; e.preventDefault(); d.classList.remove('over'); await addFiles([...e.dataTransfer.files]); });
+
+/* ================= mulai ================= */
+async function init() {
+  renderNav();
+  if (typeof Chart !== 'undefined') { Chart.defaults.font.family = '"Plus Jakarta Sans", system-ui, sans-serif'; }
+  let db = null;
+  try { db = window.claude && window.claude.use ? await window.claude.use('db') : null; } catch (e) { db = null; }
+  if (!db) {
+    $('#view').innerHTML = `<div class="empty-state"><h2>Data tidak bisa dimuat di sini</h2><p class="muted">Buka dashboard ini dari link claude.ai dan pastikan kamu sudah masuk (login) ke akun Claude.</p></div>`;
+    return;
+  }
+  App.db = db;
+  try { App.user = await window.claude.use('user'); } catch (e) { App.user = null; }
+  try { App.admin = App.user ? !!(await App.user.canEdit()) : false; } catch (e) { App.admin = false; }
+  try { await loadAll(); }
+  catch (e) { console.error(e); $('#view').innerHTML = `<div class="empty-state"><h2>Gagal memuat data</h2><p class="muted">${esc(e.message || e.code || e)}</p><button class="btn" id="reloadBtn">Coba lagi</button></div>`; renderNav(); return; }
+  if (!App.lastDate && App.admin) App.page = 'admin';
+  render();
+}
+init();
+</script>
+</body>
+</html>

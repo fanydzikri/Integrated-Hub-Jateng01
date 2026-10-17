@@ -399,8 +399,12 @@ function parseDSR(rows, hi, h, fileName) {
     name: colIdx(h, 'skuname', 'itemname'), c3: colIdx(h, 'categorylv3', 'categorylevel3'), c4: colIdx(h, 'categorylv4', 'categorylevel4'),
     loc: colIdx(h, 'location'), q: colIdx(h, 'quantity', 'qty'), sp: colIdx(h, 'salesperson', 'salesman'),
     g: colIdx(h, 'grossamount', 'grosssales'), n: colIdx(h, 'netamount', 'netsales'), st: colIdx(h, 'billstatus', 'status'), ty: colIdx(h, 'transactiontype', 'type'),
-    br: colIdx(h, 'brand'), pn: colIdx(h, 'promotionname', 'promoname'), pv: colIdx(h, 'promotionvalue', 'promovalue')
+    br: colIdx(h, 'brand'), pn: colIdx(h, 'promotionname', 'promoname'), pv: colIdx(h, 'promotionvalue', 'promovalue'),
+    inv: colIdx(h, 'invoiceno'), sprc: colIdx(h, 'saleprice'), oa: colIdx(h, 'orderamount'), cv: colIdx(h, 'couponvalue'), cc: colIdx(h, 'couponcode'),
+    cd: colIdx(h, 'coupondescription'), cr: colIdx(h, 'couponremarks'), ed: colIdx(h, 'employeediscount'), lp: colIdx(h, 'loyaltypoint'),
+    da: colIdx(h, 'discountamount'), sc: colIdx(h, 'shippingcost'), sd: colIdx(h, 'shippingdiscount'), cn: colIdx(h, 'customername', 'namacustomer', 'namapelanggan')
   };
+  const tx = (r, i) => i >= 0 ? String(r[i] ?? '').trim() : '', nx = (r, i) => i >= 0 ? numV(r[i]) : 0;
   if (C.o < 0 || C.dt < 0 || C.sku < 0 || C.q < 0 || (C.n < 0 && C.g < 0)) throw new Error('Kolom wajib Item DSR tidak lengkap (Order No, Order Date, SKU Code, Quantity, Net Amount).');
   let headLoc = null;
   for (let i = 0; i < hi; i++) for (const c of rows[i] || []) { const m = String(c ?? '').match(/^\s*Location\s*:\s*(.+)$/i); if (m) headLoc = parseLoc(m[1]); }
@@ -419,7 +423,8 @@ function parseDSR(rows, hi, h, fileName) {
     const pName = C.pn >= 0 ? String(r[C.pn] ?? '').trim() : '', pVal = C.pv >= 0 ? numV(r[C.pv]) : 0;
     /* promo markdown (sama dengan logika tim): bukan voucher/member, nama SMDS/DCNP/flush/sale atau diskon >= 25% */
     const pm = pName && pVal > 0 && !/voucher|sign\s*up|member|loyalty/i.test(pName) && (/smds|dcnp|flush|clearance|national|nasional|\bsale\b|cuci gudang/i.test(pName) || (g > 0 && pVal / g >= .25)) ? 1 : 0;
-    S.lines.push({ d: dt.d, o: String(o).trim(), t: dt.t, sku, q: numV(r[C.q]), g, n: net, sp: C.sp >= 0 ? String(r[C.sp] ?? '').trim() : '', ty: C.ty >= 0 ? String(r[C.ty] ?? '').trim() : '', st, pm, pv: pVal, pn: pName });
+    S.lines.push({ d: dt.d, o: String(o).trim(), t: dt.t, sku, q: numV(r[C.q]), g, n: net, sp: C.sp >= 0 ? String(r[C.sp] ?? '').trim() : '', ty: C.ty >= 0 ? String(r[C.ty] ?? '').trim() : '', st, pm, pv: pVal, pn: pName,
+      x: [tx(r, C.inv), nx(r, C.sprc), nx(r, C.oa), nx(r, C.cv), tx(r, C.cc), tx(r, C.cd), tx(r, C.cr), nx(r, C.ed), nx(r, C.lp), nx(r, C.da), nx(r, C.sc), nx(r, C.sd), tx(r, C.cn)] });
     if (!S.meta[sku]) S.meta[sku] = [String(r[C.name] ?? '').trim(), C.c3 >= 0 ? String(r[C.c3] ?? '').trim() : '', C.c4 >= 0 ? String(r[C.c4] ?? '').trim() : '', '', C.br >= 0 ? String(r[C.br] ?? '').trim().toUpperCase() : ''];
     if (!from || dt.d < from) from = dt.d; if (!to || dt.d > to) to = dt.d; n++;
   }
@@ -685,7 +690,7 @@ async function loadMonth(m) {
   if (App.loaded.has(m) || !App.index.sales[m]) return;
   const C = await api('dsr', { m });
   mergeSku(C.sku || {});
-  for (const c in C.stores || {}) for (const r of C.stores[c]) App.lines.push({ s: c, d: m + '-' + pad(r[0]), t: r[1], o: r[2], st: C.st[r[3]] || '', ty: C.ty[r[4]] || '', sku: r[5], q: r[6], g: r[7], n: r[8], sp: C.sp[r[9]] || '', pm: r[10] || 0 });
+  for (const c in C.stores || {}) for (const r of C.stores[c]) App.lines.push({ s: c, d: m + '-' + pad(r[0]), t: r[1], o: r[2], st: C.st[r[3]] || '', ty: C.ty[r[4]] || '', sku: r[5], q: r[6], g: r[7], n: r[8], sp: C.sp[r[9]] || '', pm: r[10] || 0, pn: (C.pn || [])[r[11]] || '', pv: r[12] || 0, cv: r[13] || 0, disc: r[14] || 0, cn: (C.cn || [])[r[15]] || '' });
   App.loaded.add(m); App.cache = {};
 }
 async function ensureMonths(from, to) {
@@ -1494,7 +1499,10 @@ async function saveAll() {
           const k = [l.o, l.sku, l.t, l.q, l.g, l.n].join('|');
           if (arr.files.has(p.file) || !arr.seen.has(k)) { arr.seen.add(k); arr.files.add(p.file);
             const mt = S.meta[l.sku] || [];
-            arr.rows.push([l.d, hhmm(l.t), S.code, S.name, l.o, l.st || '', l.ty || '', l.sku, mt[0] || '', mt[1] || '', mt[2] || '', mt[4] || '', l.q, l.g, l.pv || 0, l.pn || '', l.n, l.sp || '', l.pm ? 1 : 0]); }
+            const x = l.x || [];
+            arr.rows.push([l.d, hhmm(l.t), S.code, S.name, l.o, x[0] || '', l.st || '', l.ty || '', l.sku, mt[0] || '', mt[1] || '', mt[2] || '', mt[4] || '',
+              l.q, x[1] || 0, l.g, x[2] || 0, l.pv || 0, l.pn || '', x[3] || 0, x[4] || '', x[5] || '', x[6] || '', x[7] || 0, x[8] || 0,
+              x[9] || 0, l.n, x[10] || 0, x[11] || 0, l.sp || '', l.pm ? 1 : 0, x[12] || '']); }
           const dd = +l.d.slice(8); const arrD = sc[m] || (sc[m] = []); if (!arrD.includes(dd)) arrD.push(dd);
         }
       }
@@ -1505,7 +1513,7 @@ async function saveAll() {
       /* kirim per paket (toko-tanggal tidak pernah dipecah) */
       const groups = Object.values(pend[m]); let pack = [], sent = 0; const total = groups.reduce((s, g) => s + g.rows.length, 0);
       const flush = async () => { if (!pack.length) return; say(`Menyimpan penjualan ${fmtMonth(m)} ke spreadsheet… ${fmtN(sent)} / ${fmtN(total)} baris`); await withRetry(() => apiPost({ a: 'dsr', m, rows: pack })); sent += pack.length; pack = []; };
-      for (const g of groups) { if (pack.length && pack.length + g.rows.length > 6000) await flush(); pack.push(...g.rows); }
+      for (const g of groups) { if (pack.length && pack.length + g.rows.length > 4000) await flush(); pack.push(...g.rows); }
       await flush();
     }
     /* --- stok --- */

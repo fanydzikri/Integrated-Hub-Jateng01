@@ -1726,7 +1726,7 @@ const loginForm = (id) => `<label for="lgPass${id}">Password</label><input id="l
 function openLogin() {
   closeLogin();
   const ov = document.createElement('div'); ov.className = 'modal-ov'; ov.id = 'lgOv';
-  ov.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-labelledby="lgT"><h2 id="lgT">Masuk sebagai admin</h2><p class="small muted" style="margin:0">Masukkan password admin (ADMIN_PASSWORD di Apps Script).</p>${loginForm('')}
+  ov.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-labelledby="lgT"><h2 id="lgT">Masuk sebagai admin</h2><p class="small muted" style="margin:0">Masukkan password admin.</p>${loginForm('')}<p class="small muted" style="margin:6px 0 0">Server: …${esc(SHEET_API_URL.replace(/\/exec$/, '').slice(-8))}</p>
     <div class="row-act"><button class="btn" id="lgCancel">Batal</button><button class="btn primary" id="lgGo">Masuk</button></div></div>`;
   document.body.appendChild(ov); $('#lgPass').focus();
 }

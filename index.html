@@ -289,6 +289,13 @@ table.tbl{width:100%;border-collapse:collapse;font-size:13.5px}
 .donut{position:relative;height:260px}
 .abc{display:inline-block;width:22px;text-align:center;border-radius:5px;font-weight:800;font-size:11px;color:#fff}
 .abc.A{background:var(--ok)}.abc.B{background:var(--orange)}.abc.C{background:var(--muted)}
+.tree td.l1{font-weight:800;color:var(--navy)}
+.tree tr.lv1 td{background:var(--navy-tint)}
+.tree tr.lv2 td.nm{padding-left:26px;font-weight:700}
+.tree tr.lv3 td.nm{padding-left:48px;font-weight:500;color:var(--muted)}
+.tree tr.lv1,.tree tr.lv2{cursor:pointer}
+.tree .car{display:inline-block;width:14px;color:var(--muted)}
+.disc{display:inline-block;background:var(--orange);color:#fff;font-weight:800;font-size:11px;border-radius:5px;padding:1px 6px}
 .ra-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
 .ra-tile{background:#0F3192;color:#fff;border-radius:10px;padding:12px 16px;text-align:center}
 .ra-tile span{display:block;font-size:12px;font-weight:600;color:#C9D3F0}
@@ -934,8 +941,10 @@ async function fetchKatalog(file) {
 async function loadMaster(force) {
   if (!force && (App.mst.status === 'loading' || App.mst.status === 'ok')) return;
   App.mst = { status: 'loading' };
-  const [m, g] = await Promise.allSettled([fetchKatalog('master.json'), fetchKatalog('gambar.json')]);
-  const M = { status: 'ok', master: m.status === 'fulfilled' ? m.value : null, photo: g.status === 'fulfilled' ? g.value : null, err: [] };
+  const [m, g, pr] = await Promise.allSettled([fetchKatalog('master.json'), fetchKatalog('gambar.json'), fetchKatalog('promo.json')]);
+  const M = { status: 'ok', master: m.status === 'fulfilled' ? m.value : null, photo: g.status === 'fulfilled' ? g.value : null, promo: pr.status === 'fulfilled' ? pr.value : null, err: [] };
+  M.psku = new Map();
+  if (M.promo && M.promo.items) for (const key in M.promo.items) { const it = M.promo.items[key]; for (const sku in (it.a || {})) M.psku.set(sku, { key, d: it.d || 0, p: it.p || 0 }); }
   if (!M.master) M.err.push('master artikel'); if (!M.photo) M.err.push('foto');
   if (!M.master && !M.photo) M.status = 'err';
   M.sku = new Map(); M.art = new Map();
@@ -945,7 +954,7 @@ async function loadMaster(force) {
     const a = M.art.get(art) || []; a.push(key); M.art.set(art, a);
   }
   App.mst = M; App.cache = {};
-  if (['produk', 'stok', 'toko', 'admin'].includes(App.page) && !$('#ov')) render();
+  if (['produk', 'stok', 'toko', 'admin', 'promostock', 'lost', 'pareto'].includes(App.page) && !$('#ov')) render();
 }
 const mItem = key => App.mst.master && App.mst.master.items ? App.mst.master.items[key] : null;
 const colorOfSku = sku => { const k = App.mst.sku && App.mst.sku.get(sku); if (k) return k.split('.').slice(1).join('.'); const p = String((App.sku[sku] || [])[0] || '').split(','); return (p[1] || '').trim().toUpperCase(); };
@@ -1109,7 +1118,7 @@ const ICON = {
 };
 const NAV = [
   { k: 'sales', label: 'Sales Performance', icon: 'area', items: [['report', 'Monitoring Sales', 'Achievement, UPT & basket size'], ['trend', 'Sales Trend', 'Jam, hari, UPT & basket harian'], ['promo', 'Kontribusi Promo', 'Porsi tiap promo terhadap sales'], ['omni', 'Monitoring OmniChannel', 'EA, Eigerindo Voucher, Tax Invoice, EASAP'], ['eac', 'Sales Member EAC', 'KPI penjualan ke member'], ['ra', 'RA Performance', 'Transaksi, UPT & basket per sales person'], ['pareto', 'Product Pareto', 'Kontribusi kategori & produk (80/20)']] },
-  { k: 'inv', label: 'Inventory', icon: 'produk', items: [['produk', 'Produk', 'Penjualan & stok per artikel'], ['stok', 'Kesehatan Produk', 'SSR, dead stock, saran transfer']] },
+  { k: 'inv', label: 'Inventory', icon: 'produk', items: [['produk', 'Produk', 'Penjualan & stok per artikel'], ['stok', 'Kesehatan Produk', 'SSR, dead stock, saran transfer'], ['promostock', 'Stok DCNP/SMDS', 'Stok barang diskon per MC Lv2–Lv4']] },
   { k: 'lost', label: 'Lost Sales', icon: 'lost' },
   { k: 'admin', label: 'Kelola data', icon: 'admin', admin: 1 },
   { k: 'settings', label: 'Pengaturan', icon: 'settings', admin: 1 }
@@ -1170,7 +1179,7 @@ function render() {
     return;
   }
   if (!App.lastDate && !['admin', 'stok', 'report', 'settings', 'lost'].includes(App.page)) { App.page = srLast() ? 'report' : 'stok'; }
-  const fn = { area: pageArea, report: pageReport, trend: pageTrend, promo: pagePromo, omni: pageOmni, eac: pageEac, ra: pageRA, pareto: pagePareto, lost: pageLost, toko: pageStore, produk: pageProduct, stok: pageStock, admin: pageAdmin, settings: pageSettings }[App.page] || pageReport;
+  const fn = { area: pageArea, report: pageReport, trend: pageTrend, promo: pagePromo, omni: pageOmni, eac: pageEac, ra: pageRA, pareto: pagePareto, lost: pageLost, promostock: pagePromoStock, toko: pageStore, produk: pageProduct, stok: pageStock, admin: pageAdmin, settings: pageSettings }[App.page] || pageReport;
   try { fn(view); } catch (e) { console.error(e); view.innerHTML = `<div class="empty-state"><h2>Halaman gagal ditampilkan</h2><p class="muted">${esc(e.message)}</p></div>`; }
 }
 
@@ -1925,6 +1934,78 @@ async function exportLost() {
   (await getDownloads()).save({ filename: `Lost_Sales_${X.m}.xlsx`, data: new Blob([XLSX.write(wb, { bookType: 'xlsx', type: 'array' })]) });
 }
 
+/* ================= halaman: Stok DCNP/SMDS (list promo Katalog Produk) ================= */
+function pagePromoStock(view) {
+  const U = App.ui, MS = App.mst;
+  setHead('Stok DCNP/SMDS', MS.promo ? `${MS.promo.title || 'List promo'} · ${MS.promo.period || ''} · sumber Katalog Produk` : 'List promo dari Katalog Produk');
+  if (MS.status !== 'ok' || !MS.promo) { view.innerHTML = `<div class="empty-state"><h2>${MS.status === 'loading' || MS.status === 'idle' ? 'Memuat list promo…' : 'List promo belum bisa dimuat'}</h2><p class="muted">List artikel DCNP/SMDS diambil dari repo Katalog Produk.</p></div>`; if (MS.status === 'idle') loadMaster(); return; }
+  const codes = activeStores().filter(c => App.stock[c]), st = U.psStore && codes.includes(U.psStore) ? U.psStore : '';
+  const R = periodRange();
+  /* stok promo per sku */
+  const rowsSku = [];
+  let allPcs = 0;
+  for (const c of st ? [st] : codes) { const S = App.stock[c]; if (!S) continue;
+    for (const sku in S.items) { const t = S.items[sku][0]; if (t <= 0) continue; if (!isPB(sku)) allPcs += t; const pr = MS.psku.get(sku); if (!pr) continue;
+      const it = MS.promo.items[pr.key], mk = MS.sku.get(sku), mi = mk && mItem(mk);
+      rowsSku.push({ c, sku, art: artOf(sku), key: pr.key, d: pr.d, p: pr.p || (mi && mi.p) || 0, t, l2: it.l2 || (mi && mi.l2) || '–', l3: it.l3 || (mi && mi.l3) || '–', l4: (mi && mi.l4) || (App.sku[sku] || [])[2] || '–', n: it.n }); } }
+  /* filter diskon & lv2 */
+  const discs = [...new Set(rowsSku.map(r => r.d))].sort((a, b) => a - b), l2s = [...new Set(rowsSku.map(r => r.l2))].sort();
+  const F = rowsSku.filter(r => (!U.psD || r.d === +U.psD) && (!U.psL2 || r.l2 === U.psL2));
+  /* penjualan barang promo di periode berjalan */
+  const sold = new Map(); for (const l of linesIn(R.from, R.to, st || null)) { if (!MS.psku.has(l.sku)) continue; const x = sold.get(l.sku) || { q: 0, v: 0 }; x.q += l.q; x.v += l.g; sold.set(l.sku, x); }
+  const soldOf = rs => { const seen = new Set(); let q = 0, v = 0; for (const r of rs) { if (seen.has(r.sku)) continue; seen.add(r.sku); const x = sold.get(r.sku); if (x) { q += x.q; v += x.v; } } return { q, v }; };
+  const tot = F.reduce((a, r) => { a.pcs += r.t; a.val += r.t * r.p; a.net += r.t * r.p * (1 - r.d / 100); a.keys.add(r.key); return a; }, { pcs: 0, val: 0, net: 0, keys: new Set() });
+  const S0 = soldOf(F);
+  /* hirarki lv2 > lv3 > lv4 */
+  const tree = new Map();
+  for (const r of F) { const a = tree.get(r.l2) || { k: r.l2, pcs: 0, val: 0, keys: new Set(), rs: [], ch: new Map() }; a.pcs += r.t; a.val += r.t * r.p; a.keys.add(r.key); a.rs.push(r); tree.set(r.l2, a);
+    const b = a.ch.get(r.l3) || { k: r.l3, pcs: 0, val: 0, keys: new Set(), rs: [], ch: new Map() }; b.pcs += r.t; b.val += r.t * r.p; b.keys.add(r.key); b.rs.push(r); a.ch.set(r.l3, b);
+    const c = b.ch.get(r.l4) || { k: r.l4, pcs: 0, val: 0, keys: new Set(), rs: [] }; c.pcs += r.t; c.val += r.t * r.p; c.keys.add(r.key); c.rs.push(r); b.ch.set(r.l4, c); }
+  const open = U.psOpen || (U.psOpen = {});
+  const trow = (lv, id, g, hasCh) => { const sd = soldOf(g.rs); const rate = sd.q / Math.max(1, dayDiff(R.from, R.to) + 1) * 30;
+    return `<tr class="lv${lv}" ${hasCh ? `data-pstog="${esc(id)}"` : ''}><td class="nm">${hasCh ? `<span class="car">${open[id] ? '▾' : '▸'}</span>` : ''}${esc(g.k)}</td><td class="r">${fmtN(g.keys.size)}</td><td class="r"><b>${fmtN(g.pcs)}</b></td><td class="r">${fmtPct(tot.pcs ? g.pcs / tot.pcs : null, 1)}</td><td class="r">${fmtRpS(g.val)}</td><td class="r">${fmtN(sd.q)}</td><td class="r">${fmtRpS(sd.v)}</td><td class="r">${rate > 0 ? fmtX(g.pcs / rate, 1) : '∞'}</td></tr>`; };
+  let trs = '';
+  for (const a of [...tree.values()].sort((x, y) => y.pcs - x.pcs)) { const ida = a.k; trs += trow(1, ida, a, true);
+    if (open[ida]) for (const b of [...a.ch.values()].sort((x, y) => y.pcs - x.pcs)) { const idb = a.k + '›' + b.k; trs += trow(2, idb, b, true);
+      if (open[idb]) for (const c of [...b.ch.values()].sort((x, y) => y.pcs - x.pcs)) trs += trow(3, idb + '›' + c.k, c, false); } }
+  /* per diskon & per toko */
+  const byD = new Map(); for (const r of rowsSku.filter(r => !U.psL2 || r.l2 === U.psL2)) { const x = byD.get(r.d) || { pcs: 0, val: 0 }; x.pcs += r.t; x.val += r.t * r.p; byD.set(r.d, x); }
+  const byS = new Map(); for (const r of F) { const x = byS.get(r.c) || { pcs: 0, val: 0, keys: new Set() }; x.pcs += r.t; x.val += r.t * r.p; x.keys.add(r.key); byS.set(r.c, x); }
+  const storePcs = c => { let t = 0; const S = App.stock[c]; if (S) for (const k in S.items) if (!isPB(k) && S.items[k][0] > 0) t += S.items[k][0]; return t; };
+  /* per artikel-warna */
+  const byK = new Map(); for (const r of F) { const x = byK.get(r.key) || { key: r.key, art: r.art, n: r.n, color: r.key.split('.').slice(1).join('.'), d: r.d, p: r.p, l4: r.l4, pcs: 0, stores: new Set(), rs: [] }; x.pcs += r.t; x.stores.add(r.c); x.rs.push(r); byK.set(r.key, x); }
+  view.innerHTML = `<div class="stack">
+    <div class="filters" style="margin:0"><label class="small muted" for="psStore">Location</label><select id="psStore" class="inp"><option value="">Semua toko</option>${codes.map(c => `<option value="${esc(c)}" ${c === st ? 'selected' : ''}>${esc(c)} - ${esc(sName(c))}</option>`).join('')}</select>
+      <label class="small muted" for="psD">Diskon</label><select id="psD" class="inp"><option value="">Semua</option>${discs.map(d => `<option value="${d}" ${String(d) === String(U.psD) ? 'selected' : ''}>${d}%</option>`).join('')}</select>
+      <label class="small muted" for="psL2">MC Lv2</label><select id="psL2" class="inp"><option value="">Semua</option>${l2s.map(x => `<option ${x === U.psL2 ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select>
+      <span class="small muted">Terjual = ${esc(R.label.toLowerCase())}</span></div>
+    <div class="pt-tiles" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr))">
+      <div class="pt-tile"><span>Stok DCNP/SMDS</span><b>${fmtN(tot.pcs)} pcs</b><small>${fmtPct(allPcs ? tot.pcs / allPcs : null, 1)} dari total stok</small></div>
+      <div class="pt-tile"><span>Artikel-warna</span><b>${fmtN(tot.keys.size)}</b><small>dari ${fmtN(Object.keys(MS.promo.items).length)} di list promo</small></div>
+      <div class="pt-tile"><span>Nilai stok (harga normal)</span><b>${fmtRpS(tot.val)}</b><small>setelah diskon ${fmtRpS(tot.net)}</small></div>
+      <div class="pt-tile"><span>Terjual periode ini</span><b>${fmtN(S0.q)} pcs</b><small>${fmtRpS(S0.v)} gross</small></div>
+      <div class="pt-tile" style="background:#0B1B4A"><span>Sell-through</span><b>${fmtPct(S0.q + tot.pcs ? S0.q / (S0.q + tot.pcs) : null, 1)}</b><small>terjual ÷ (terjual + stok)</small></div>
+    </div>
+    <section class="card"><div class="card-h"><h3>Detail stok per MC Lv2 › Lv3 › Lv4</h3><p class="small muted">klik baris untuk membuka / menutup</p></div>
+      <div class="tbl-wrap"><table class="tbl tree"><thead><tr><th>Kategori</th><th class="r">Artikel</th><th class="r">Stok (pcs)</th><th class="r">% stok</th><th class="r">Nilai stok</th><th class="r">Terjual</th><th class="r">Sales</th><th class="r">Cover (bln)</th></tr></thead><tbody>${trs || '<tr><td colspan="8" class="empty">Tidak ada stok barang promo.</td></tr>'}</tbody></table></div>
+      <div class="row-act"><button class="btn sm" id="psAll">Buka semua</button><button class="btn sm" id="psNone">Tutup semua</button></div></section>
+    <div class="grid g2">
+      <section class="card"><div class="card-h"><h3>Stok per besaran diskon</h3></div><div class="chart-box"><canvas id="psDisc"></canvas></div></section>
+      <section class="card"><div class="card-h"><h3>Per toko</h3><p class="small muted">klik untuk filter</p></div><div id="psStoreT"></div></section>
+    </div>
+    <section class="card"><div class="card-h"><h3>Artikel DCNP/SMDS</h3><p class="small muted">${fmtN(byK.size)} artikel-warna · klik untuk detail</p></div><div id="psArtT"></div></section>
+    <p class="small muted">List promo diambil otomatis dari Katalog Produk (${esc(MS.promo.source || '')}, dibuat ${esc(MS.promo.generated || '')}). Stok = stok terakhir per toko dari Export by Bin. Cover = stok ÷ rata-rata terjual per bulan pada periode terpilih.</p>
+  </div>`;
+  if (typeof Chart !== 'undefined') { const ds = [...byD.keys()].sort((a, b) => a - b); App.charts.length; mkDual($('#psDisc'), ds.map(d => d + '%'), ds.map(d => byD.get(d).pcs), ds.map(d => byD.get(d).val), 'Stok (pcs)', 'Nilai stok', v => fmtN(v), v => fmtRpS(v)); }
+  $('#psStoreT').innerHTML = tbl('psStore', { rows: [...byS.entries()].map(([c, x]) => ({ c, name: sName(c), pcs: x.pcs, val: x.val, n: x.keys.size, share: storePcs(c) ? x.pcs / storePcs(c) : null })), sort: { k: 'pcs', dir: 'desc' }, limit: 40, onRow: r => { App.ui.psStore = r.c; render(); window.scrollTo(0, 0); }, cols: [
+    { k: 'name', label: 'Toko', h: r => `<span class="nm">${esc(r.name)}</span><span class="sub">${esc(r.c)}</span>` }, { k: 'n', label: 'Artikel', r: 1, h: r => fmtN(r.n) }, { k: 'pcs', label: 'Stok', r: 1, h: r => fmtN(r.pcs) },
+    { k: 'share', label: '% stok toko', r: 1, h: r => fmtPct(r.share, 1) }, { k: 'val', label: 'Nilai', r: 1, h: r => fmtRpS(r.val) }] });
+  $('#psArtT').innerHTML = tbl('psArt', { rows: [...byK.values()].map(x => { const sd = soldOf(x.rs); return { art: x.art, n: x.n, color: x.color, d: x.d, p: x.p, l4: x.l4, pcs: x.pcs, ns: x.stores.size, q: sd.q, val: x.pcs * x.p }; }), sort: { k: 'pcs', dir: 'desc' }, limit: 30, onRow: r => openProduct(r.art, st || null), cols: [
+    { k: 'n', label: 'Artikel', h: r => prodCell(r.art, r.n + ' · ' + r.color, r.art + ' · ' + r.l4) }, { k: 'd', label: 'Diskon', r: 1, h: r => `<span class="disc">${r.d}%</span>` },
+    { k: 'p', label: 'Harga', r: 1, h: r => `<span style="text-decoration:line-through;color:var(--muted)">${fmtRpS(r.p)}</span><span class="sub">${fmtRpS(r.p * (1 - r.d / 100))}</span>` },
+    { k: 'pcs', label: 'Stok', r: 1, h: r => `<b>${fmtN(r.pcs)}</b>` }, { k: 'ns', label: 'Toko', r: 1, h: r => fmtN(r.ns) }, { k: 'q', label: 'Terjual', r: 1, h: r => fmtN(r.q) }, { k: 'val', label: 'Nilai stok', r: 1, h: r => fmtRpS(r.val) }] });
+}
+
 /* ================= halaman: per toko ================= */
 function pageStore(view) {
   const codes = storeCodes(); if (!App.ui.store || !codes.includes(App.ui.store)) App.ui.store = codes[0];
@@ -2159,6 +2240,7 @@ function pageAdmin(view) {
     <section class="card"><div class="card-h"><h3>Master artikel & foto</h3></div>
       <p class="small muted" style="margin-top:0">Diambil otomatis dari <b>Katalog Produk</b>. Update master artikel bulanan dan foto cukup lewat admin Katalog; dashboard ini ikut memakai versi terbaru.</p>
       ${App.mst.status === 'ok' ? `<p class="small">Master artikel: ${App.mst.master ? `<b>${fmtN(Object.keys(App.mst.master.items || {}).length)}</b> artikel-warna · sumber ${esc(App.mst.master.source || '-')} · dibuat ${esc(App.mst.master.generated || '-')}` : '<b style="color:var(--bad)">gagal dimuat</b>'}<br>
+        List promo DCNP/SMDS: ${App.mst.promo ? `<b>${fmtN(Object.keys(App.mst.promo.items || {}).length)}</b> artikel-warna · ${esc(App.mst.promo.title || '')} ${esc(App.mst.promo.period || '')} · sumber ${esc(App.mst.promo.source || '-')}` : '<b style="color:var(--bad)">gagal dimuat</b>'}<br>
         Foto produk: ${App.mst.photo ? `<b>${fmtN(Object.keys(App.mst.photo.items || {}).length)}</b> generic · sumber ${esc(App.mst.photo.source || '-')} · dibuat ${esc(App.mst.photo.generated || '-')}` : '<b style="color:var(--bad)">gagal dimuat</b>'}</p>`
         : App.mst.status === 'err' ? '<p class="small" style="color:var(--bad)">Master & foto belum bisa dimuat dari Katalog Produk. Cek koneksi atau pastikan repo Katalog-Produk aktif.</p>' : '<p class="small muted">Sedang memuat…</p>'}
       <div class="row-act"><button class="btn sm" id="mstReload">Muat ulang master & foto</button></div></section>
@@ -2520,6 +2602,8 @@ document.addEventListener('click', async e => {
   if (t.id === 'omXls') { exportOmni(); return; }
   if (t.id === 'raXls') { exportRA(); return; }
   if (t.id === 'lsXls') { exportLost(); return; }
+  const pst = t.closest('[data-pstog]'); if (pst) { const o = App.ui.psOpen || (App.ui.psOpen = {}); o[pst.dataset.pstog] = !o[pst.dataset.pstog]; render(); return; }
+  if (t.id === 'psAll' || t.id === 'psNone') { const o = App.ui.psOpen = {}; if (t.id === 'psAll') $$('[data-pstog]').forEach(x => { o[x.dataset.pstog] = true; }); if (t.id === 'psAll') { render(); $$('[data-pstog]').forEach(x => { o[x.dataset.pstog] = true; }); } render(); return; }
   const rpf = t.closest('[data-rpf]'); if (rpf) { App.ui.rpFull = rpf.dataset.rpf === '1'; render(); return; }
   const rpv = t.closest('[data-rpv]'); if (rpv) { App.ui.rpVal = rpv.dataset.rpv; render(); return; }
   if (t.id === 'rpXls') { exportReport(); return; }
@@ -2551,6 +2635,9 @@ document.addEventListener('change', async e => {
   const t = e.target;
   if (App.page === 'settings' && settingsChange(t)) return;
   if (t.id === 'perSel' || t.id === 'rFrom' || t.id === 'rTo') { await onPeriodChange(); return; }
+  if (t.id === 'psStore') { App.ui.psStore = t.value; App.ui.more = {}; render(); return; }
+  if (t.id === 'psD') { App.ui.psD = t.value; render(); return; }
+  if (t.id === 'psL2') { App.ui.psL2 = t.value; render(); return; }
   if (t.id === 'lsM') { App.ui.lsM = t.value; render(); return; }
   if (t.id === 'lsStore') { App.ui.lsStore = t.value; App.ui.more = {}; render(); return; }
   if (t.id === 'ptStore') { App.ui.ptStore = t.value; App.ui.more = {}; render(); return; }

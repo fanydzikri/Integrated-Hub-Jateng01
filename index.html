@@ -13,6 +13,8 @@
 <script>
 const SHEET_API_URL = "https://script.google.com/macros/s/AKfycbwJAbY6vgj6TW9fbUCkvZTF1_QwTLWt1S3BnnF7_AWoxhclR07cJOtkPMrUGrPePsbZbg/exec";
 /* link spreadsheet master (opsional, untuk tombol "Buka spreadsheet" di Kelola data) */
+ /* master artikel & foto diambil otomatis dari Katalog Produk (diupdate lewat admin Katalog) */
+const KATALOG_BASE = ["https://katalogeigerjogjajateng.github.io/Katalog-Produk/", "https://raw.githubusercontent.com/katalogeigerjogjajateng/Katalog-Produk/main/"];
 const SHEET_URL = "https://docs.google.com/spreadsheets/d/1ufhRH1oIeFrNzdTqx89mdpd1kPXleJnOdS_RbOa88xk/edit";
 </script>
 <!-- ===================================================================== -->
@@ -271,6 +273,11 @@ table.tbl{width:100%;border-collapse:collapse;font-size:13.5px}
 .heat th{font-weight:600;color:var(--muted);padding:2px 4px;text-align:center}
 .heat th.d{text-align:left;font-family:var(--font-body);color:var(--ink);font-weight:700;padding-right:8px}
 .heat td{width:34px;height:26px;text-align:center;border-radius:4px;color:var(--ink)}
+.pc{display:flex;gap:10px;align-items:center;min-width:0}
+.pc .th{width:42px;height:42px;flex:none;border-radius:7px;object-fit:cover;background:var(--surface-2);border:1px solid var(--line)}
+.pc .th.ph{display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:10px}
+.gal{display:flex;gap:8px;overflow-x:auto;margin:12px 0 6px;padding-bottom:4px}
+.gal figure img,.gal img{width:120px;height:120px;object-fit:cover;border-radius:10px;border:1px solid var(--line);background:var(--surface-2);flex:none}
 .ra-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
 .ra-tile{background:#0F3192;color:#fff;border-radius:10px;padding:12px 16px;text-align:center}
 .ra-tile span{display:block;font-size:12px;font-weight:600;color:#C9D3F0}
@@ -882,13 +889,73 @@ function stockByArt(c) {
   return (App.cache[k] = m);
 }
 const stockPcs = c => { const S = App.stock[c]; if (!S) return null; let t = 0; for (const k in S.items) if (!isPB(k)) t += S.items[k][0]; return t; };
+/* ---------- master artikel & foto (dari Katalog Produk) ---------- */
+App.mst = { status: 'idle' };
+async function fetchKatalog(file) {
+  let last;
+  for (const b of KATALOG_BASE) { try { const r = await fetch(b + file, { cache: 'default' }); if (r.ok) return await r.json(); last = new Error('HTTP ' + r.status); } catch (e) { last = e; } }
+  throw last || new Error('gagal');
+}
+async function loadMaster(force) {
+  if (!force && (App.mst.status === 'loading' || App.mst.status === 'ok')) return;
+  App.mst = { status: 'loading' };
+  const [m, g] = await Promise.allSettled([fetchKatalog('master.json'), fetchKatalog('gambar.json')]);
+  const M = { status: 'ok', master: m.status === 'fulfilled' ? m.value : null, photo: g.status === 'fulfilled' ? g.value : null, err: [] };
+  if (!M.master) M.err.push('master artikel'); if (!M.photo) M.err.push('foto');
+  if (!M.master && !M.photo) M.status = 'err';
+  M.sku = new Map(); M.art = new Map();
+  if (M.master && M.master.items) for (const key in M.master.items) {
+    const it = M.master.items[key], art = key.split('.')[0];
+    for (const sku in (it.a || {})) M.sku.set(sku, key);
+    const a = M.art.get(art) || []; a.push(key); M.art.set(art, a);
+  }
+  App.mst = M; App.cache = {};
+  if (['produk', 'stok', 'toko', 'admin'].includes(App.page) && !$('#ov')) render();
+}
+const mItem = key => App.mst.master && App.mst.master.items ? App.mst.master.items[key] : null;
+const colorOfSku = sku => { const k = App.mst.sku && App.mst.sku.get(sku); if (k) return k.split('.').slice(1).join('.'); const p = String((App.sku[sku] || [])[0] || '').split(','); return (p[1] || '').trim().toUpperCase(); };
+function artMaster(art) {
+  const keys = (App.mst.art && App.mst.art.get(art)) || []; if (!keys.length) return null;
+  const it = mItem(keys[0]); const prices = keys.map(k => (mItem(k) || {}).p || 0).filter(Boolean);
+  return { n: it.n, l2: it.l2, l3: it.l3, l4: it.l4, pt: it.pt, gd: it.gd, p: prices.length ? Math.max(...prices) : 0, colors: keys.map(k => k.split('.').slice(1).join('.')) };
+}
+const priceOfSku = sku => { const k = App.mst.sku && App.mst.sku.get(sku); const it = k && mItem(k); return it ? it.p || 0 : ((artMaster(artOf(sku)) || {}).p || 0); };
+function decodeImg(e) {
+  const P = App.mst.photo; if (!P || typeof e !== 'string') return null;
+  if (/^https:\/\//.test(e)) return e;
+  const m = /^(?:(\d+):)?([0-9a-f]{32})$/.exec(e); if (!m) return null;
+  const base = (P.bases || ['https://id-live.slatic.net/p/'])[Number(m[1] || 0)]; return base ? base + m[2] + '.jpg' : null;
+}
+const sizedImg = (u, px) => /\.slatic\.net\//.test(u) ? u + '_' + px + 'x' + px + 'q80.jpg' : u;
+function photosOf(art, color) {
+  const P = App.mst.photo; const it = P && P.items && P.items[art]; if (!it || !it.c) return [];
+  const list = (color && it.c[color]) || it.c[Object.keys(it.c)[0]] || [];
+  return list.map(decodeImg).filter(Boolean);
+}
+/* warna utama artikel: warna dengan stok/penjualan terbanyak yang punya foto */
+function mainColor(art, store) {
+  const cnt = new Map(); const add = (sku, v) => { if (artOf(sku) !== art) return; const c = colorOfSku(sku); if (c) cnt.set(c, (cnt.get(c) || 0) + v); };
+  for (const c of store ? [store] : Object.keys(App.stock)) { const S = App.stock[c]; if (S) for (const sku in S.items) add(sku, Math.max(0, S.items[sku][0])); }
+  const P = App.mst.photo, have = P && P.items && P.items[art] ? P.items[art].c : {};
+  const sorted = [...cnt.entries()].sort((a, b) => b[1] - a[1]).map(x => x[0]);
+  return sorted.find(c => have[c]) || Object.keys(have || {})[0] || sorted[0] || '';
+}
+function thumbOf(art) {
+  const k = 'th:' + art; if (App.cache[k] !== undefined) return App.cache[k];
+  const u = photosOf(art, mainColor(art))[0]; return (App.cache[k] = u ? sizedImg(u, 120) : null);
+}
+const imgTag = (u, cls, alt) => u ? `<img class="${cls}" loading="lazy" alt="${esc(alt || '')}" src="${esc(u)}" onerror="if(!this.dataset.f){this.dataset.f=1;this.src=this.src.replace(/_\\d+x\\d+q80\\.jpg$/,'')}else{this.style.visibility='hidden'}">` : `<span class="${cls} ph">${App.mst.status === 'loading' ? '…' : ''}</span>`;
+const prodCell = (art, name, sub) => `<div class="pc">${imgTag(thumbOf(art), 'th', name)}<div style="min-width:0"><span class="nm">${esc(name)}</span><span class="sub">${esc(sub)}</span></div></div>`;
 function artInfo(a) {
   const k = 'ai'; if (!App.cache[k]) {
     const m = new Map();
     for (const sku in App.sku) { const v = App.sku[sku]; const ar = artOf(sku); const o = m.get(ar); if (!o || (!o.c2 && v[3])) m.set(ar, { name: artName(v[0]) || ar, c3: v[1] || 'LAINNYA', c4: v[2] || '', c2: v[3] || '' }); }
     App.cache[k] = m;
   }
-  return App.cache[k].get(a) || { name: a, c3: 'LAINNYA', c4: '', c2: '' };
+  let o = App.cache[k].get(a) || { name: a, c3: 'LAINNYA', c4: '', c2: '' };
+  const M = App.mst.status === 'ok' ? artMaster(a) : null;
+  if (M) { o = Object.assign({}, o, { name: o.name === a ? M.n || a : o.name, c2: M.l2 || o.c2, gd: M.gd || '', pt: M.pt || '', price: M.p || 0 }); App.cache[k].set(a, o); }
+  return o;
 }
 /* target */
 const monthTarget = (c, m) => (App.targets[m] && +App.targets[m][c]) || 0;
@@ -1704,7 +1771,7 @@ function pageStore(view) {
   $('#prodT').innerHTML = tbl('sprod', {
     rows: prods, sort: { k: 'n', dir: 'desc' }, limit: 15, onRow: r => openProduct(r.art, c),
     cols: [
-      { k: 'name', label: 'Produk', h: r => `<span class="nm">${esc(r.name)}</span><span class="sub">${esc(r.art)} · ${esc(r.c3)} › ${esc(r.c4)}</span>` },
+      { k: 'name', label: 'Produk', h: r => prodCell(r.art, r.name, r.art + ' · ' + r.c3 + ' › ' + r.c4) },
       { k: 'q', label: 'Qty', r: 1, h: r => fmtN(r.q) }, { k: 'n', label: VLL(), r: 1, h: r => fmtRp(r.n) },
       { k: 'stock', label: 'Stok', r: 1, h: r => r.stock == null ? '–' : fmtN(r.stock) }, { k: 'k', label: 'Status', h: r => badge(r.k) }
     ]
@@ -1728,21 +1795,27 @@ function pageProduct(view) {
   const stockA = new Map(); for (const c of codes) for (const [a, s] of stockByArt(c)) stockA.set(a, (stockA.get(a) || 0) + s.t);
   const H = health();
   const q90 = new Map(); for (const c of codes) { const S = H.stores[c]; if (S) for (const it of S.items.values()) q90.set(it.art, (q90.get(it.art) || 0) + it.rate); }
-  let rows = [...m.values()].map(x => { const inf = artInfo(x.art); const st = stockA.get(x.art) || 0, rate = q90.get(x.art) || 0; return { art: x.art, name: inf.name, c3: inf.c3, c4: inf.c4, q: x.q, n: x.n, stores: x.st.size, stock: st, cover: rate > 0 ? st / rate : null }; });
+  let rows = [...m.values()].map(x => { const inf = artInfo(x.art); const st = stockA.get(x.art) || 0, rate = q90.get(x.art) || 0; return { art: x.art, name: inf.name, c3: inf.c3, c4: inf.c4, l2: inf.c2 || '', gd: inf.gd || '', price: inf.price || 0, q: x.q, n: x.n, stores: x.st.size, stock: st, cover: rate > 0 ? st / rate : null }; });
   const c3s = [...new Set(rows.map(r => r.c3))].sort();
+  const l2s = [...new Set(rows.map(r => r.l2).filter(Boolean))].sort(), gds = [...new Set(rows.map(r => r.gd).filter(Boolean))].sort();
   if (U.prodC3) rows = rows.filter(r => r.c3 === U.prodC3);
+  if (U.prodL2) rows = rows.filter(r => r.l2 === U.prodL2);
+  if (U.prodGd) rows = rows.filter(r => r.gd === U.prodGd);
   if (U.prodQ) { const q = U.prodQ.toLowerCase(); rows = rows.filter(r => (r.name + ' ' + r.art + ' ' + r.c4).toLowerCase().includes(q)); }
   view.innerHTML = `<section class="card"><div class="filters">
       <input id="pq" class="inp" type="search" placeholder="Cari nama atau kode artikel" value="${esc(U.prodQ)}" style="flex:1 1 220px">
       <select id="pc3" class="inp"><option value="">Semua kategori</option>${c3s.map(c => `<option ${c === U.prodC3 ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select>
+      ${l2s.length ? `<select id="pl2" class="inp"><option value="">Semua MC Lv2</option>${l2s.map(c => `<option ${c === U.prodL2 ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select>` : ''}
+      ${gds.length ? `<select id="pgd" class="inp"><option value="">Semua gender</option>${gds.map(c => `<option ${c === U.prodGd ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select>` : ''}
       <select id="pst" class="inp"><option value="">Semua toko</option>${storeCodes().map(c => `<option value="${esc(c)}" ${c === U.prodStore ? 'selected' : ''}>${esc(sName(c))}</option>`).join('')}</select>
     </div><div id="pT"></div><p class="small muted" style="margin-top:10px">Cover = stok ÷ rata-rata penjualan per bulan (90 hari terakhir). Paper bag tidak dihitung.</p></section>`;
   $('#pT').innerHTML = tbl('prod', {
     rows, sort: { k: 'n', dir: 'desc' }, limit: 30, onRow: r => openProduct(r.art, U.prodStore || null),
     cols: [
-      { k: 'name', label: 'Produk', h: r => `<span class="nm">${esc(r.name)}</span><span class="sub">${esc(r.art)} · ${esc(r.c3)} › ${esc(r.c4)}</span>` },
+      { k: 'name', label: 'Produk', h: r => prodCell(r.art, r.name, r.art + ' · ' + r.c3 + ' › ' + r.c4) },
       { k: 'q', label: 'Qty', r: 1, h: r => fmtN(r.q) }, { k: 'n', label: VLL(), r: 1, h: r => fmtRp(r.n) },
       ...(U.prodStore ? [] : [{ k: 'stores', label: 'Toko terjual', r: 1, h: r => r.stores + ' / ' + activeStores().length }]),
+      { k: 'price', label: 'Harga', r: 1, h: r => r.price ? fmtRpS(r.price) : '–' },
       { k: 'stock', label: 'Stok', r: 1, h: r => fmtN(r.stock) }, { k: 'cover', label: 'Cover (bln)', r: 1, h: r => r.cover == null ? '–' : fmtX(r.cover) }
     ]
   });
@@ -1756,7 +1829,13 @@ function openProduct(art, store) {
   for (const l of cur) { if (store && l.s !== store) continue; const x = vm.get(l.sku) || { sku: l.sku, q: 0, n: 0, stock: 0 }; x.q += l.q; x.n += VAL(l); vm.set(l.sku, x); }
   for (const c of (store ? [store] : storeCodes())) { const S = App.stock[c]; if (!S) continue; for (const sku in S.items) if (artOf(sku) === art) { const x = vm.get(sku) || { sku, q: 0, n: 0, stock: 0 }; x.stock += S.items[sku][0]; vm.set(sku, x); } }
   const vars = [...vm.values()].sort((a, b) => b.q - a.q || b.stock - a.stock);
-  openDrawer(`<p class="muted small">${esc(inf.c2 ? inf.c2 + ' › ' : '')}${esc(inf.c3)} › ${esc(inf.c4)} · kode ${esc(art)}</p><h2>${esc(inf.name)}</h2><p class="muted small">${esc(R.label)}</p>
+  const mc = mainColor(art, store), gal = photosOf(art, mc).slice(0, 8);
+  const colorThumbs = (artMaster(art) || { colors: [] }).colors.map(c => { const u = photosOf(art, c)[0]; return u ? `<figure style="margin:0;text-align:center">${imgTag(sizedImg(u, 200), '', c)}<figcaption class="small muted">${esc(c)}</figcaption></figure>` : ''; }).join('');
+  openDrawer(`<p class="muted small">${esc(inf.c2 ? inf.c2 + ' › ' : '')}${esc(inf.c3)} › ${esc(inf.c4)} · kode ${esc(art)}${inf.gd ? ' · ' + esc(inf.gd) : ''}</p><h2>${esc(inf.name)}</h2>
+    ${inf.price ? `<p style="margin:2px 0 0;font-weight:800;color:var(--orange-deep)">${fmtRp(inf.price)}</p>` : ''}
+    ${gal.length ? `<div class="gal">${gal.map(u => imgTag(sizedImg(u, 340), '', inf.name)).join('')}</div>` : (App.mst.status === 'loading' ? '<p class="small muted">Memuat foto…</p>' : '')}
+    ${colorThumbs ? `<p class="small muted" style="margin:6px 0 0">Warna tersedia di master:</p><div class="gal" style="margin-top:4px">${colorThumbs}</div>` : ''}
+    <p class="muted small">${esc(R.label)}</p>
     <h3 style="font-family:var(--font-head);margin:18px 0 8px">Per toko</h3>
     <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Toko</th><th class="r">Qty</th><th class="r">${VL()}</th><th class="r">Stok</th><th class="r">Jual/bln</th><th>Status</th></tr></thead><tbody>
     ${per.sort((a, b) => b.q - a.q || b.stock - a.stock).map(r => `<tr><td><span class="nm">${esc(r.name)}</span><span class="sub">${esc(r.c)}</span></td><td class="r">${fmtN(r.q)}</td><td class="r">${fmtRpS(r.n)}</td><td class="r">${fmtN(r.stock)}</td><td class="r">${fmtX(r.rate)}</td><td>${badge(r.k)}</td></tr>`).join('') || '<tr><td colspan="6" class="empty">Tidak ada penjualan atau stok.</td></tr>'}
@@ -1776,7 +1855,8 @@ function pageStock(view) {
     <p class="small muted">Status mengikuti logika dashboard toko: SSR = stok ÷ rata-rata jual per bulan (${SET().windowDays} hari terakhir), dengan ambang ${SET().autoThreshold ? 'otomatis per toko dari sebaran SSR' : 'manual'}. Laku sekali & laku juga mensyaratkan qty di atas median/kuartil toko. National promo = ≥ ${SET().promoShare}% qty terjual lewat promo markdown. Statement = harga rata-rata di persentil ${SET().statementPct} ke atas. Dead stock = ada stok tanpa penjualan. Discontinue diatur manual di Pengaturan. Dihitung per artikel (semua size & warna).</p></div>`;
   const body = $('#stBody');
   if (U.stTab === 'sum') {
-    const rows = activeStores().filter(c => App.stock[c] || sType(c) !== 'bz').map(c => { const S = H.stores[c] || { count: {}, stock: {}, days: 0 }; const tot = HKEYS.filter(k => k !== 'HB').reduce((s, k) => s + (S.stock[k] || 0), 0); const sehat = SEHAT_K.reduce((s, k) => s + (S.stock[k] || 0), 0); return { c, name: sName(c), has: S.hasStock, date: App.stock[c] && App.stock[c].date, days: S.days, tot, sehat: tot ? sehat / tot : null, ...Object.fromEntries(HKEYS.map(k => ['n' + k, S.count[k] || 0])), dsP: S.stock.DS || 0 }; });
+    const valOf = (S, k) => { if (App.mst.status !== 'ok' || !S.items) return 0; let v = 0; for (const it of S.items.values()) if ((!k || it.k === k) && it.stock > 0) v += it.stock * ((artInfo(it.art).price) || 0); return v; };
+    const rows = activeStores().filter(c => App.stock[c] || sType(c) !== 'bz').map(c => { const S = H.stores[c] || { count: {}, stock: {}, days: 0 }; const tot = HKEYS.filter(k => k !== 'HB').reduce((s, k) => s + (S.stock[k] || 0), 0); const sehat = SEHAT_K.reduce((s, k) => s + (S.stock[k] || 0), 0); return { c, name: sName(c), has: S.hasStock, date: App.stock[c] && App.stock[c].date, days: S.days, tot, sehat: tot ? sehat / tot : null, ...Object.fromEntries(HKEYS.map(k => ['n' + k, S.count[k] || 0])), dsP: S.stock.DS || 0, val: valOf(S), dsV: valOf(S, 'DS') }; });
     body.innerHTML = `<section class="card">${tbl('hsum', {
       rows, sort: { k: 'sehat', dir: 'asc' }, limit: 30, onRow: r => { U.stTab = 'list'; U.stStore = r.c; U.stStatus = ''; render(); },
       cols: [
@@ -1784,7 +1864,8 @@ function pageStock(view) {
         { k: 'tot', label: 'Stok (pcs)', r: 1, h: r => r.has ? fmtN(r.tot) : '–' },
         { k: 'sehat', label: '% stok sehat', r: 1, h: r => r.sehat == null ? '–' : `<b style="color:${r.sehat >= .7 ? 'var(--ok)' : r.sehat >= .5 ? 'var(--warn)' : 'var(--bad)'}">${fmtPct(r.sehat, 0)}</b>` },
         ...HKEYS.map(k => ({ k: 'n' + k, label: HEALTH[k].label, r: 1, h: r => r.has ? fmtN(r['n' + k]) : '–' })),
-        { k: 'dsP', label: 'Pcs dead stock', r: 1, h: r => r.has ? fmtN(r.dsP) : '–' }
+        { k: 'dsP', label: 'Pcs dead stock', r: 1, h: r => r.has ? fmtN(r.dsP) : '–' },
+        ...(App.mst.status === 'ok' ? [{ k: 'val', label: 'Nilai stok', r: 1, h: r => r.has ? fmtRpS(r.val) : '–' }, { k: 'dsV', label: 'Nilai dead stock', r: 1, h: r => r.has ? `<b style="color:var(--bad)">${fmtRpS(r.dsV)}</b>` : '–' }] : [])
       ]
     })}<p class="small muted" style="margin-top:8px">% stok sehat = pcs laku sekali + laku + cukup laku + statement dibagi total pcs. Klik toko untuk melihat artikelnya.</p></section>`;
   } else if (U.stTab === 'list') {
@@ -1800,10 +1881,11 @@ function pageStock(view) {
       ${S && S.hasStock ? tbl('hlist', {
         rows, sort: { k: 'stock', dir: 'desc' }, limit: 40, onRow: r => openProduct(r.art, U.stStore),
         cols: [
-          { k: 'name', label: 'Produk', h: r => `<span class="nm">${esc(r.name)}</span><span class="sub">${esc(r.art)} · ${esc(r.c3)} › ${esc(r.c4)}</span>` },
+          { k: 'name', label: 'Produk', h: r => prodCell(r.art, r.name, r.art + ' · ' + r.c3 + ' › ' + r.c4) },
           { k: 'k', label: 'Status', v: r => HKEYS.indexOf(r.k), h: r => badge(r.k) },
           { k: 'q', label: `Jual ${S.days} hr`, r: 1, h: r => fmtN(r.q) }, { k: 'rate', label: 'Jual/bln', r: 1, h: r => fmtX(r.rate) },
           { k: 'stock', label: 'Stok', r: 1, h: r => fmtN(r.stock) }, { k: 'sa', label: 'Display', r: 1, h: r => fmtN(r.sa) }, { k: 'wh', label: 'Gudang', r: 1, h: r => fmtN(r.wh) },
+          ...(App.mst.status === 'ok' ? [{ k: 'val', label: 'Nilai stok', r: 1, v: r => (r.price || 0) * Math.max(0, r.stock), h: r => r.price ? fmtRpS(r.price * Math.max(0, r.stock)) : '–' }] : []),
           { k: 'cover', label: 'SSR (bln)', r: 1, v: r => r.cover ?? (r.k === 'DS' ? 999 : -1), h: r => r.k === 'DS' ? '∞' : r.cover == null ? '–' : fmtX(r.cover) },
           { k: 'why', label: 'Alasan', ns: 1, h: r => `<span class="small muted">${esc(r.why || '')}</span>` }
         ]
@@ -1818,7 +1900,7 @@ function pageStock(view) {
       ${tbl('trans', {
         rows, sort: { k: 'qty', dir: 'desc' }, limit: 40, onRow: r => openProduct(r.art, null), empty: 'Belum ada saran transfer. Perlu stok dan minimal 14 hari data penjualan per toko.',
         cols: [
-          { k: 'name', label: 'Produk', h: r => `<span class="nm">${esc(r.name)}</span><span class="sub">${esc(r.art)} · ${esc(r.c3)}</span>` },
+          { k: 'name', label: 'Produk', h: r => prodCell(r.art, r.name, r.art + ' · ' + r.c3) },
           { k: 'from', label: 'Dari', v: r => sName(r.from), h: r => `${esc(sName(r.from))}<span class="sub">stok ${fmtN(r.fromStock)} · ${HEALTH[r.fromK].label.toLowerCase()}</span>` },
           { k: 'to', label: 'Ke', v: r => sName(r.to), h: r => `${esc(sName(r.to))}<span class="sub">stok ${fmtN(r.toStock)} · jual ${fmtX(r.toRate)}/bln</span>` },
           { k: 'qty', label: 'Saran qty', r: 1, h: r => `<b>${fmtN(r.qty)}</b>` }
@@ -1866,6 +1948,12 @@ function pageAdmin(view) {
       ${(App.books || []).length ? `<div class="chips" style="margin:6px 0 4px">${App.books.map(b => `<a class="btn sm" href="${esc(b.url)}" target="_blank" rel="noopener">Data DSR ${esc(b.key)}</a>`).join('')}</div>` : ''}
       ${App.cells ? `<p class="small muted">Spreadsheet master terpakai ${fmtN(App.cells)} dari 10.000.000 sel (${fmtPct(App.cells / 1e7, 1)}).</p>` : ''}
       <div class="row-act">${SHEET_URL ? `<a class="btn" href="${esc(SHEET_URL)}" target="_blank" rel="noopener">Buka spreadsheet</a>` : ''}<button class="btn" id="rebuildBtn">Perbarui cache</button><span id="rebuildMsg" class="small muted"></span></div></section>
+    <section class="card"><div class="card-h"><h3>Master artikel & foto</h3></div>
+      <p class="small muted" style="margin-top:0">Diambil otomatis dari <b>Katalog Produk</b>. Update master artikel bulanan dan foto cukup lewat admin Katalog; dashboard ini ikut memakai versi terbaru.</p>
+      ${App.mst.status === 'ok' ? `<p class="small">Master artikel: ${App.mst.master ? `<b>${fmtN(Object.keys(App.mst.master.items || {}).length)}</b> artikel-warna · sumber ${esc(App.mst.master.source || '-')} · dibuat ${esc(App.mst.master.generated || '-')}` : '<b style="color:var(--bad)">gagal dimuat</b>'}<br>
+        Foto produk: ${App.mst.photo ? `<b>${fmtN(Object.keys(App.mst.photo.items || {}).length)}</b> generic · sumber ${esc(App.mst.photo.source || '-')} · dibuat ${esc(App.mst.photo.generated || '-')}` : '<b style="color:var(--bad)">gagal dimuat</b>'}</p>`
+        : App.mst.status === 'err' ? '<p class="small" style="color:var(--bad)">Master & foto belum bisa dimuat dari Katalog Produk. Cek koneksi atau pastikan repo Katalog-Produk aktif.</p>' : '<p class="small muted">Sedang memuat…</p>'}
+      <div class="row-act"><button class="btn sm" id="mstReload">Muat ulang master & foto</button></div></section>
     <section class="card"><div class="card-h"><h3>Riwayat upload</h3></div><div id="logT"></div></section>
     <section class="card"><div class="card-h"><h3>Hapus data</h3><p class="small muted">Untuk data yang salah upload</p></div>
       <div class="filters"><select id="delS" class="inp">${allCodes.map(c => `<option value="${esc(c)}">${esc(sName(c))} (${esc(c)})</option>`).join('')}</select>
@@ -2220,6 +2308,7 @@ document.addEventListener('click', async e => {
   if (t.id === 'admLink' || t.id === 'loginBtn') { e.preventDefault(); if (App.admin) go('admin'); else openLogin(); return; }
   if (t.id === 'logoutBtn') { App.adminPw = ''; App.admin = false; LS.set('dash_admin', ''); toast('Kamu sudah keluar'); App.page = 'report'; render(); return; }
   if (t.id === 'rebuildBtn') { rebuildCache(); return; }
+  if (t.id === 'mstReload') { toast('Memuat master & foto dari Katalog Produk…'); loadMaster(true); render(); return; }
   if (t.id === 'tplBtn') { downloadTemplate(($('#tplM') || {}).value); return; }
   if (t.id === 'lgCancel' || t.classList.contains('modal-ov')) { closeLogin(); return; }
   if (t.id === 'lgGo') { doLogin(); return; }
@@ -2249,6 +2338,8 @@ document.addEventListener('change', async e => {
   if (t.id === 'prDate') { if (t.value) { App.ui.prDate = t.value; render(); } return; }
   if (t.id === 'stSel') { App.ui.store = t.value; App.ui.more = {}; render(); return; }
   if (t.id === 'pc3') { App.ui.prodC3 = t.value; render(); return; }
+  if (t.id === 'pl2') { App.ui.prodL2 = t.value; render(); return; }
+  if (t.id === 'pgd') { App.ui.prodGd = t.value; render(); return; }
   if (t.id === 'pst') { App.ui.prodStore = t.value; render(); return; }
   if (t.id === 'hst') { App.ui.stStore = t.value; App.ui.more = {}; render(); return; }
   if (t.id === 'hss') { App.ui.stStatus = t.value; render(); return; }
@@ -2316,6 +2407,7 @@ async function boot() {
   if ((App.page === 'admin' || App.page === 'settings') && !App.admin) App.page = 'report';
   if (!App.lastDate && App.admin && !Object.keys(App.index.stock).length) App.page = 'admin';
   render();
+  loadMaster();
 }
 async function init() {
   renderNav();

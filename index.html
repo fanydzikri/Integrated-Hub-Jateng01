@@ -425,6 +425,7 @@ function dateFromFilename(name) {
 function detectSheet(rows, fileName) {
   for (let i = 0; i < Math.min(rows.length, 25); i++) {
     const h = (rows[i] || []).map(normH);
+    if (h.includes('createdat') && h.includes('reason') && h.includes('locationcode')) return parseLost(rows, i, h, fileName);
     if (h.includes('locationcode') && h.includes('bruto')) throw new Error('Sales Report tidak dipakai lagi. Upload Item DSR saja.');
     if (h.includes('dailyratio') || (h.some(x => x === 'date' || x === 'tanggal') && h.some(x => /ratio|bobot|weight/.test(x)) && !h.includes('orderno'))) return parseWeights(rows, i, h, fileName);
     if ((h.includes('kodesite') || h.includes('sitecode') || h.includes('kodetoko')) && h.filter(x => MON_KEY[x.slice(0, 3)] && /^[a-z]{3,9}\d{0,4}$/.test(x) && !/^(offline|eiger|total)$/.test(x)).length >= 1 && !h.includes('offline')) return parseEac(rows, i, h, fileName);
@@ -670,6 +671,25 @@ function parseEac(rows, hi, h, fileName) {
   return { kind: 'EAC', file: fileName, data, names, rows: n, year };
 }
 function eacResolve(p) { const y = p.year || +(App.lastDate || todayISO()).slice(0, 4); const out = {}; for (const k in p.data) { const m = k.startsWith('?') ? y + k.slice(1) : k; out[m] = Object.assign(out[m] || {}, p.data[k]); } return out; }
+/* Lost Sale Report: hanya toko yang terdaftar di daftar toko area (Kelola data) */
+function parseLost(rows, hi, h, fileName) {
+  const C = { at: colIdx(h, 'createdat'), cn: colIdx(h, 'customername'), mc: colIdx(h, 'membercode'), sku: colIdx(h, 'skucode'), nm: colIdx(h, 'skuname'), q: colIdx(h, 'quantity', 'qty'),
+    pr: colIdx(h, 'price'), amt: colIdx(h, 'saleamount'), rs: colIdx(h, 'reason'), ty: colIdx(h, 'type'), lc: colIdx(h, 'locationcode'), ln: colIdx(h, 'locationname'), by: colIdx(h, 'createdby') };
+  const known = new Set(Object.keys(App.stores || {}));
+  const keep = [], other = new Map(); let from = null, to = null;
+  for (let i = hi + 1; i < rows.length; i++) {
+    const r = rows[i] || []; let code = String(r[C.lc] ?? '').trim(); if (/^\d+\.0$/.test(code)) code = code.slice(0, -2);
+    const sku = String(r[C.sku] ?? '').trim(); if (!code || !sku) continue;
+    const dt = parseDateTime(r[C.at]); if (!dt) continue;
+    if (known.size && !known.has(code)) { other.set(code, (other.get(code) || 0) + 1); continue; }
+    const q = numV(r[C.q]) || 1; let price = numV(r[C.pr]), amt = numV(r[C.amt]);
+    const nm = String(r[C.ln] ?? '').replace(/\s+/g, ' ').trim();
+    keep.push([dt.d, pad(Math.floor(dt.t / 100)) + ':' + pad(dt.t % 100), code, nm, String(r[C.cn] ?? '').trim(), String(r[C.mc] ?? '').trim(), sku, String(r[C.nm] ?? '').trim(), q, price, amt, String(r[C.rs] ?? '').trim(), String(r[C.ty] ?? '').trim(), String(r[C.by] ?? '').trim()]);
+    if (!from || dt.d < from) from = dt.d; if (!to || dt.d > to) to = dt.d;
+  }
+  if (!keep.length) throw new Error(known.size ? `Tidak ada baris untuk toko area di file ini (${[...other.values()].reduce((a, b) => a + b, 0)} baris toko lain dilewati). Tambahkan kode site di Kelola data bila ada toko baru.` : 'Daftar toko area masih kosong.');
+  return { kind: 'LST', file: fileName, rows: keep, from, to, skipped: [...other.values()].reduce((a, b) => a + b, 0), otherStores: other.size };
+}
 function basisVal(o, b) {
   if (!o) return 0;
   const eiger = o.eiger != null ? o.eiger : (o.offline || 0) + (o.ea || 0) + (o.wab || 0);
@@ -794,7 +814,7 @@ async function loadAll() {
   computeLastDate();
   const months = Object.keys(App.index.sales).sort();
   const want = months.length ? months.filter(m => m >= addMonths(months[months.length - 1], -3)) : [];
-  await Promise.all([loadStock(), ...want.map(loadMonth)]);
+  await Promise.all([loadStock(), loadLost(), ...want.map(loadMonth)]);
 }
 function targetsFromDetail() {
   const t = {};
@@ -806,6 +826,10 @@ async function loadStock() {
   const C = await api('stock');
   for (const c in C.stores || {}) App.stock[c] = C.stores[c];
   mergeSku(C.sku || {}); App.cache = {};
+}
+async function loadLost() {
+  try { const C = await api('lost'); App.lost = (C.rows || []).map(r => ({ d: r[0], t: r[1], s: r[2], cn: r[3], mc: r[4], sku: r[5], name: r[6], q: r[7] || 0, price: r[8] || 0, amt: r[9] || 0, reason: r[10], type: r[11], by: r[12] })); }
+  catch (e) { App.lost = []; }
 }
 async function loadMonth(m) {
   if (App.loaded.has(m) || !App.index.sales[m]) return;
@@ -1080,11 +1104,13 @@ const ICON = {
   produk: '<path d="M4 8l8-4 8 4-8 4zM4 8v8l8 4 8-4V8M12 12v8"/>',
   stok: '<path d="M12 21s-7-4.5-7-10.5A4.5 4.5 0 0 1 12 7a4.5 4.5 0 0 1 7 3.5C19 16.5 12 21 12 21z"/>',
   admin: '<path d="M12 3v12m0-12l-4 4m4-4l4 4M4 17v3h16v-3"/>',
+  lost: '<path d="M12 9v4m0 4h.01M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/>',
   settings: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>'
 };
 const NAV = [
   { k: 'sales', label: 'Sales Performance', icon: 'area', items: [['report', 'Monitoring Sales', 'Achievement, UPT & basket size'], ['trend', 'Sales Trend', 'Jam, hari, UPT & basket harian'], ['promo', 'Kontribusi Promo', 'Porsi tiap promo terhadap sales'], ['omni', 'Monitoring OmniChannel', 'EA, Eigerindo Voucher, Tax Invoice, EASAP'], ['eac', 'Sales Member EAC', 'KPI penjualan ke member'], ['ra', 'RA Performance', 'Transaksi, UPT & basket per sales person'], ['pareto', 'Product Pareto', 'Kontribusi kategori & produk (80/20)']] },
   { k: 'inv', label: 'Inventory', icon: 'produk', items: [['produk', 'Produk', 'Penjualan & stok per artikel'], ['stok', 'Kesehatan Produk', 'SSR, dead stock, saran transfer']] },
+  { k: 'lost', label: 'Lost Sales', icon: 'lost' },
   { k: 'admin', label: 'Kelola data', icon: 'admin', admin: 1 },
   { k: 'settings', label: 'Pengaturan', icon: 'settings', admin: 1 }
 ];
@@ -1102,7 +1128,7 @@ function renderNav() {
 function renderPeriod() {
   const box = $('#periodBox');
   const tsel = hasTypes() && App.page !== 'toko' ? `<label class="small muted" for="typeSel">Jenis toko</label><select id="typeSel" class="inp"><option value="">Semua toko</option>${['rg', 'bz', 'ot'].filter(t => storeCodes().some(c => sType(c) === t)).map(t => `<option value="${t}" ${App.ui.typeF === t ? 'selected' : ''}>${TYPE_LABEL[t]}</option>`).join('')}</select>` : '';
-  if (['report', 'promo', 'omni', 'eac'].includes(App.page)) { box.innerHTML = tsel; return; }
+  if (['report', 'promo', 'omni', 'eac', 'lost'].includes(App.page)) { box.innerHTML = tsel; return; }
   if (!App.lastDate || App.page === 'admin' || App.page === 'settings') { box.innerHTML = ''; return; }
   const L = App.lastDate, cm = L.slice(0, 7);
   const months = Object.keys(App.index.sales).sort().reverse().filter(m => m !== cm);
@@ -1143,8 +1169,8 @@ function render() {
     view.innerHTML = `<div class="empty-state"><h2>Belum ada data di dashboard</h2><p class="muted">${App.admin ? 'Upload file Item DSR Report dan Export by Bin dari semua toko di halaman Kelola data. Setelah tersimpan, semua orang yang membuka link ini langsung melihat datanya tanpa upload.' : 'Admin area belum mengunggah data. Coba buka lagi nanti.'}</p>${App.admin ? '<button class="btn primary" data-go="admin">Buka Kelola data</button>' : '<p class="small muted">Kamu admin? <a href="#" id="admLink" style="color:var(--navy);font-weight:700">Masuk sebagai admin</a> untuk upload.</p>'}</div>`;
     return;
   }
-  if (!App.lastDate && !['admin', 'stok', 'report', 'settings'].includes(App.page)) { App.page = srLast() ? 'report' : 'stok'; }
-  const fn = { area: pageArea, report: pageReport, trend: pageTrend, promo: pagePromo, omni: pageOmni, eac: pageEac, ra: pageRA, pareto: pagePareto, toko: pageStore, produk: pageProduct, stok: pageStock, admin: pageAdmin, settings: pageSettings }[App.page] || pageReport;
+  if (!App.lastDate && !['admin', 'stok', 'report', 'settings', 'lost'].includes(App.page)) { App.page = srLast() ? 'report' : 'stok'; }
+  const fn = { area: pageArea, report: pageReport, trend: pageTrend, promo: pagePromo, omni: pageOmni, eac: pageEac, ra: pageRA, pareto: pagePareto, lost: pageLost, toko: pageStore, produk: pageProduct, stok: pageStock, admin: pageAdmin, settings: pageSettings }[App.page] || pageReport;
   try { fn(view); } catch (e) { console.error(e); view.innerHTML = `<div class="empty-state"><h2>Halaman gagal ditampilkan</h2><p class="muted">${esc(e.message)}</p></div>`; }
 }
 
@@ -1800,6 +1826,105 @@ function pagePareto(view) {
     { k: 'name', label: 'Location', h: r => `<span class="small"><b>${esc(r.name)}</b></span>` }, { k: 'trx', label: 'Transaksi', r: 1, h: r => fmtN(r.trx) }, { k: 'q', label: 'Qty', r: 1, h: r => fmtN(r.q) }, { k: 'v', label: 'Sales', r: 1, h: r => fmtRpS(r.v) }] });
 }
 
+/* ================= halaman: Lost Sales ================= */
+function lostReason(r) {
+  const x = String(r || '').toLowerCase();
+  if (/size|ukuran|\buk\b|nomor/.test(x)) return 'Size tidak tersedia';
+  if (/warna|colou?r/.test(x)) return 'Warna tidak tersedia';
+  if (/coba|lihat langsung|fitting|pegang/.test(x)) return 'Ingin coba / lihat langsung';
+  if (/cepat|segera|buru|dipakai|hari ini/.test(x)) return 'Butuh cepat';
+  if (/harga|mahal|diskon|promo/.test(x)) return 'Harga / promo';
+  if (/stok|stock|kosong|tidak ada|tidak tersedia|no item|ready|habis|tersedia/.test(x)) return 'Stok / artikel tidak ada';
+  return 'Lainnya';
+}
+/* Price/Sale Amount di bawah Rp1.000 dianggap salah input: pakai harga master artikel bila ada */
+function lostAmt(x) { if (x.amt >= 1000) return { v: x.amt, fix: false }; const p = priceOfSku(x.sku); return p ? { v: p * (x.q || 1), fix: true } : { v: x.amt, fix: false }; }
+function pageLost(view) {
+  const U = App.ui, L = (App.lost || []).filter(x => typeOk(x.s));
+  if (!L.length) { setHead('Lost Sales', ''); view.innerHTML = `<div class="empty-state"><h2>Belum ada data lost sales</h2><p class="muted">${App.admin ? 'Upload Lost Sale Report harian di Kelola data.' : 'Admin belum mengunggah Lost Sale Report.'}</p></div>`; return; }
+  const last = L.reduce((a, x) => x.d > a ? x.d : a, '');
+  const months = [...new Set(L.map(x => x.d.slice(0, 7)))].sort().reverse();
+  const m = U.lsM && months.includes(U.lsM) ? U.lsM : months[0]; U.lsM = m;
+  const mLast = L.filter(x => x.d.slice(0, 7) === m).reduce((a, x) => x.d > a ? x.d : a, m + '-01');
+  const day = +mLast.slice(8), pm = addMonths(m, -1), from = m + '-01', to = mLast, cfrom = pm + '-01', cto = pm + '-' + pad(Math.min(day, dim(pm)));
+  const codes = activeStores(), st = U.lsStore && codes.includes(U.lsStore) ? U.lsStore : '';
+  const cur = L.filter(x => x.d >= from && x.d <= to && (!st || x.s === st)), prev = L.filter(x => x.d >= cfrom && x.d <= cto && (!st || x.s === st));
+  const sum = a => a.reduce((s, x) => s + lostAmt(x).v, 0), qty = a => a.reduce((s, x) => s + (x.q || 0), 0);
+  const T = { v: sum(cur), q: qty(cur), n: cur.length }, P = { v: sum(prev), q: qty(prev), n: prev.length };
+  const fixed = cur.filter(x => lostAmt(x).fix).length;
+  const salesV = linesIn(from, to, st || null).reduce((s, l) => s + l.g, 0);
+  const gr = (a, b) => b ? a / b - 1 : null;
+  const gtxt = g => g == null ? '' : `<small class="${g <= 0 ? 'up' : 'down'}">${g >= 0 ? '▲ ' : '▼ '}${fmtPct(Math.abs(g), 1)} dari bulan sebelumnya</small>`;
+  setHead('Lost Sales' + (st ? ' · ' + sName(st) : ''), fmtMonth(m) + ' · 1–' + day + ' · updated data ' + fmtDate(last));
+  /* agregasi */
+  const grp = (keyFn, extra) => { const M = new Map(); for (const x of cur) { const k = keyFn(x); if (k == null) continue; let g = M.get(k); if (!g) M.set(k, g = Object.assign({ k, v: 0, q: 0, n: 0 }, extra ? extra(x) : {})); g.v += lostAmt(x).v; g.q += x.q || 0; g.n++; } return [...M.values()].sort((a, b) => b.v - a.v); };
+  const mc = x => { const k = App.mst.sku && App.mst.sku.get(x.sku); const it = k && mItem(k); const d = App.sku[x.sku] || []; return { l3: (it && it.l3) || d[1] || '(tidak di master)', l4: (it && it.l4) || d[2] || '(tidak di master)' }; };
+  const byStore = grp(x => x.s), byL3 = grp(x => mc(x).l3), byL4 = grp(x => mc(x).l4), byRs = grp(x => lostReason(x.reason)), byTy = grp(x => x.type || '–'), byRaw = grp(x => x.reason || '(kosong)');
+  const byArt = grp(x => artOf(x.sku), x => ({ name: artName(x.name) || x.name, l4: mc(x).l4, stores: new Set() }));
+  for (const x of cur) { const a = byArt.find(g => g.k === artOf(x.sku)); if (a) a.stores.add(x.s); }
+  const daily = new Map(); for (const x of cur) { const d = daily.get(x.d) || { v: 0, n: 0 }; d.v += lostAmt(x).v; d.n++; daily.set(x.d, d); }
+  /* penjualan per toko untuk rasio */
+  const salesBy = new Map(); for (const l of linesIn(from, to, st || null)) salesBy.set(l.s, (salesBy.get(l.s) || 0) + l.g);
+  const stockAll = a => { let t = 0; const per = []; for (const c of storeCodes()) { const s = stockByArt(c).get(a); if (s && s.t > 0) { t += s.t; per.push([c, s.t]); } } per.sort((x, y) => y[1] - x[1]); return { t, per }; };
+  view.innerHTML = `<div class="stack">
+    <div class="filters" style="margin:0"><label class="small muted" for="lsM">Bulan</label><select id="lsM" class="inp">${months.map(x => `<option value="${x}" ${x === m ? 'selected' : ''}>${fmtMonth(x)}</option>`).join('')}</select>
+      <label class="small muted" for="lsStore">Location</label><select id="lsStore" class="inp"><option value="">Semua toko</option>${codes.map(c => `<option value="${esc(c)}" ${c === st ? 'selected' : ''}>${esc(c)} - ${esc(sName(c))}</option>`).join('')}</select>
+      <span style="flex:1"></span>${App.admin ? '<button class="btn" data-go="admin">Input lost sales</button>' : ''}<button class="btn" id="lsXls">Download Excel</button></div>
+    <div class="pt-tiles" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr))">
+      <div class="pt-tile"><span>Total Lost Sales</span><b>${fmtRpS(T.v)}</b>${gtxt(gr(T.v, P.v))}</div>
+      <div class="pt-tile"><span>Quantity</span><b>${fmtN(T.q)}</b>${gtxt(gr(T.q, P.q))}</div>
+      <div class="pt-tile"><span>Data input</span><b>${fmtN(T.n)}</b>${gtxt(gr(T.n, P.n))}</div>
+      <div class="pt-tile"><span>Lost vs sales</span><b>${salesV ? fmtPct(T.v / salesV, 1) : '–'}</b><small>dari ${fmtRpS(salesV)} gross sales</small></div>
+      <div class="pt-tile" style="background:#0B1B4A"><span>Updated data</span><b>${fmtDateS(last)}</b><small>${fmtN(byArt.length)} artikel unik</small></div>
+    </div>
+    ${fixed ? `<div class="note">${fixed} baris punya harga di bawah Rp1.000 (kemungkinan salah input), jadi nilainya dihitung dari harga master artikel.</div>` : ''}
+    <div class="grid g2">
+      <section class="card"><div class="card-h"><h3>Lost sales harian</h3><p class="small muted">batang = nilai, garis = jumlah input</p></div><div class="chart-box"><canvas id="lsDay"></canvas></div></section>
+      <section class="card"><div class="card-h"><h3>Alasan lost sales</h3><p class="small muted">dikelompokkan dari kolom Reason</p></div><div class="chart-box"><canvas id="lsRs"></canvas></div></section>
+    </div>
+    <div class="grid g2">
+      <section class="card"><div class="card-h"><h3>Per toko</h3><p class="small muted">klik untuk filter</p></div><div id="lsStoreT"></div></section>
+      <div class="stack">
+        <section class="card"><div class="card-h"><h3>Lost by MC Lv.3</h3></div><div class="chart-box" style="height:${Math.max(160, byL3.length * 30 + 40)}px"><canvas id="lsL3"></canvas></div></section>
+        <section class="card"><div class="card-h"><h3>Lost by MC Lv.4</h3><p class="small muted">10 teratas</p></div><div class="chart-box" style="height:${Math.max(160, Math.min(10, byL4.length) * 28 + 40)}px"><canvas id="lsL4"></canvas></div></section>
+      </div>
+    </div>
+    <section class="card"><div class="card-h"><h3>Artikel paling sering dicari tapi tidak terlayani</h3><p class="small muted">dengan stok area saat ini, untuk bahan transfer / order</p></div><div id="lsArtT"></div></section>
+    <div class="grid g2">
+      <section class="card"><div class="card-h"><h3>Type</h3></div><div class="donut"><canvas id="lsTy"></canvas></div></section>
+      <section class="card"><div class="card-h"><h3>Alasan asli (Reason)</h3></div><div id="lsRawT"></div></section>
+    </div>
+    ${App.admin ? '<section class="card"><div class="card-h"><h3>Detail input</h3><p class="small muted">hanya admin</p></div><div id="lsDetT"></div></section>' : ''}
+  </div>`;
+  const ink = css('--muted');
+  const dl = []; for (let d = from; d <= to; d = addDays(d, 1)) dl.push(d);
+  mkDual($('#lsDay'), dl.map(fmtDateS), dl.map(d => (daily.get(d) || {}).v || 0), dl.map(d => (daily.get(d) || {}).n || 0), 'Lost sales', 'Jumlah input', v => fmtRpS(v), v => fmtN(v));
+  const hbar = (id, arr, color) => { if (typeof Chart === 'undefined' || !arr.length) return; App.charts.push(new Chart($(id), { type: 'bar', data: { labels: arr.map(x => x.k), datasets: [{ label: 'Lost sales', data: arr.map(x => x.v), backgroundColor: color, borderRadius: 3 }] }, options: { indexAxis: 'y', maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => fmtRp(c.parsed.x) + ' · ' + fmtN(arr[c.dataIndex].q) + ' pcs · ' + arr[c.dataIndex].n + ' input' } } }, scales: { x: { ticks: { color: ink, callback: v => fmtRpS(v) }, grid: { color: css('--line') } }, y: { ticks: { color: ink, font: { size: 11 } }, grid: { display: false } } } } })); };
+  hbar('#lsL3', byL3, css('--bad')); hbar('#lsL4', byL4.slice(0, 10), css('--orange'));
+  if (typeof Chart !== 'undefined') {
+    App.charts.push(new Chart($('#lsRs'), { type: 'doughnut', data: { labels: byRs.map(x => x.k), datasets: [{ data: byRs.map(x => x.n), backgroundColor: PAL, borderWidth: 1 }] }, options: { maintainAspectRatio: false, cutout: '55%', plugins: { legend: { position: 'right', labels: { color: ink, boxWidth: 10, font: { size: 11 } } }, tooltip: { callbacks: { label: c => c.label + ': ' + c.parsed + ' input · ' + fmtRpS(byRs[c.dataIndex].v) } } } } }));
+    App.charts.push(new Chart($('#lsTy'), { type: 'doughnut', data: { labels: byTy.map(x => x.k), datasets: [{ data: byTy.map(x => x.n), backgroundColor: PAL, borderWidth: 1 }] }, options: { maintainAspectRatio: false, cutout: '55%', plugins: { legend: { position: 'bottom', labels: { color: ink, boxWidth: 10 } }, tooltip: { callbacks: { label: c => c.label + ': ' + c.parsed + ' input · ' + fmtRpS(byTy[c.dataIndex].v) } } } } }));
+  }
+  $('#lsStoreT').innerHTML = tbl('lsStore', { rows: byStore.map(g => ({ c: g.k, name: sName(g.k), q: g.q, v: g.v, n: g.n, ratio: salesBy.get(g.k) ? g.v / salesBy.get(g.k) : null })), sort: { k: 'q', dir: 'desc' }, limit: 40, onRow: r => { App.ui.lsStore = r.c; render(); window.scrollTo(0, 0); }, cols: [
+    { k: 'c', label: 'Site', h: r => `<span class="tn">${esc(r.c)}</span>` }, { k: 'name', label: 'Location name', h: r => `<b class="small">${esc(r.name)}</b>` },
+    { k: 'q', label: 'Qty', r: 1, h: r => fmtN(r.q) }, { k: 'v', label: 'Sale amount', r: 1, h: r => fmtN(r.v) }, { k: 'n', label: 'Input', r: 1, h: r => fmtN(r.n) }, { k: 'ratio', label: '% vs sales', r: 1, h: r => fmtPct(r.ratio, 1) }] });
+  $('#lsArtT').innerHTML = tbl('lsArt', { rows: byArt.map(g => { const s0 = stockAll(g.k); return { art: g.k, name: g.name, l4: g.l4, q: g.q, v: g.v, n: g.n, ns: g.stores.size, stk: s0.t, where: s0.per.slice(0, 3).map(([c, t]) => sName(c) + ' ' + t).join(', ') }; }), sort: { k: 'q', dir: 'desc' }, limit: 20, onRow: r => openProduct(r.art, null), cols: [
+    { k: 'name', label: 'Artikel', h: r => prodCell(r.art, r.name, r.art + ' · ' + r.l4) }, { k: 'q', label: 'Qty lost', r: 1, h: r => `<b>${fmtN(r.q)}</b>` }, { k: 'v', label: 'Nilai', r: 1, h: r => fmtRpS(r.v) },
+    { k: 'ns', label: 'Toko', r: 1, h: r => fmtN(r.ns) }, { k: 'stk', label: 'Stok area', r: 1, h: r => r.stk ? fmtN(r.stk) : '<span style="color:var(--bad)">0</span>' }, { k: 'where', label: 'Ada di', ns: 1, h: r => `<span class="small muted">${esc(r.where || 'tidak ada di toko area')}</span>` }] });
+  $('#lsRawT').innerHTML = tbl('lsRaw', { rows: byRaw.map(g => ({ k: g.k, cat: lostReason(g.k), n: g.n, v: g.v })), sort: { k: 'n', dir: 'desc' }, limit: 12, cols: [
+    { k: 'k', label: 'Reason', h: r => `<span class="small">${esc(r.k)}</span><span class="sub">${esc(r.cat)}</span>` }, { k: 'n', label: 'Input', r: 1, h: r => fmtN(r.n) }, { k: 'v', label: 'Nilai', r: 1, h: r => fmtRpS(r.v) }] });
+  if (App.admin) $('#lsDetT').innerHTML = tbl('lsDet', { rows: cur.map(x => ({ d: x.d + ' ' + x.t, s: x.s, cn: x.cn, name: x.name, q: x.q, v: lostAmt(x).v, fix: lostAmt(x).fix, reason: x.reason, type: x.type, by: x.by })), sort: { k: 'd', dir: 'desc' }, limit: 25, cols: [
+    { k: 'd', label: 'Waktu', h: r => `<span class="small tn">${esc(r.d)}</span>` }, { k: 's', label: 'Site', h: r => `<span class="small">${esc(r.s)} ${esc(sName(r.s))}</span>` }, { k: 'cn', label: 'Customer', h: r => `<span class="small">${esc(r.cn)}</span>` },
+    { k: 'name', label: 'SKU', h: r => `<span class="small">${esc(r.name)}</span>` }, { k: 'q', label: 'Qty', r: 1 }, { k: 'v', label: 'Nilai', r: 1, h: r => fmtN(r.v) + (r.fix ? ' *' : '') }, { k: 'reason', label: 'Reason', h: r => `<span class="small">${esc(r.reason)}</span>` }, { k: 'type', label: 'Type' }, { k: 'by', label: 'Input oleh', h: r => `<span class="small tn">${esc(r.by)}</span>` }] });
+  App.ui.lsLast = { cur, m };
+}
+async function exportLost() {
+  const X = App.ui.lsLast; if (!X || typeof XLSX === 'undefined') return;
+  const aoa = [['Tanggal', 'Jam', 'Kode Toko', 'Nama Toko', 'SKU', 'Nama SKU', 'Qty', 'Nilai', 'Reason', 'Kelompok alasan', 'Type'], ...X.cur.map(x => [x.d, x.t, x.s, sName(x.s), x.sku, x.name, x.q, lostAmt(x).v, x.reason, lostReason(x.reason), x.type])];
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), 'Lost Sales');
+  (await getDownloads()).save({ filename: `Lost_Sales_${X.m}.xlsx`, data: new Blob([XLSX.write(wb, { bookType: 'xlsx', type: 'array' })]) });
+}
+
 /* ================= halaman: per toko ================= */
 function pageStore(view) {
   const codes = storeCodes(); if (!App.ui.store || !codes.includes(App.ui.store)) App.ui.store = codes[0];
@@ -2001,7 +2126,7 @@ function pageAdmin(view) {
   const codes = storeCodes().filter(c => sType(c) !== 'bz' || monthTarget(c, tm) || (App.index.sales[tm] || {})[c] || (App.tgtDetail[tm] || {})[c]);
   const allCodes = storeCodes();
   view.innerHTML = `<div class="stack">${permNote}
-    <section class="card"><div class="card-h"><h3>Upload data</h3><p class="small muted">Item DSR Report, Export by Bin (stok), target bulanan, target OmniChannel, dan bobot harian. Semua tersimpan di spreadsheet master.</p></div>
+    <section class="card"><div class="card-h"><h3>Upload data</h3><p class="small muted">Item DSR Report, Lost Sale Report, Export by Bin (stok), dan file target. Semua tersimpan di spreadsheet master.</p></div>
       <label class="drop" id="drop"><input type="file" id="fileIn" multiple accept=".xlsx,.xls,.csv"><b>Pilih file</b><span class="small muted">atau seret file ke sini. Toko dikenali otomatis dari kolom Location.</span></label>
       <div class="pend" id="pend"></div>
       <div class="note" style="margin-top:12px;display:flex;flex-wrap:wrap;gap:10px;align-items:center"><span><b>Template target bulanan</b> — satu file berisi sheet Target Sales, Target OmniChannel, Bobot Harian, dan Target EAC (Jan–Des), sudah terisi daftar toko & tanggal. Isi angkanya, lalu upload sekali.</span>
@@ -2027,6 +2152,10 @@ function pageAdmin(view) {
       ${(App.books || []).length ? `<div class="chips" style="margin:6px 0 4px">${App.books.map(b => `<a class="btn sm" href="${esc(b.url)}" target="_blank" rel="noopener">Data DSR ${esc(b.key)}</a>`).join('')}</div>` : ''}
       ${App.cells ? `<p class="small muted">Spreadsheet master terpakai ${fmtN(App.cells)} dari 10.000.000 sel (${fmtPct(App.cells / 1e7, 1)}).</p>` : ''}
       <div class="row-act">${SHEET_URL ? `<a class="btn" href="${esc(SHEET_URL)}" target="_blank" rel="noopener">Buka spreadsheet</a>` : ''}<button class="btn" id="rebuildBtn">Perbarui cache</button><span id="rebuildMsg" class="small muted"></span></div></section>
+    <section class="card"><div class="card-h"><h3>Daftar toko area</h3><p class="small muted">${fmtN(storeCodes().length)} site</p></div>
+      <p class="small muted" style="margin-top:0">Hanya toko di daftar ini yang diambil dari Lost Sale Report. Toko juga otomatis masuk saat muncul di file target atau Item DSR. Tambahkan toko baru cukup dengan kode site.</p>
+      <div class="filters"><input id="newCode" class="inp" placeholder="Kode site, mis. 2501" style="width:170px" inputmode="numeric"><input id="newName" class="inp" placeholder="Nama toko (opsional)" style="flex:1 1 220px"><button class="btn primary" id="addStore">Tambah toko</button></div>
+      <div class="chips">${storeCodes().map(c => `<span class="chips-item" style="display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line-strong);border-radius:999px;padding:4px 6px 4px 12px;font-size:12.5px"><b class="tn">${esc(c)}</b> ${esc(sName(c))}${sType(c) === 'bz' ? ' <span class="muted">(bazaar)</span>' : ''}<button class="btn sm danger" style="min-height:24px;padding:0 8px" data-rmstore="${esc(c)}" title="Hapus dari daftar">×</button></span>`).join('')}</div></section>
     <section class="card"><div class="card-h"><h3>Master artikel & foto</h3></div>
       <p class="small muted" style="margin-top:0">Diambil otomatis dari <b>Katalog Produk</b>. Update master artikel bulanan dan foto cukup lewat admin Katalog; dashboard ini ikut memakai versi terbaru.</p>
       ${App.mst.status === 'ok' ? `<p class="small">Master artikel: ${App.mst.master ? `<b>${fmtN(Object.keys(App.mst.master.items || {}).length)}</b> artikel-warna · sumber ${esc(App.mst.master.source || '-')} · dibuat ${esc(App.mst.master.generated || '-')}` : '<b style="color:var(--bad)">gagal dimuat</b>'}<br>
@@ -2042,14 +2171,14 @@ function pageAdmin(view) {
   renderPending(); renderCoverage(cm);
   $('#logT').innerHTML = tbl('log', { rows: App.log.slice().reverse(), limit: 15, empty: 'Belum ada upload.', cols: [
     { k: 'at', label: 'Waktu', h: r => esc(new Date(r.at).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })) },
-    { k: 'kind', label: 'Jenis', h: r => ({ DSR: 'Penjualan', INV: 'Stok', TGT: 'Target', OMT: 'Target Omni', EAC: 'Target EAC', WGT: 'Bobot harian', SR: 'Sales Report', DEL: 'Hapus' }[r.kind] || r.kind) }, { k: 'file', label: 'File', h: r => `<span class="small">${esc(r.file)}</span>` },
+    { k: 'kind', label: 'Jenis', h: r => ({ DSR: 'Penjualan', INV: 'Stok', TGT: 'Target', OMT: 'Target Omni', EAC: 'Target EAC', LST: 'Lost Sales', WGT: 'Bobot harian', SR: 'Sales Report', DEL: 'Hapus' }[r.kind] || r.kind) }, { k: 'file', label: 'File', h: r => `<span class="small">${esc(r.file)}</span>` },
     { k: 'stores', label: 'Toko', r: 1 }, { k: 'info', label: 'Isi', h: r => esc(r.info) + (r.removed ? ' <span class="badge b-DS">sudah dihapus</span>' : '') },
     { k: 'x', label: '', ns: 1, h: r => r.id && r.scope && !r.removed ? `<button class="btn sm danger" data-dellog="${esc(r.id)}">Hapus data file ini</button>` : '' }] });
 }
 /* hapus semua data yang dimasukkan oleh satu file (dikerjakan di spreadsheet) */
 async function deleteByLog(id) {
   const e = App.log.find(x => x.id === id); if (!e || !e.scope) return;
-  const what = { DSR: 'penjualan (Item DSR)', INV: 'stok', TGT: 'target', OMT: 'target OmniChannel', EAC: 'target Member EAC', WGT: 'bobot harian' }[e.kind] || 'data';
+  const what = { DSR: 'penjualan (Item DSR)', INV: 'stok', TGT: 'target', OMT: 'target OmniChannel', EAC: 'target Member EAC', LST: 'lost sales', WGT: 'bobot harian' }[e.kind] || 'data';
   if (!confirm(`Hapus data ${what} dari file "${e.file}"?\n${e.info}\n\nCatatan: kalau toko & tanggal yang sama pernah diupload ulang dari file lain, data itu ikut terhapus. Tidak bisa dibatalkan.`)) return;
   try { toast('Menghapus data di spreadsheet…', 15000); await apiPost({ a: 'deleteLog', id }); await loadAll(); toast('Data dari file itu sudah dihapus'); render(); }
   catch (er) { console.error(er); toast('Gagal menghapus: ' + errMsg(er)); }
@@ -2066,6 +2195,10 @@ function renderPending() {
     if (p.kind === 'WGT') {
       const warn = p.days !== dim(p.month) ? ` <b style="color:var(--warn)">hanya ${p.days} dari ${dim(p.month)} hari</b>` : '';
       return `<div class="pend-i"><span class="k">Bobot harian</span><div><div class="f">${esc(p.file)}</div><div class="d">${fmtMonth(p.month)} · ${p.days} hari · total ${fmtPct(p.rawSum, 2)}${warn}</div></div><button class="btn sm" data-rmp="${i}">Hapus</button></div>`;
+    }
+    if (p.kind === 'LST') {
+      const amt = p.rows.reduce((a, r) => a + (r[10] || 0), 0), st = new Set(p.rows.map(r => r[2])).size;
+      return `<div class="pend-i"><span class="k err" style="background:var(--orange-tint);color:var(--orange-deep)">Lost Sales</span><div><div class="f">${esc(p.file)}</div><div class="d">${p.from === p.to ? fmtDate(p.from) : fmtDate(p.from) + ' – ' + fmtDate(p.to)} · ${fmtN(p.rows.length)} baris dari ${st} toko area · ${fmtRp(amt)}${p.skipped ? ` · ${fmtN(p.skipped)} baris dari ${p.otherStores} toko di luar area dilewati` : ''}</div></div><button class="btn sm" data-rmp="${i}">Hapus</button></div>`;
     }
     if (p.kind === 'EAC') {
       const R = eacResolve(p), ms = Object.keys(R).sort(), tot = ms.reduce((a, m) => a + Object.values(R[m]).reduce((x, v) => x + v, 0), 0);
@@ -2192,6 +2325,13 @@ async function saveAll() {
       for (const m in R) for (const c in R[m]) rows.push([m, c, p.names[c] || '', R[m][c]]);
       if (rows.length) await withRetry(() => apiPost({ a: 'eacTarget', rows }));
       logs.push({ id: uid(), scope: { months: Object.keys(R), codes: Object.keys(p.names) }, at: now, kind: 'EAC', file: p.file, stores: p.rows, info: 'target Member EAC ' + Object.keys(R).sort().map(fmtMonth).join(', ') });
+    }
+    /* --- lost sales --- */
+    for (const p of items.filter(p => p.kind === 'LST')) {
+      say('Menyimpan lost sales…');
+      await withRetry(() => apiPost({ a: 'lost', rows: p.rows }));
+      const pairs = [...new Set(p.rows.map(r => r[2] + '|' + r[0]))];
+      logs.push({ id: uid(), scope: { pairs }, at: now, kind: 'LST', file: p.file, stores: new Set(p.rows.map(r => r[2])).size, info: 'lost sales ' + (p.from === p.to ? fmtDate(p.from) : fmtDate(p.from) + ' – ' + fmtDate(p.to)) + ', ' + p.rows.length + ' baris' });
     }
     /* --- bobot harian --- */
     for (const p of items.filter(p => p.kind === 'WGT')) {
@@ -2379,6 +2519,7 @@ document.addEventListener('click', async e => {
   const oms = t.closest('[data-oms]'); if (oms) { const k = oms.dataset.oms; const s0 = App.ui.omSort || { k: 'totP', dir: 'desc' }; App.ui.omSort = s0.k === k ? { k, dir: s0.dir === 'asc' ? 'desc' : 'asc' } : { k, dir: k === 'name' ? 'asc' : 'desc' }; render(); return; }
   if (t.id === 'omXls') { exportOmni(); return; }
   if (t.id === 'raXls') { exportRA(); return; }
+  if (t.id === 'lsXls') { exportLost(); return; }
   const rpf = t.closest('[data-rpf]'); if (rpf) { App.ui.rpFull = rpf.dataset.rpf === '1'; render(); return; }
   const rpv = t.closest('[data-rpv]'); if (rpv) { App.ui.rpVal = rpv.dataset.rpv; render(); return; }
   if (t.id === 'rpXls') { exportReport(); return; }
@@ -2387,6 +2528,8 @@ document.addEventListener('click', async e => {
   if (t.id === 'admLink' || t.id === 'loginBtn') { e.preventDefault(); if (App.admin) go('admin'); else openLogin(); return; }
   if (t.id === 'logoutBtn') { App.adminPw = ''; App.admin = false; LS.set('dash_admin', ''); toast('Kamu sudah keluar'); App.page = 'report'; render(); return; }
   if (t.id === 'rebuildBtn') { rebuildCache(); return; }
+  if (t.id === 'addStore') { const c = ($('#newCode').value || '').trim(), n = ($('#newName').value || '').trim(); if (!/^[0-9A-Za-z]{3,8}$/.test(c)) { toast('Isi kode site yang valid'); return; } if (App.stores[c]) { toast('Kode ' + c + ' sudah ada di daftar'); return; } try { await apiPost({ a: 'storeAdd', code: c, name: n }); await loadAll(); toast('Toko ' + c + ' ditambahkan'); render(); } catch (er) { toast('Gagal: ' + errMsg(er)); } return; }
+  const rms = t.closest('[data-rmstore]'); if (rms) { const c = rms.dataset.rmstore; if (!confirm(`Hapus ${c} - ${sName(c)} dari daftar toko area? Data penjualannya tidak ikut terhapus.`)) return; try { await apiPost({ a: 'storeRemove', code: c }); await loadAll(); toast('Dihapus dari daftar'); render(); } catch (er) { toast('Gagal: ' + errMsg(er)); } return; }
   if (t.id === 'mstReload') { toast('Memuat master & foto dari Katalog Produk…'); loadMaster(true); render(); return; }
   if (t.id === 'tplBtn') { downloadTemplate(($('#tplM') || {}).value); return; }
   if (t.id === 'lgCancel' || t.classList.contains('modal-ov')) { closeLogin(); return; }
@@ -2408,6 +2551,8 @@ document.addEventListener('change', async e => {
   const t = e.target;
   if (App.page === 'settings' && settingsChange(t)) return;
   if (t.id === 'perSel' || t.id === 'rFrom' || t.id === 'rTo') { await onPeriodChange(); return; }
+  if (t.id === 'lsM') { App.ui.lsM = t.value; render(); return; }
+  if (t.id === 'lsStore') { App.ui.lsStore = t.value; App.ui.more = {}; render(); return; }
   if (t.id === 'ptStore') { App.ui.ptStore = t.value; App.ui.more = {}; render(); return; }
   if (t.id === 'raStore') { App.ui.raStore = t.value; App.ui.more = {}; render(); return; }
   if (t.id === 'raMin') { App.ui.raMin = Math.max(0, +t.value || 0); render(); return; }

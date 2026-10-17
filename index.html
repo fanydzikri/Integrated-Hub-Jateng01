@@ -278,6 +278,17 @@ table.tbl{width:100%;border-collapse:collapse;font-size:13.5px}
 .pc .th.ph{display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:10px}
 .gal{display:flex;gap:8px;overflow-x:auto;margin:12px 0 6px;padding-bottom:4px}
 .gal figure img,.gal img{width:120px;height:120px;object-fit:cover;border-radius:10px;border:1px solid var(--line);background:var(--surface-2);flex:none}
+.pt-tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.pt-tile{background:#0F3192;color:#fff;border-radius:10px;padding:12px 16px}
+.pt-tile span{display:block;font-size:12.5px;font-weight:600;color:#C9D3F0}
+.pt-tile b{display:block;font-size:26px;font-weight:800;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.pt-tile small{font-size:12px;font-weight:700}
+.pt-tile small.up{color:#7FE0AE}.pt-tile small.down{color:#FFB4A6}
+@media (max-width:760px){.pt-tiles{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.g4{grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr))}
+.donut{position:relative;height:260px}
+.abc{display:inline-block;width:22px;text-align:center;border-radius:5px;font-weight:800;font-size:11px;color:#fff}
+.abc.A{background:var(--ok)}.abc.B{background:var(--orange)}.abc.C{background:var(--muted)}
 .ra-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
 .ra-tile{background:#0F3192;color:#fff;border-radius:10px;padding:12px 16px;text-align:center}
 .ra-tile span{display:block;font-size:12px;font-weight:600;color:#C9D3F0}
@@ -1072,7 +1083,7 @@ const ICON = {
   settings: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>'
 };
 const NAV = [
-  { k: 'sales', label: 'Sales Performance', icon: 'area', items: [['report', 'Monitoring Sales', 'Achievement, UPT & basket size'], ['trend', 'Sales Trend', 'Jam, hari, UPT & basket harian'], ['promo', 'Kontribusi Promo', 'Porsi tiap promo terhadap sales'], ['omni', 'Monitoring OmniChannel', 'EA, Eigerindo Voucher, Tax Invoice, EASAP'], ['eac', 'Sales Member EAC', 'KPI penjualan ke member'], ['ra', 'RA Performance', 'Transaksi, UPT & basket per sales person']] },
+  { k: 'sales', label: 'Sales Performance', icon: 'area', items: [['report', 'Monitoring Sales', 'Achievement, UPT & basket size'], ['trend', 'Sales Trend', 'Jam, hari, UPT & basket harian'], ['promo', 'Kontribusi Promo', 'Porsi tiap promo terhadap sales'], ['omni', 'Monitoring OmniChannel', 'EA, Eigerindo Voucher, Tax Invoice, EASAP'], ['eac', 'Sales Member EAC', 'KPI penjualan ke member'], ['ra', 'RA Performance', 'Transaksi, UPT & basket per sales person'], ['pareto', 'Product Pareto', 'Kontribusi kategori & produk (80/20)']] },
   { k: 'inv', label: 'Inventory', icon: 'produk', items: [['produk', 'Produk', 'Penjualan & stok per artikel'], ['stok', 'Kesehatan Produk', 'SSR, dead stock, saran transfer']] },
   { k: 'admin', label: 'Kelola data', icon: 'admin', admin: 1 },
   { k: 'settings', label: 'Pengaturan', icon: 'settings', admin: 1 }
@@ -1133,7 +1144,7 @@ function render() {
     return;
   }
   if (!App.lastDate && !['admin', 'stok', 'report', 'settings'].includes(App.page)) { App.page = srLast() ? 'report' : 'stok'; }
-  const fn = { area: pageArea, report: pageReport, trend: pageTrend, promo: pagePromo, omni: pageOmni, eac: pageEac, ra: pageRA, toko: pageStore, produk: pageProduct, stok: pageStock, admin: pageAdmin, settings: pageSettings }[App.page] || pageReport;
+  const fn = { area: pageArea, report: pageReport, trend: pageTrend, promo: pagePromo, omni: pageOmni, eac: pageEac, ra: pageRA, pareto: pagePareto, toko: pageStore, produk: pageProduct, stok: pageStock, admin: pageAdmin, settings: pageSettings }[App.page] || pageReport;
   try { fn(view); } catch (e) { console.error(e); view.innerHTML = `<div class="empty-state"><h2>Halaman gagal ditampilkan</h2><p class="muted">${esc(e.message)}</p></div>`; }
 }
 
@@ -1719,6 +1730,74 @@ async function exportRA() {
   const wb = XLSX.utils.book_new(); const w1 = XLSX.utils.aoa_to_sheet(a1); w1['!cols'] = [{ wch: 34 }, { wch: 42 }, { wch: 12 }, { wch: 10 }, { wch: 8 }, { wch: 12 }, { wch: 14 }];
   XLSX.utils.book_append_sheet(wb, w1, 'RA Performance'); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(a2), 'UPT by Date');
   (await getDownloads()).save({ filename: `RA_Performance_${X.R.from}_${X.R.to}.xlsx`, data: new Blob([XLSX.write(wb, { bookType: 'xlsx', type: 'array' })]) });
+}
+
+/* ================= halaman: Product Pareto ================= */
+const seriesOf = name => /^(X-?\s*)?(WS|JR)\b/i.test(String(name || '').trim()) ? 'WOMAN SERIES' : 'MAN SERIES';
+const PAL = ['#0F3192', '#E46636', '#13806F', '#E2A82B', '#7A4FB5', '#2B9FD9', '#C0392B', '#5A6482', '#9CB0E8', '#F5A88C', '#6CC3A7', '#B8B0D9'];
+function pagePareto(view) {
+  const R = periodRange(), U = App.ui, codes = activeStores();
+  const st = U.ptStore && codes.includes(U.ptStore) ? U.ptStore : '';
+  setHead('Product Pareto' + (st ? ' · ' + sName(st) : ''), R.label + ' · dibanding ' + R.cmpLabel + ' · ' + VLL().toLowerCase());
+  const stat = lines => { const trx = new Set(); let q = 0, v = 0; for (const l of lines) { v += VAL(l); if (!isPB(l.sku)) q += l.q; if (l.q > 0) trx.add(l.s + l.d + l.o); } return { trx: trx.size, q, v, upt: trx.size ? q / trx.size : null, bs: trx.size ? v / trx.size : null }; };
+  const cur = linesIn(R.from, R.to, st || null), prev = linesIn(R.cfrom, R.cto, st || null);
+  const A = stat(cur), B = stat(prev);
+  const gr = (a, b) => a != null && b ? a / b - 1 : null;
+  const tile = (lbl, val, g) => `<div class="pt-tile"><span>${lbl}</span><b>${val}</b><small class="${g == null ? '' : g >= 0 ? 'up' : 'down'}">${g == null ? '&nbsp;' : (g >= 0 ? '▲ ' : '▼ ') + fmtPct(Math.abs(g), 1)}</small></div>`;
+  /* dimensi */
+  const dims = { gd: new Map(), l2: new Map(), l3: new Map(), l4: new Map(), gen: new Map(), loc: new Map() };
+  const add = (m, k, l, extra) => { let x = m.get(k); if (!x) m.set(k, x = Object.assign({ k, q: 0, v: 0, trx: new Set() }, extra || {})); x.v += VAL(l); if (!isPB(l.sku)) x.q += l.q; if (l.q > 0) x.trx.add(l.s + l.d + l.o); };
+  for (const l of cur) {
+    const m = App.sku[l.sku] || [], inf = artInfo(artOf(l.sku));
+    add(dims.loc, l.s, l);
+    if (isPB(l.sku)) continue;
+    add(dims.gd, seriesOf(m[0]), l);
+    add(dims.l2, inf.c2 || '(tanpa MC Lv2)', l);
+    add(dims.l3, m[1] || 'LAINNYA', l);
+    add(dims.l4, m[2] || 'LAINNYA', l);
+    add(dims.gen, artName(m[0]) || artOf(l.sku), l, { l4: m[2] || '', art: artOf(l.sku) });
+  }
+  const arr = m => [...m.values()].sort((a, b) => b.v - a.v);
+  /* pareto artikel (generic) */
+  const gens = arr(dims.gen); const totV = gens.reduce((a, x) => a + x.v, 0); let run = 0, n80 = 0;
+  gens.forEach(x => { run += x.v; x.cum = totV ? run / totV : 0; x.share = totV ? x.v / totV : 0; x.cls = x.cum - x.share < .8 ? 'A' : x.cum - x.share < .95 ? 'B' : 'C'; if (x.cls === 'A') n80++; });
+  const cnt = c => gens.filter(x => x.cls === c).length;
+  view.innerHTML = `<div class="stack">
+    <div class="filters" style="margin:0"><label class="small muted" for="ptStore">Location</label><select id="ptStore" class="inp"><option value="">Semua toko</option>${codes.map(c => `<option value="${esc(c)}" ${c === st ? 'selected' : ''}>${esc(c)} - ${esc(sName(c))}</option>`).join('')}</select></div>
+    <div class="pt-tiles">${tile('Trans', fmtN(A.trx), gr(A.trx, B.trx))}${tile('Quantity', fmtN(A.q), gr(A.q, B.q))}${tile('UPT', A.upt == null ? '–' : fmtX(A.upt, 2), gr(A.upt, B.upt))}${tile('Basket Size', A.bs == null ? '–' : fmtRpS(A.bs).replace('Rp ', ''), gr(A.bs, B.bs))}</div>
+    <div class="grid g4">${[['gd', 'Category Gender'], ['l2', 'Category Lv. 2'], ['l3', 'Category Lv. 3'], ['l4', 'Category Lv. 4']].map(([k, t]) => `<section class="card"><div class="card-h"><h3>${t}</h3></div><div class="donut"><canvas id="dn_${k}"></canvas></div><div id="tb_${k}" style="margin-top:10px"></div></section>`).join('')}</div>
+    <section class="card"><div class="card-h"><h3>Pareto produk (generic)</h3><p class="small muted"><b>${fmtN(n80)}</b> dari ${fmtN(gens.length)} generic (${fmtPct(gens.length ? n80 / gens.length : null, 0)}) menghasilkan 80% sales</p></div>
+      <div class="chart-box"><canvas id="cPareto"></canvas></div>
+      <div class="legend"><span><span class="abc A">A</span> penyumbang 80% sales pertama (${fmtN(cnt('A'))} generic)</span><span><span class="abc B">B</span> 15% berikutnya (${fmtN(cnt('B'))})</span><span><span class="abc C">C</span> 5% terakhir (${fmtN(cnt('C'))})</span></div></section>
+    <div class="grid g2">
+      <section class="card"><div class="card-h"><h3>Generic</h3><p class="small muted">klik untuk detail</p></div><div id="tb_gen"></div></section>
+      <section class="card"><div class="card-h"><h3>Location</h3></div><div id="tb_loc"></div></section>
+    </div>
+    <p class="small muted">Category Gender: nama artikel berawalan WS atau JR dihitung WOMAN SERIES, selain itu MAN SERIES. Category Lv.2 dari master artikel Katalog Produk; Lv.3 & Lv.4 dari Item DSR. Paper bag & produk yang dikecualikan di Pengaturan tidak dihitung pada kategori & generic.</p>
+  </div>`;
+  const ink = css('--muted');
+  for (const k of ['gd', 'l2', 'l3', 'l4']) {
+    const a = arr(dims[k]); const top = a.slice(0, 10), rest = a.slice(10).reduce((s, x) => s + x.v, 0);
+    const labels = top.map(x => x.k).concat(rest > 0 ? ['Lainnya'] : []), data = top.map(x => x.v).concat(rest > 0 ? [rest] : []);
+    if (typeof Chart !== 'undefined' && data.length) App.charts.push(new Chart($('#dn_' + k), { type: 'doughnut', data: { labels, datasets: [{ data, backgroundColor: PAL, borderWidth: 1 }] },
+      options: { maintainAspectRatio: false, cutout: '55%', plugins: { legend: { position: 'bottom', labels: { color: ink, boxWidth: 8, padding: 6, font: { size: 10 } } },
+        tooltip: { callbacks: { label: c => c.label + ': ' + fmtRpS(c.parsed) + ' (' + fmtPct(c.parsed / data.reduce((s, x) => s + x, 0), 1) + ')' } } } } }));
+    $('#tb_' + k).innerHTML = tbl('pt_' + k, { rows: a.map(x => ({ k: x.k, q: x.q, v: x.v })), sort: { k: 'v', dir: 'desc' }, limit: 8, cols: [
+      { k: 'k', label: k === 'gd' ? 'Gender' : 'Kategori', h: r => `<span class="small"><b>${esc(r.k)}</b></span>` }, { k: 'q', label: 'Qty', r: 1, h: r => fmtN(r.q) }, { k: 'v', label: 'Sales', r: 1, h: r => fmtRpS(r.v) }] });
+  }
+  if (typeof Chart !== 'undefined' && gens.length) {
+    const top = gens.slice(0, Math.min(40, gens.length));
+    App.charts.push(new Chart($('#cPareto'), { type: 'bar', data: { labels: top.map(x => x.k.length > 18 ? x.k.slice(0, 17) + '…' : x.k), datasets: [
+      { type: 'bar', label: 'Sales', data: top.map(x => x.v), backgroundColor: top.map(x => x.cls === 'A' ? css('--ok') : x.cls === 'B' ? css('--orange') : css('--muted')), yAxisID: 'y', order: 2 },
+      { type: 'line', label: 'Kumulatif %', data: top.map(x => +(x.cum * 100).toFixed(1)), borderColor: css('--navy'), backgroundColor: css('--navy'), pointRadius: 2, yAxisID: 'y1', order: 1 }] },
+      options: { maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { labels: { color: ink, boxWidth: 12 } }, tooltip: { callbacks: { title: c => top[c[0].dataIndex].k, label: c => c.datasetIndex === 0 ? 'Sales: ' + fmtRpS(c.parsed.y) : 'Kumulatif: ' + fmtX(c.parsed.y, 1) + '%' } } },
+        scales: { x: { ticks: { color: ink, maxRotation: 60, minRotation: 45, font: { size: 9.5 } }, grid: { display: false } }, y: { ticks: { color: ink, callback: v => fmtRpS(v) }, grid: { color: css('--line') } }, y1: { position: 'right', min: 0, max: 100, ticks: { color: ink, callback: v => v + '%' }, grid: { display: false } } } } }));
+  }
+  $('#tb_gen').innerHTML = tbl('pt_gen', { rows: gens.map(x => ({ k: x.k, art: x.art, l4: x.l4, q: x.q, v: x.v, share: x.share, cum: x.cum, cls: x.cls })), sort: { k: 'v', dir: 'desc' }, limit: 25, onRow: r => openProduct(r.art, st || null), cols: [
+    { k: 'cls', label: '', h: r => `<span class="abc ${r.cls}">${r.cls}</span>` }, { k: 'k', label: 'Generic', h: r => prodCell(r.art, r.k, r.l4) },
+    { k: 'q', label: 'Qty', r: 1, h: r => fmtN(r.q) }, { k: 'v', label: 'Sales', r: 1, h: r => fmtRpS(r.v) }, { k: 'share', label: '%', r: 1, h: r => fmtPct(r.share, 2) }, { k: 'cum', label: 'Kum. %', r: 1, h: r => fmtPct(r.cum, 1) }] });
+  $('#tb_loc').innerHTML = tbl('pt_loc', { rows: arr(dims.loc).map(x => ({ c: x.k, name: x.k + ' - ' + sName(x.k), trx: x.trx.size, q: x.q, v: x.v })), sort: { k: 'v', dir: 'desc' }, limit: 40, onRow: r => { App.ui.ptStore = r.c; render(); window.scrollTo(0, 0); }, cols: [
+    { k: 'name', label: 'Location', h: r => `<span class="small"><b>${esc(r.name)}</b></span>` }, { k: 'trx', label: 'Transaksi', r: 1, h: r => fmtN(r.trx) }, { k: 'q', label: 'Qty', r: 1, h: r => fmtN(r.q) }, { k: 'v', label: 'Sales', r: 1, h: r => fmtRpS(r.v) }] });
 }
 
 /* ================= halaman: per toko ================= */
@@ -2329,6 +2408,7 @@ document.addEventListener('change', async e => {
   const t = e.target;
   if (App.page === 'settings' && settingsChange(t)) return;
   if (t.id === 'perSel' || t.id === 'rFrom' || t.id === 'rTo') { await onPeriodChange(); return; }
+  if (t.id === 'ptStore') { App.ui.ptStore = t.value; App.ui.more = {}; render(); return; }
   if (t.id === 'raStore') { App.ui.raStore = t.value; App.ui.more = {}; render(); return; }
   if (t.id === 'raMin') { App.ui.raMin = Math.max(0, +t.value || 0); render(); return; }
   if (t.id === 'eaDate') { if (t.value) { App.ui.eaDate = t.value; render(); } return; }

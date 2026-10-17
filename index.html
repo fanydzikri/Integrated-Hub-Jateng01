@@ -668,7 +668,7 @@ async function loadAll() {
   App.index = M.index || {}; App.index.sales = App.index.sales || {}; App.index.stock = App.index.stock || {};
   App.stores = M.stores || {};
   App.tgtDetail = M.targets || {}; App.tgtBasis = M.tgtBasis || 'total'; App.targets = targetsFromDetail();
-  App.log = M.log || [];
+  App.log = M.log || []; App.books = M.books || []; App.cells = M.cells || 0;
   App.lines = []; App.loaded = new Set(); App.sku = {}; App.stock = {}; App.cache = {}; App.sr = {};
   computeLastDate();
   const months = Object.keys(App.index.sales).sort();
@@ -1403,7 +1403,9 @@ function pageAdmin(view) {
         <div style="overflow-x:auto"><div style="display:flex;gap:3px;align-items:flex-end;height:120px;min-width:${n * 22}px">${vals.map((v, i) => { const iso = wm + '-' + pad(i + 1); const wd = new Date(+wm.slice(0, 4), +wm.slice(5) - 1, i + 1).getDay(); return `<div title="${fmtDate(iso)}: ${fmtPct(v, 2)}" style="flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;height:100%;gap:3px"><span style="display:block;width:100%;height:${v / mx * 82}%;border-radius:3px 3px 0 0;background:${W ? (wd === 0 || wd === 6 ? 'var(--ochre)' : 'var(--pine-2)') : 'var(--line)'};opacity:${iso <= today ? 1 : .55}"></span><span class="small muted" style="font-size:11px">${i + 1}</span></div>`; }).join('')}</div></div>
         ${W ? `<div class="legend"><span><i style="background:var(--pine-2)"></i>Hari kerja</span><span><i style="background:var(--ochre)"></i>Sabtu & Minggu</span><span>Kumulatif s/d ${fmtDateS(today.slice(0, 7) === wm ? today : wm + '-' + pad(n))}: ${fmtPct(cumWeight(wm, today.slice(0, 7) === wm ? +today.slice(8) : n), 1)}</span></div>` : ''}`; })()}</section>
     <section class="card"><div class="card-h"><h3>Spreadsheet master</h3></div>
-      <p class="small muted" style="margin-top:0">Semua data tersimpan di Google Spreadsheet (tab DSR per bulan, Stok, Target, Bobot, Toko, Log). Kalau kamu mengoreksi data langsung di spreadsheet, tekan Perbarui cache supaya dashboard ikut berubah.</p>
+      <p class="small muted" style="margin-top:0">Spreadsheet master menyimpan Stok, Target, Bobot, Toko, Log, dan pengaturan. Data Item DSR disimpan di file terpisah per 3 bulan (dibuat otomatis) supaya tidak cepat penuh. Kalau kamu mengoreksi data langsung di spreadsheet, tekan Perbarui cache supaya dashboard ikut berubah.</p>
+      ${(App.books || []).length ? `<div class="chips" style="margin:6px 0 4px">${App.books.map(b => `<a class="btn sm" href="${esc(b.url)}" target="_blank" rel="noopener">Data DSR ${esc(b.key)}</a>`).join('')}</div>` : ''}
+      ${App.cells ? `<p class="small muted">Spreadsheet master terpakai ${fmtN(App.cells)} dari 10.000.000 sel (${fmtPct(App.cells / 1e7, 1)}).</p>` : ''}
       <div class="row-act">${SHEET_URL ? `<a class="btn" href="${esc(SHEET_URL)}" target="_blank" rel="noopener">Buka spreadsheet</a>` : ''}<button class="btn" id="rebuildBtn">Perbarui cache</button><span id="rebuildMsg" class="small muted"></span></div></section>
     <section class="card"><div class="card-h"><h3>Riwayat upload</h3></div><div id="logT"></div></section>
     <section class="card"><div class="card-h"><h3>Hapus data</h3><p class="small muted">Untuk data yang salah upload</p></div>

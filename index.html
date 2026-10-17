@@ -271,6 +271,19 @@ table.tbl{width:100%;border-collapse:collapse;font-size:13.5px}
 .heat th{font-weight:600;color:var(--muted);padding:2px 4px;text-align:center}
 .heat th.d{text-align:left;font-family:var(--font-body);color:var(--ink);font-weight:700;padding-right:8px}
 .heat td{width:34px;height:26px;text-align:center;border-radius:4px;color:var(--ink)}
+.ra-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+.ra-tile{background:#0F3192;color:#fff;border-radius:10px;padding:12px 16px;text-align:center}
+.ra-tile span{display:block;font-size:12px;font-weight:600;color:#C9D3F0}
+.ra-tile b{display:block;font-size:20px;font-weight:800;letter-spacing:.01em;margin:2px 0;overflow-wrap:anywhere}
+.ra-tile small{font-size:12px;color:#FFC9B2;font-family:var(--font-mono)}
+.ra-tile.hi{background:#13806F}
+table.mx{border-collapse:separate;border-spacing:0;font-size:12px;width:100%}
+.mx th{background:var(--navy-tint);color:var(--navy);font-weight:700;padding:6px 8px;white-space:nowrap;position:sticky;top:0;z-index:1;border-bottom:2px solid var(--navy)}
+.mx th.nm,.mx td.nm{position:sticky;left:0;background:var(--surface);z-index:2;text-align:left;min-width:190px;max-width:220px}
+.mx th.nm{background:var(--navy-tint);z-index:3}
+.mx td{padding:5px 8px;border-bottom:1px solid var(--line);text-align:center;font-family:var(--font-mono);font-weight:600}
+.mx td.nm{font-family:var(--font-body);font-weight:700;white-space:normal;line-height:1.2}
+.mx td.nm small{display:block;font-weight:500;color:var(--muted);font-size:11px}
 table.rp{border-collapse:separate;border-spacing:0;font-size:12px;width:100%;min-width:1040px}
 .rp th{background:#0F3192;color:#fff;font-weight:700;font-size:12px;padding:6px 6px;text-align:center;border-right:1px solid rgba(255,255,255,.16);border-bottom:1px solid rgba(255,255,255,.16);position:sticky;top:0;z-index:2;white-space:nowrap}
 .rp thead tr:first-child th{background:#0B1B4A;font-size:13.5px}
@@ -992,7 +1005,7 @@ const ICON = {
   settings: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>'
 };
 const NAV = [
-  { k: 'sales', label: 'Sales Performance', icon: 'area', items: [['report', 'Monitoring Sales', 'Achievement, UPT & basket size'], ['trend', 'Sales Trend', 'Jam, hari, UPT & basket harian'], ['promo', 'Kontribusi Promo', 'Porsi tiap promo terhadap sales'], ['omni', 'Monitoring OmniChannel', 'EA, Eigerindo Voucher, Tax Invoice, EASAP'], ['eac', 'Sales Member EAC', 'KPI penjualan ke member']] },
+  { k: 'sales', label: 'Sales Performance', icon: 'area', items: [['report', 'Monitoring Sales', 'Achievement, UPT & basket size'], ['trend', 'Sales Trend', 'Jam, hari, UPT & basket harian'], ['promo', 'Kontribusi Promo', 'Porsi tiap promo terhadap sales'], ['omni', 'Monitoring OmniChannel', 'EA, Eigerindo Voucher, Tax Invoice, EASAP'], ['eac', 'Sales Member EAC', 'KPI penjualan ke member'], ['ra', 'RA Performance', 'Transaksi, UPT & basket per sales person']] },
   { k: 'inv', label: 'Inventory', icon: 'produk', items: [['produk', 'Produk', 'Penjualan & stok per artikel'], ['stok', 'Kesehatan Produk', 'SSR, dead stock, saran transfer']] },
   { k: 'admin', label: 'Kelola data', icon: 'admin', admin: 1 },
   { k: 'settings', label: 'Pengaturan', icon: 'settings', admin: 1 }
@@ -1053,7 +1066,7 @@ function render() {
     return;
   }
   if (!App.lastDate && !['admin', 'stok', 'report', 'settings'].includes(App.page)) { App.page = srLast() ? 'report' : 'stok'; }
-  const fn = { area: pageArea, report: pageReport, trend: pageTrend, promo: pagePromo, omni: pageOmni, eac: pageEac, toko: pageStore, produk: pageProduct, stok: pageStock, admin: pageAdmin, settings: pageSettings }[App.page] || pageReport;
+  const fn = { area: pageArea, report: pageReport, trend: pageTrend, promo: pagePromo, omni: pageOmni, eac: pageEac, ra: pageRA, toko: pageStore, produk: pageProduct, stok: pageStock, admin: pageAdmin, settings: pageSettings }[App.page] || pageReport;
   try { fn(view); } catch (e) { console.error(e); view.innerHTML = `<div class="empty-state"><h2>Halaman gagal ditampilkan</h2><p class="muted">${esc(e.message)}</p></div>`; }
 }
 
@@ -1581,6 +1594,64 @@ function pageEac(view) {
   if (App.admin) $('#eaTop').innerHTML = tbl('eacTop', { rows: top, sort: { k: 'v', dir: 'desc' }, limit: 20, cols: [
     { k: 'cn', label: 'Nama customer', h: r => `<span class="nm">${esc(r.cn)}</span><span class="sub">${esc(r.st)}</span>` },
     { k: 'trx', label: 'Transaksi', r: 1, h: r => fmtN(r.trx) }, { k: 'v', label: 'Sales', r: 1, h: r => fmtRpS(r.v) }, { k: 'last', label: 'Terakhir belanja', r: 1, h: r => fmtDateS(r.last) }] });
+}
+
+/* ================= halaman: RA Performance (Sales Person) ================= */
+const spName = v => String(v || '').replace(/\s+/g, ' ').trim().toUpperCase() || '(TANPA NAMA)';
+function pageRA(view) {
+  const R = periodRange(), U = App.ui, codes = activeStores();
+  const st = U.raStore && codes.includes(U.raStore) ? U.raStore : '';
+  const minT = U.raMin != null ? U.raMin : 10;
+  setHead('RA Performance' + (st ? ' · ' + sName(st) : ''), R.label + ' · per sales person · ' + VLL().toLowerCase());
+  const lines = linesIn(R.from, R.to, st || null);
+  const P = new Map(), byDay = new Map(), days = new Set();
+  for (const l of lines) {
+    const sp = spName(l.sp), key = sp + '|' + l.s;
+    let x = P.get(key); if (!x) P.set(key, x = { sp, s: l.s, trx: new Set(), q: 0, v: 0 });
+    const ok = l.d + '|' + l.o; x.v += VAL(l); if (!isPB(l.sku)) x.q += l.q; if (l.q > 0) x.trx.add(ok);
+    days.add(l.d);
+    const dk = key + '|' + l.d; let y = byDay.get(dk); if (!y) byDay.set(dk, y = { trx: new Set(), q: 0 }); if (!isPB(l.sku)) y.q += l.q; if (l.q > 0) y.trx.add(ok);
+  }
+  const rows = [...P.entries()].map(([k, x]) => ({ k, sp: x.sp, s: x.s, loc: x.s + ' - ' + ((App.stores[x.s] && (App.stores[x.s].alias || App.stores[x.s].name)) || x.s), trx: x.trx.size, q: x.q, v: x.v, upt: x.trx.size ? x.q / x.trx.size : null, bs: x.trx.size ? x.v / x.trx.size : null })).filter(r => r.trx > 0 || r.v);
+  const tot = rows.reduce((a, r) => { a.trx += r.trx; a.q += r.q; a.v += r.v; return a; }, { trx: 0, q: 0, v: 0 });
+  const noName = rows.filter(r => r.sp === '(TANPA NAMA)'); const nn = noName.reduce((a, r) => { a.trx += r.trx; a.v += r.v; return a; }, { trx: 0, v: 0 });
+  const named = rows.filter(r => r.sp !== '(TANPA NAMA)');
+  const elig = named.filter(r => r.trx >= minT);
+  const pick = (f, dir) => elig.slice().sort((a, b) => dir * (f(a) - f(b)))[0];
+  const tiles = [['UPT terendah', pick(r => r.upt, 1), r => fmtX(r.upt, 2)], ['Sales terendah', pick(r => r.v, 1), r => fmtRpS(r.v)], ['Basket size terendah', pick(r => r.bs, 1), r => fmtRpS(r.bs)]];
+  const tilesHi = [['UPT tertinggi', pick(r => r.upt, -1), r => fmtX(r.upt, 2)], ['Sales tertinggi', pick(r => r.v, -1), r => fmtRpS(r.v)], ['Basket size tertinggi', pick(r => r.bs, -1), r => fmtRpS(r.bs)]];
+  const dl = [...days].sort().reverse().slice(0, 62);
+  const mxRows = named.slice().sort((a, b) => (b.upt ?? -1) - (a.upt ?? -1));
+  const maxU = Math.max(2, ...[...byDay.values()].map(y => y.trx.size ? y.q / y.trx.size : 0));
+  const tileHtml = (arr, cls) => arr.map(([lbl, r, f]) => `<div class="ra-tile ${cls}"><span>${lbl}</span><b>${r ? esc(r.sp) : '–'}</b><small>${r ? f(r) + ' · ' + esc(sName(r.s)) : 'belum ada'}</small></div>`).join('');
+  view.innerHTML = `<div class="stack">
+    <div class="filters" style="margin:0"><label class="small muted" for="raStore">Location</label><select id="raStore" class="inp"><option value="">Semua toko</option>${codes.map(c => `<option value="${esc(c)}" ${c === st ? 'selected' : ''}>${esc(c)} - ${esc(sName(c))}</option>`).join('')}</select>
+      <label class="small muted" for="raMin">Min. transaksi untuk peringkat</label><input type="number" id="raMin" class="inp sm" style="width:80px" min="0" value="${minT}">
+      <span style="flex:1"></span><button class="btn" id="raXls">Download Excel</button></div>
+    <div class="ra-tiles">${tileHtml(tiles, '')}</div>
+    <div class="ra-tiles">${tileHtml(tilesHi, 'hi')}</div>
+    <p class="small muted" style="margin:-6px 0 0">Peringkat terendah/tertinggi hanya menghitung sales person dengan minimal ${minT} transaksi di periode ini, supaya yang baru masuk atau jarang bertugas tidak ikut terhitung.</p>
+    <section class="card"><div class="card-h"><h3>Performa sales person</h3><p class="small muted">${fmtN(named.length)} sales person · klik judul kolom untuk mengurutkan</p></div><div id="raT"></div>
+      ${nn.trx || nn.v ? `<div class="more">Tanpa nama sales person (biasanya transaksi B2B / wholesale): ${fmtN(nn.trx)} transaksi · ${fmtRp(nn.v)} — tidak dimasukkan ke tabel, tetap dihitung di total.</div>` : ''}
+      <div class="more" style="font-weight:700;color:var(--ink)">Total keseluruhan: ${fmtN(tot.trx)} transaksi · ${fmtN(tot.q)} qty · UPT ${tot.trx ? fmtX(tot.q / tot.trx, 2) : '–'} · basket ${tot.trx ? fmtRp(tot.v / tot.trx) : '–'} · ${fmtRp(tot.v)}</div></section>
+    <section class="card"><div class="card-h"><h3>UPT by date</h3><p class="small muted">makin gelap makin tinggi · "–" = tidak ada transaksi</p></div>
+      <div class="rp-wrap" style="max-height:60vh"><table class="mx"><thead><tr><th class="nm">Sales person</th>${dl.map(d => `<th>${fmtDateS(d)}</th>`).join('')}</tr></thead><tbody>
+      ${mxRows.map(r => `<tr><td class="nm">${esc(r.sp)}<small>${esc(sName(r.s))}</small></td>${dl.map(d => { const y = byDay.get(r.k + '|' + d); if (!y || !y.trx.size) return '<td class="muted">–</td>'; const u = y.q / y.trx.size, a = Math.min(1, u / maxU); return `<td style="background:rgba(15,49,146,${(a * .75).toFixed(2)});color:${a > .55 ? '#fff' : 'var(--ink)'}" title="${esc(r.sp)} ${fmtDate(d)}: ${y.trx.size} trx, ${fmtN(y.q)} qty">${fmtX(u, 2)}</td>`; }).join('')}</tr>`).join('') || `<tr><td class="nm">Belum ada data</td></tr>`}
+      </tbody></table></div></section>
+  </div>`;
+  $('#raT').innerHTML = tbl('raT', { rows: named, sort: { k: 'upt', dir: 'desc' }, limit: 30, cols: [
+    { k: 'sp', label: 'Sales person', h: r => `<span class="nm">${esc(r.sp)}</span>` }, { k: 'loc', label: 'Location', h: r => `<span class="small">${esc(r.loc)}</span>` },
+    { k: 'trx', label: 'Transaction', r: 1, h: r => fmtN(r.trx) }, { k: 'q', label: 'Quantity', r: 1, h: r => fmtN(r.q) },
+    { k: 'upt', label: 'UPT', r: 1, h: r => `<b>${fmtX(r.upt, 2)}</b>` }, { k: 'bs', label: 'Basket size', r: 1, h: r => r.bs == null ? '–' : fmtN(r.bs) }, { k: 'v', label: 'Sales', r: 1, h: r => fmtN(r.v) }] });
+  App.ui.raLast = { rows, dl, byDay, R };
+}
+async function exportRA() {
+  const X = App.ui.raLast; if (!X || typeof XLSX === 'undefined') return;
+  const a1 = [['RA Performance ' + X.R.label], [], ['Sales Person', 'Location', 'Transaction', 'Quantity', 'UPT', 'Basket Size', 'Sales'], ...X.rows.slice().sort((a, b) => (b.upt ?? -1) - (a.upt ?? -1)).map(r => [r.sp, r.loc, r.trx, r.q, r.upt == null ? null : Math.round(r.upt * 100) / 100, r.bs == null ? null : Math.round(r.bs), Math.round(r.v)])];
+  const a2 = [['Sales Person', 'Location', ...X.dl]]; for (const r of X.rows) a2.push([r.sp, r.loc, ...X.dl.map(d => { const y = X.byDay.get(r.k + '|' + d); return y && y.trx.size ? Math.round(y.q / y.trx.size * 100) / 100 : null; })]);
+  const wb = XLSX.utils.book_new(); const w1 = XLSX.utils.aoa_to_sheet(a1); w1['!cols'] = [{ wch: 34 }, { wch: 42 }, { wch: 12 }, { wch: 10 }, { wch: 8 }, { wch: 12 }, { wch: 14 }];
+  XLSX.utils.book_append_sheet(wb, w1, 'RA Performance'); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(a2), 'UPT by Date');
+  (await getDownloads()).save({ filename: `RA_Performance_${X.R.from}_${X.R.to}.xlsx`, data: new Blob([XLSX.write(wb, { bookType: 'xlsx', type: 'array' })]) });
 }
 
 /* ================= halaman: per toko ================= */
@@ -2140,6 +2211,7 @@ document.addEventListener('click', async e => {
   const eas = t.closest('[data-eas]'); if (eas) { const k = eas.dataset.eas; const s0 = App.ui.eaSort || { k: 'pC', dir: 'desc' }; App.ui.eaSort = s0.k === k ? { k, dir: s0.dir === 'asc' ? 'desc' : 'asc' } : { k, dir: k === 'name' ? 'asc' : 'desc' }; render(); return; }
   const oms = t.closest('[data-oms]'); if (oms) { const k = oms.dataset.oms; const s0 = App.ui.omSort || { k: 'totP', dir: 'desc' }; App.ui.omSort = s0.k === k ? { k, dir: s0.dir === 'asc' ? 'desc' : 'asc' } : { k, dir: k === 'name' ? 'asc' : 'desc' }; render(); return; }
   if (t.id === 'omXls') { exportOmni(); return; }
+  if (t.id === 'raXls') { exportRA(); return; }
   const rpf = t.closest('[data-rpf]'); if (rpf) { App.ui.rpFull = rpf.dataset.rpf === '1'; render(); return; }
   const rpv = t.closest('[data-rpv]'); if (rpv) { App.ui.rpVal = rpv.dataset.rpv; render(); return; }
   if (t.id === 'rpXls') { exportReport(); return; }
@@ -2168,6 +2240,8 @@ document.addEventListener('change', async e => {
   const t = e.target;
   if (App.page === 'settings' && settingsChange(t)) return;
   if (t.id === 'perSel' || t.id === 'rFrom' || t.id === 'rTo') { await onPeriodChange(); return; }
+  if (t.id === 'raStore') { App.ui.raStore = t.value; App.ui.more = {}; render(); return; }
+  if (t.id === 'raMin') { App.ui.raMin = Math.max(0, +t.value || 0); render(); return; }
   if (t.id === 'eaDate') { if (t.value) { App.ui.eaDate = t.value; render(); } return; }
   if (t.id === 'omM') { App.ui.omM = t.value; render(); return; }
   if (t.id === 'tdStore') { App.ui.tdStore = t.value; App.ui.more = {}; render(); return; }

@@ -391,21 +391,39 @@ function dateFromFilename(name) {
   if (d < 1 || d > 31 || mo < 1 || mo > 12) return null;
   return m[3] + '-' + pad(mo) + '-' + pad(d);
 }
-function parseWorkbook(buf, fileName) {
+function detectSheet(rows, fileName) {
+  for (let i = 0; i < Math.min(rows.length, 25); i++) {
+    const h = (rows[i] || []).map(normH);
+    if (h.includes('locationcode') && h.includes('bruto')) throw new Error('Sales Report tidak dipakai lagi. Upload Item DSR saja.');
+    if (h.includes('dailyratio') || (h.some(x => x === 'date' || x === 'tanggal') && h.some(x => /ratio|bobot|weight/.test(x)) && !h.includes('orderno'))) return parseWeights(rows, i, h, fileName);
+    if ((h.includes('kodesite') || h.includes('sitecode') || h.includes('kodetoko')) && h.filter(x => MON_KEY[x.slice(0, 3)] && /^[a-z]{3,9}\d{0,4}$/.test(x) && !/^(offline|eiger|total)$/.test(x)).length >= 1 && !h.includes('offline')) return parseEac(rows, i, h, fileName);
+    if (h.some(x => x.includes('endlessaisle')) && h.some(x => x.includes('taxinvoice') || x.includes('easap') || x.includes('eigerindovoucher'))) return parseOmni(rows, i, h, fileName);
+    if (h.includes('sitecode')) return parseTarget(rows, i, h, fileName);
+    if (h.includes('orderno') && h.includes('skucode')) return parseDSR(rows, i, h, fileName);
+    if (h.includes('bincode') && h.includes('skucode') && h.includes('totalqty')) return parseInv(rows, i, h, fileName);
+  }
+  return null;
+}
+/* membaca semua sheet: satu file boleh berisi target sales, target OmniChannel, dan bobot harian sekaligus */
+function parseWorkbookAll(buf, fileName) {
   const wb = XLSX.read(buf, { type: 'array', cellDates: true });
+  const out = [], errs = [];
   for (const sn of wb.SheetNames) {
     const rows = XLSX.utils.sheet_to_json(wb.Sheets[sn], { header: 1, raw: true, defval: null, blankrows: false });
-    for (let i = 0; i < Math.min(rows.length, 25); i++) {
-      const h = (rows[i] || []).map(normH);
-      if (h.includes('locationcode') && h.includes('bruto')) throw new Error('Sales Report tidak dipakai lagi. Upload Item DSR saja.');
-      if (h.includes('dailyratio') || (h.some(x => x === 'date' || x === 'tanggal') && h.some(x => /ratio|bobot|weight/.test(x)) && !h.includes('orderno'))) return parseWeights(rows, i, h, fileName);
-      if (h.includes('sitecode')) return parseTarget(rows, i, h, fileName);
-      if (h.includes('orderno') && h.includes('skucode')) return parseDSR(rows, i, h, fileName);
-      if (h.includes('bincode') && h.includes('skucode') && h.includes('totalqty')) return parseInv(rows, i, h, fileName);
-    }
+    const label = wb.SheetNames.length > 1 ? fileName + ' › ' + sn : fileName;
+    try { const r = detectSheet(rows, label); if (r) out.push(r); }
+    catch (e) { errs.push({ file: label, err: e.message || String(e) }); }
   }
-  throw new Error('Bukan file Item DSR Report, Export by Bin, atau Target (kolom Order No / Bin Code / Site Code tidak ditemukan).');
+  if (!out.length) { if (errs.length) return errs; throw new Error('Bukan file Item DSR, Export by Bin, target, target OmniChannel, atau bobot harian.'); }
+  /* bulan bersama: dari bobot harian (paling pasti) atau target lain di file yang sama */
+  const wm = (out.find(p => p.kind === 'WGT') || {}).month || (out.find(p => (p.kind === 'TGT' || p.kind === 'OMT') && p.month && !p.needMonth) || {}).month;
+  for (const p of out) {
+    if (p.kind === 'OMT' && p.needMonth && wm) { p.month = wm; p.needMonth = false; }
+    if (p.kind === 'TGT' && p.needMonth && wm && p.data['?']) { p.month = wm; p.needMonth = false; }
+  }
+  return out;
 }
+function parseWorkbook(buf, fileName) { const r = parseWorkbookAll(buf, fileName); return r[0]; }
 function parseDSR(rows, hi, h, fileName) {
   const C = {
     o: colIdx(h, 'orderno', 'ordernumber'), dt: colIdx(h, 'orderdate', 'transactiondate'), sku: colIdx(h, 'skucode', 'sku'),
@@ -477,7 +495,7 @@ function parseMonthCell(v) {
   if (typeof v === 'number' && v > 20000 && v < 80000 && typeof XLSX !== 'undefined') { const p = XLSX.SSF.parse_date_code(v); if (p) return p.y + '-' + pad(p.m); }
   const s = String(v ?? '').trim().toLowerCase();
   let m = s.match(/^([a-z]{3})[a-z]*[\s\-'\/.]*(\d{2}|\d{4})$/);
-  if (m && MON_KEY[m[1]]) { let y = +m[2]; if (y < 100) y += 2000; return y + '-' + pad(MON_KEY[m[1]]); }
+  if (m && MON_KEY[m[1]]) { let y = +m[2]; if (y < 100) y += 2000; if (y < 2024 || y > 2099) return null; return y + '-' + pad(MON_KEY[m[1]]); }
   m = s.match(/^(\d{4})-(\d{1,2})(-\d{1,2})?/); if (m && +m[2] >= 1 && +m[2] <= 12) return m[1] + '-' + pad(m[2]);
   return null;
 }
@@ -503,6 +521,8 @@ function parseTarget(rows, hi, h, fileName) {
     n++;
   }
   if (!n) throw new Error('Tidak ada baris toko (Site Code) di file target.');
+  /* kolom Eiger/Total berisi rumus yang belum terhitung: hitung sendiri */
+  for (const m in data) for (const c in data[m]) { const o = data[m][c]; if (!o.eiger) o.eiger = (o.offline || 0) + (o.ea || 0) + (o.wab || 0); if (!o.total) o.total = o.eiger + (o.outlive || 0); }
   return { kind: 'TGT', file: fileName, data, names, rows: n, needMonth: !!data['?'] };
 }
 function parseWeights(rows, hi, h, fileName) {
@@ -563,6 +583,62 @@ function parseSR(rows, hi, h, fileName, region) {
   if (!n) throw new Error(`Tidak ada toko region ${region} di file ini. Region yang ada: ${[...regions].slice(0, 30).join(', ')}.`);
   return { kind: 'SR', file: fileName, region, from, to, daily, month: from.slice(0, 7), day: +to.slice(8), stores, rows: n };
 }
+/* target OmniChannel: kolom per channel (Endless Aisle, Eigerindo Voucher, Tax Invoice, EASAP); boleh berformat seperti sheet monitoring (Target/Actual/Diff/%Ach) */
+const OMNI_KEYS = [['ea', 'endlessaisle'], ['ev', 'eigerindovoucher'], ['ti', 'taxinvoice'], ['es', 'easap']];
+function parseOmni(rows, hi, h, fileName) {
+  const chStart = {}; OMNI_KEYS.forEach(([k, key]) => { const i = h.findIndex(x => x.includes(key)); if (i >= 0) chStart[k] = i; });
+  /* baris sub-judul (Target / Actual / ...) bila ada */
+  let sr = -1;
+  for (let i = hi + 1; i <= Math.min(hi + 3, rows.length - 1); i++) { const hh = (rows[i] || []).map(normH); if (hh.includes('target')) { sr = i; break; } }
+  const sub = sr >= 0 ? (rows[sr] || []).map(normH) : [];
+  const col = {};
+  for (const [k] of OMNI_KEYS) {
+    if (chStart[k] === undefined) continue;
+    let c = chStart[k];
+    if (sr >= 0) { for (let j = chStart[k]; j < chStart[k] + 4; j++) if (sub[j] === 'target') { c = j; break; } }
+    col[k] = c;
+  }
+  /* kolom toko */
+  const firstCh = Math.min(...Object.values(chStart));
+  let siteC = -1, codeC = -1;
+  for (const R of [hi, sr, hi - 1, hi + 1]) { if (R == null || R < 0 || !rows[R]) continue; const hh = rows[R].map(normH);
+    if (codeC < 0) codeC = hh.findIndex((x, j) => j < firstCh && (x === 'sitecode' || x === 'kodetoko' || x === 'kode'));
+    if (siteC < 0) siteC = hh.findIndex((x, j) => j < firstCh && (x === 'sitename' || x === 'site' || x === 'namatoko' || x === 'store')); }
+  if (siteC < 0 && codeC < 0) siteC = 0;
+  /* bulan dari judul di atas tabel */
+  let month = null;
+  for (let i = Math.max(0, hi - 3); i <= hi; i++) for (const c of rows[i] || []) { const m = parseMonthCell(c); if (m) month = m; }
+  const data = {}, names = {}; let n = 0;
+  for (let i = Math.max(hi, sr) + 1; i < rows.length; i++) {
+    const r = rows[i] || [];
+    let code = codeC >= 0 ? String(r[codeC] ?? '').trim() : '', name = '';
+    if (siteC >= 0) { const loc = parseLoc(r[siteC]); if (loc && /^\d{3,6}$/.test(loc.code)) { if (!code) code = loc.code; name = loc.name; } }
+    if (!/^\d{3,6}$/.test(code)) continue;
+    const o = {}; for (const [k] of OMNI_KEYS) o[k] = col[k] !== undefined ? numV(r[col[k]]) : 0;
+    data[code] = o; names[code] = name; n++;
+  }
+  if (!n) throw new Error('Tidak ada baris toko di file target OmniChannel (kolom Site Name / Site Code).');
+  return { kind: 'OMT', file: fileName, data, names, rows: n, month, needMonth: !month };
+}
+/* target Sales Member EAC: Kode Site | Store Name | JAN ... DES (beberapa bulan sekaligus) */
+function parseEac(rows, hi, h, fileName) {
+  const cCode = h.findIndex(x => x === 'kodesite' || x === 'sitecode' || x === 'kodetoko'), cName = h.findIndex(x => x === 'storename' || x === 'sitename' || x === 'namatoko');
+  let year = null;
+  for (let i = Math.max(0, hi - 4); i < hi; i++) for (const c of rows[i] || []) { const m = String(c ?? '').match(/\b(20\d{2})\b/); if (m) year = +m[1]; }
+  const cols = [];
+  h.forEach((x, j) => { const k = MON_KEY[x.slice(0, 3)]; if (!k || !/^[a-z]{3,9}\d{0,4}$/.test(x) || j === cCode || j === cName) return; const yy = x.match(/(\d{2,4})$/); cols.push({ j, mo: k, y: yy ? (yy[1].length === 2 ? 2000 + +yy[1] : +yy[1]) : null }); });
+  const data = {}, names = {}; let n = 0;
+  for (let i = hi + 1; i < rows.length; i++) {
+    const r = rows[i] || []; let code = String(r[cCode] ?? '').trim(); if (/^\d+\.0$/.test(code)) code = code.slice(0, -2);
+    if (!/^\d{3,6}$/.test(code)) continue;
+    names[code] = cName >= 0 ? String(r[cName] ?? '').replace(/\s+/g, ' ').trim() : '';
+    for (const c of cols) { const v = r[c.j]; if (v == null || v === '') continue; const key = (c.y ? c.y + '-' + pad(c.mo) : '?-' + pad(c.mo)); (data[key] || (data[key] = {}))[code] = numV(v); }
+    n++;
+  }
+  if (!n) throw new Error('Tidak ada baris toko (Kode Site) di file target EAC.');
+  return { kind: 'EAC', file: fileName, data, names, rows: n, year };
+}
+function eacResolve(p) { const y = p.year || +(App.lastDate || todayISO()).slice(0, 4); const out = {}; for (const k in p.data) { const m = k.startsWith('?') ? y + k.slice(1) : k; out[m] = Object.assign(out[m] || {}, p.data[k]); } return out; }
 function basisVal(o, b) {
   if (!o) return 0;
   const eiger = o.eiger != null ? o.eiger : (o.offline || 0) + (o.ea || 0) + (o.wab || 0);
@@ -681,6 +757,7 @@ async function loadAll() {
   App.index = M.index || {}; App.index.sales = App.index.sales || {}; App.index.stock = App.index.stock || {};
   App.stores = M.stores || {};
   App.tgtDetail = M.targets || {}; App.tgtBasis = M.tgtBasis || 'total'; App.targets = targetsFromDetail();
+  App.omni = M.omni || {}; App.eac = M.eac || {};
   App.log = M.log || []; App.books = M.books || []; App.cells = M.cells || 0;
   App.lines = []; App.loaded = new Set(); App.sku = {}; App.stock = {}; App.cache = {}; App.sr = {};
   computeLastDate();
@@ -915,7 +992,7 @@ const ICON = {
   settings: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>'
 };
 const NAV = [
-  { k: 'sales', label: 'Sales Performance', icon: 'area', items: [['report', 'Monitoring Sales', 'Achievement, UPT & basket size'], ['trend', 'Sales Trend', 'Jam, hari, UPT & basket harian'], ['promo', 'Kontribusi Promo', 'Porsi tiap promo terhadap sales']] },
+  { k: 'sales', label: 'Sales Performance', icon: 'area', items: [['report', 'Monitoring Sales', 'Achievement, UPT & basket size'], ['trend', 'Sales Trend', 'Jam, hari, UPT & basket harian'], ['promo', 'Kontribusi Promo', 'Porsi tiap promo terhadap sales'], ['omni', 'Monitoring OmniChannel', 'EA, Eigerindo Voucher, Tax Invoice, EASAP'], ['eac', 'Sales Member EAC', 'KPI penjualan ke member']] },
   { k: 'inv', label: 'Inventory', icon: 'produk', items: [['produk', 'Produk', 'Penjualan & stok per artikel'], ['stok', 'Kesehatan Produk', 'SSR, dead stock, saran transfer']] },
   { k: 'admin', label: 'Kelola data', icon: 'admin', admin: 1 },
   { k: 'settings', label: 'Pengaturan', icon: 'settings', admin: 1 }
@@ -934,7 +1011,7 @@ function renderNav() {
 function renderPeriod() {
   const box = $('#periodBox');
   const tsel = hasTypes() && App.page !== 'toko' ? `<label class="small muted" for="typeSel">Jenis toko</label><select id="typeSel" class="inp"><option value="">Semua toko</option>${['rg', 'bz', 'ot'].filter(t => storeCodes().some(c => sType(c) === t)).map(t => `<option value="${t}" ${App.ui.typeF === t ? 'selected' : ''}>${TYPE_LABEL[t]}</option>`).join('')}</select>` : '';
-  if (App.page === 'report' || App.page === 'promo') { box.innerHTML = tsel; return; }
+  if (['report', 'promo', 'omni', 'eac'].includes(App.page)) { box.innerHTML = tsel; return; }
   if (!App.lastDate || App.page === 'admin' || App.page === 'settings') { box.innerHTML = ''; return; }
   const L = App.lastDate, cm = L.slice(0, 7);
   const months = Object.keys(App.index.sales).sort().reverse().filter(m => m !== cm);
@@ -976,7 +1053,7 @@ function render() {
     return;
   }
   if (!App.lastDate && !['admin', 'stok', 'report', 'settings'].includes(App.page)) { App.page = srLast() ? 'report' : 'stok'; }
-  const fn = { area: pageArea, report: pageReport, trend: pageTrend, promo: pagePromo, toko: pageStore, produk: pageProduct, stok: pageStock, admin: pageAdmin, settings: pageSettings }[App.page] || pageReport;
+  const fn = { area: pageArea, report: pageReport, trend: pageTrend, promo: pagePromo, omni: pageOmni, eac: pageEac, toko: pageStore, produk: pageProduct, stok: pageStock, admin: pageAdmin, settings: pageSettings }[App.page] || pageReport;
   try { fn(view); } catch (e) { console.error(e); view.innerHTML = `<div class="empty-state"><h2>Halaman gagal ditampilkan</h2><p class="muted">${esc(e.message)}</p></div>`; }
 }
 
@@ -1374,6 +1451,138 @@ function pagePromo(view) {
     { k: 'top', label: 'Promo terbesar', h: r => r.top ? `${esc(r.top)} <span class="sub">${fmtPct(r.topShare, 1)} dari sales toko</span>` : '–' }] });
 }
 
+/* ================= halaman: Monitoring OmniChannel ================= */
+const tyIs = (l, t) => String(l.ty || '').trim().toLowerCase() === t;
+const OMNI = [
+  ['ea', 'Endless Aisle', l => tyIs(l, 'endless aisle')],
+  ['ev', 'Eigerindo Voucher', l => String((App.sku[l.sku] || [])[2] || '').trim().toUpperCase() === 'VOUCHER'],
+  ['ti', 'Tax Invoice', l => tyIs(l, 'b2b2g')],
+  ['es', 'EASAP', l => tyIs(l, 'tour & travel')]
+];
+function omniData(m) {
+  const T = App.omni[m] || {}, from = m + '-01', to = m + '-' + pad(dim(m));
+  const act = new Map();
+  for (const l of App.lines) {
+    if (l.d < from || l.d > to || !lineOk(l) || !typeOk(l.s)) continue;
+    for (const [k, , f] of OMNI) if (f(l)) { let a = act.get(l.s); if (!a) act.set(l.s, a = { ea: 0, ev: 0, ti: 0, es: 0 }); a[k] += l.g; }
+  }
+  const codes = new Set([...Object.keys(T).filter(typeOk), ...act.keys()]);
+  const rows = [...codes].map(c => {
+    const t = T[c] || {}, a = act.get(c) || {}, r = { c, name: (App.stores[c] && (App.stores[c].alias || App.stores[c].name)) || c, type: sType(c) };
+    let tt = 0, ta = 0;
+    for (const [k] of OMNI) { const x = t[k] || 0, y = a[k] || 0; r[k + 'T'] = x; r[k + 'A'] = y; r[k + 'D'] = y - x; r[k + 'P'] = x ? y / x : null; tt += x; ta += y; }
+    r.totT = tt; r.totA = ta; r.totD = ta - tt; r.totP = tt ? ta / tt : null;
+    return r;
+  });
+  const tot = { c: '', name: 'JATENG 01' }; for (const k of [...OMNI.map(o => o[0]), 'tot']) { tot[k + 'T'] = rows.reduce((s, r) => s + r[k + 'T'], 0); tot[k + 'A'] = rows.reduce((s, r) => s + r[k + 'A'], 0); tot[k + 'D'] = tot[k + 'A'] - tot[k + 'T']; tot[k + 'P'] = tot[k + 'T'] ? tot[k + 'A'] / tot[k + 'T'] : null; }
+  let last = null; for (const l of App.lines) if (l.d >= from && l.d <= to && (!last || l.d > last)) last = l.d;
+  return { m, rows, tot, hasT: Object.keys(T).length > 0, last };
+}
+function pageOmni(view) {
+  const U = App.ui, months = Object.keys(App.index.sales).sort().reverse();
+  const allM = [...new Set([...months, ...Object.keys(App.omni)])].sort().reverse();
+  const m = U.omM && allM.includes(U.omM) ? U.omM : (allM[0] || (App.lastDate || todayISO()).slice(0, 7)); U.omM = m;
+  if (!App.loaded.has(m) && App.index.sales[m]) { view.innerHTML = '<div class="loading"><span class="spin"></span>Mengambil data…</div>'; ensureMonths(m + '-01', m + '-01').then(render); return; }
+  const O = omniData(m);
+  setHead('Monitoring OmniChannel' + (U.typeF ? ' · ' + TYPE_LABEL[U.typeF] : ''), fmtMonth(m) + (O.last ? ' · actual s/d ' + fmtDate(O.last) : '') + ' · ' + O.rows.length + ' site');
+  const st = U.omSort || { k: 'totP', dir: 'desc' };
+  const rows = O.rows.slice().sort((a, b) => { const x = a[st.k], y = b[st.k]; const r = typeof x === 'string' ? String(x).localeCompare(String(y), 'id') : (x ?? -Infinity) - (y ?? -Infinity); return st.dir === 'asc' ? r : -r; });
+  const G = SET().achGreen / 100;
+  const pc = v => `<td class="r ${v == null ? '' : v >= G ? 'dpos' : 'dneg'}">${v == null ? '–' : fmtPct(v, 2)}</td>`;
+  const df = (v, t) => `<td class="r ${!t && !v ? '' : v >= 0 ? 'dpos' : 'dneg'}">${fN(v)}</td>`;
+  const cells = r => [...OMNI.map(o => o[0]), 'tot'].map(k => `<td class="r sep">${r[k + 'T'] ? fN(r[k + 'T']) : '–'}</td><td class="r">${fN(r[k + 'A'])}</td>${df(r[k + 'D'], r[k + 'T'])}${pc(r[k + 'P'])}`).join('');
+  const sh = (k, l) => `<th class="s" data-oms="${k}">${l}${st.k === k ? (st.dir === 'asc' ? ' ▲' : ' ▼') : ''}</th>`;
+  const heads = [...OMNI.map(o => [o[0], o[1]]), ['tot', 'TOTAL']];
+  const head2 = heads.map(([k]) => sh(k + 'T', 'Target') + sh(k + 'A', 'Actual') + sh(k + 'D', 'Diff') + sh(k + 'P', '%Ach')).join('');
+  view.innerHTML = `<div class="stack">
+    <div class="filters" style="margin:0"><label class="small muted" for="omM">Bulan</label><select id="omM" class="inp">${allM.map(x => `<option value="${x}" ${x === m ? 'selected' : ''}>${fmtMonth(x)}</option>`).join('')}</select>
+      <div class="seg" role="group" aria-label="Format angka"><button data-rpf="0" class="${rpFull() ? '' : 'on'}">Ringkas (jt)</button><button data-rpf="1" class="${rpFull() ? 'on' : ''}">Penuh</button></div>
+      <span style="flex:1"></span><button class="btn" id="omXls">Download Excel</button></div>
+    ${O.hasT ? '' : '<div class="note">Target OmniChannel ' + esc(fmtMonth(m)) + ' belum diupload. Upload file target OmniChannel di Kelola data agar Target, Diff dan %Ach terisi.</div>'}
+    <div class="kpis">${heads.map(([k, l]) => `<div class="kpi"><span>${l}</span><b style="color:${O.tot[k + 'P'] == null ? 'var(--navy)' : O.tot[k + 'P'] >= G ? 'var(--ok)' : 'var(--bad)'}">${O.tot[k + 'P'] == null ? fmtRpS(O.tot[k + 'A']) : fmtPct(O.tot[k + 'P'], 1)}</b><small>${fmtRpS(O.tot[k + 'A'])}${O.tot[k + 'T'] ? ' dari target ' + fmtRpS(O.tot[k + 'T']) : ''}</small></div>`).join('')}</div>
+    <div class="rp-wrap"><table class="rp" style="min-width:1250px">
+      <thead><tr><th rowspan="2" class="nmh s" data-oms="name">Site</th>${heads.map(([, l], i) => `<th colspan="4">${i < 4 ? '<span style="opacity:.8">' + '①②③④'[i] + '</span> ' : ''}${l.toUpperCase()}</th>`).join('')}</tr><tr>${head2}</tr></thead>
+      <tbody>${rows.map(r => `<tr data-store="${esc(r.c)}" style="cursor:pointer"><td class="nm">${esc(r.c)} · ${esc(r.name)}</td>${cells(r)}</tr>`).join('') || '<tr><td colspan="21" style="text-align:center;padding:24px">Belum ada data.</td></tr>'}</tbody>
+      <tfoot><tr><td class="nm" style="background:#0B1B4A;color:#fff">TOTAL ${esc(O.tot.name)}</td>${cells(O.tot).replace(/ dpos| dneg/g, '')}</tr></tfoot>
+    </table></div>
+    <div class="legend"><span>${rpFull() ? '' : 'Angka dalam juta rupiah. '}Actual = gross sales bulan berjalan. Endless Aisle = tipe transaksi Endless Aisle · Eigerindo Voucher = Category Lv.4 VOUCHER · Tax Invoice = tipe transaksi B2B2G · EASAP = tipe transaksi Tour &amp; Travel. Hijau = %Ach ≥ ${SET().achGreen}%.</span></div>
+  </div>`;
+  App.ui.omLast = O;
+}
+async function exportOmni() {
+  const O = App.ui.omLast; if (!O || typeof XLSX === 'undefined') return;
+  const r4 = x => x == null ? null : Math.round(x * 10000) / 10000, ks = [...OMNI.map(o => o[0]), 'tot'];
+  const line = r => [r.c ? r.c + ' - ' + r.name : r.name, ...ks.flatMap(k => [Math.round(r[k + 'T']), Math.round(r[k + 'A']), Math.round(r[k + 'D']), r4(r[k + 'P'])])];
+  const aoa = [['Monitoring OmniChannel ' + fmtMonth(O.m)], [], ['Site Name', ...OMNI.flatMap(o => [o[1], '', '', '']), 'TOTAL'], ['', ...ks.flatMap(() => ['Target', 'Actual', 'Diff', '%Ach'])], ...O.rows.map(line), line(Object.assign({}, O.tot, { c: '', name: 'TOTAL JATENG 01' }))];
+  const ws = XLSX.utils.aoa_to_sheet(aoa); ws['!cols'] = [{ wch: 42 }, ...Array(20).fill({ wch: 13 })];
+  for (let i = 4; i < aoa.length; i++) for (let j = 1; j < 21; j++) { const a = XLSX.utils.encode_cell({ r: i, c: j }); if (ws[a] && typeof ws[a].v === 'number') ws[a].z = j % 4 === 0 ? '0.00%' : '#,##0'; }
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'OmniChannel');
+  const out = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+  (await getDownloads()).save({ filename: `Monitoring_OmniChannel_${O.m}.xlsx`, data: new Blob([out]) });
+}
+
+/* ================= halaman: Sales Member EAC ================= */
+const isMember = l => !!String(l.cn || '').trim();
+function pageEac(view) {
+  const U = App.ui, maxD = App.lastDate;
+  const D = U.eaDate && U.eaDate <= maxD ? U.eaDate : maxD; U.eaDate = D;
+  const m = D.slice(0, 7), day = +D.slice(8), from = m + '-01';
+  if (!App.loaded.has(m) && App.index.sales[m]) { view.innerHTML = '<div class="loading"><span class="spin"></span>Mengambil data…</div>'; ensureMonths(D, D).then(render); return; }
+  const cw = cumWeight(m, day), T = App.eac[m] || {};
+  const S = new Map(); const mk = () => ({ v: 0, mv: 0, dv: 0, dmv: 0, mtrx: new Set(), ntrx: new Set(), nv: 0, mem: new Set() });
+  const daily = new Map(); const CU = new Map();
+  for (const l of App.lines) {
+    if (l.d < from || l.d > D || !lineOk(l) || !typeOk(l.s)) continue;
+    let x = S.get(l.s); if (!x) S.set(l.s, x = mk());
+    const v = l.g, mem = isMember(l), k = l.d + '|' + l.o;
+    x.v += v; if (l.d === D) x.dv += v;
+    const dd = daily.get(l.d) || { v: 0, mv: 0 }; dd.v += v;
+    if (mem) { x.mv += v; if (l.d === D) x.dmv += v; dd.mv += v; if (l.q > 0) x.mtrx.add(k); x.mem.add(l.cn);
+      const cu = CU.get(l.cn) || { cn: l.cn, v: 0, trx: new Set(), st: new Set(), last: '' }; cu.v += v; if (l.q > 0) cu.trx.add(l.s + k); cu.st.add(l.s); if (l.d > cu.last) cu.last = l.d; CU.set(l.cn, cu); }
+    else { x.nv += v; if (l.q > 0) x.ntrx.add(k); }
+    daily.set(l.d, dd);
+  }
+  const codes = new Set([...Object.keys(T).filter(typeOk), ...S.keys()]);
+  const rows = [...codes].map(c => {
+    const x = S.get(c) || mk(), t = T[c] || 0, ct = t * cw;
+    return { c, name: (App.stores[c] && (App.stores[c].alias || App.stores[c].name)) || c, t, ct, a: x.mv, d: x.mv - ct, pM: t ? x.mv / t : null, pC: ct ? x.mv / ct : null,
+      share: x.v ? x.mv / x.v : null, mem: x.mem.size, mtrx: x.mtrx.size, mbs: x.mtrx.size ? x.mv / x.mtrx.size : null, nbs: x.ntrx.size ? x.nv / x.ntrx.size : null, dmv: x.dmv, dshare: x.dv ? x.dmv / x.dv : null };
+  });
+  const tot = rows.reduce((a, r) => { a.t += r.t; a.ct += r.ct; a.a += r.a; a.mtrx += r.mtrx; a.dmv += r.dmv; return a; }, { t: 0, ct: 0, a: 0, mtrx: 0, dmv: 0 });
+  let allV = 0, allN = 0, allNT = 0, allDV = 0; for (const x of S.values()) { allV += x.v; allN += x.nv; allNT += x.ntrx.size; allDV += x.dv; }
+  tot.pM = tot.t ? tot.a / tot.t : null; tot.pC = tot.ct ? tot.a / tot.ct : null; tot.d = tot.a - tot.ct; tot.share = allV ? tot.a / allV : null; tot.mem = CU.size; tot.mbs = tot.mtrx ? tot.a / tot.mtrx : null; tot.nbs = allNT ? allN / allNT : null; tot.dshare = allDV ? tot.dmv / allDV : null;
+  setHead('Sales Member EAC' + (U.typeF ? ' · ' + TYPE_LABEL[U.typeF] : ''), 'Kumulatif 1–' + day + ' ' + fmtMonth(m) + ' · sales dari transaksi yang mencantumkan nama customer · gross');
+  const st = U.eaSort || { k: 'pC', dir: 'desc' };
+  const srt = rows.slice().sort((a, b) => { const x = a[st.k], y = b[st.k]; const r = typeof x === 'string' ? String(x).localeCompare(String(y), 'id') : (x ?? -Infinity) - (y ?? -Infinity); return st.dir === 'asc' ? r : -r; });
+  const G = SET().achGreen / 100, Y = SET().achYellow / 100;
+  const pc = v => `<td class="r ${v == null ? '' : v >= G ? 'dpos' : v >= Y ? '' : 'dneg'}">${v == null ? '–' : fmtPct(v, 2)}</td>`;
+  const sh = (k, l) => `<th class="s" data-eas="${k}">${l}${st.k === k ? (st.dir === 'asc' ? ' ▲' : ' ▼') : ''}</th>`;
+  const line = r => `<td class="r sep">${r.t ? fN(r.t) : '–'}</td><td class="r">${r.t ? fN(r.ct) : '–'}</td><td class="r">${fN(r.a)}</td>${r.t ? rpDiff(r.d) : '<td class="r">–</td>'}${pc(r.pM)}${pc(r.pC)}<td class="r sep kpi2">${fmtPct(r.share, 1)}</td><td class="r kpi2">${fmtN(r.mem)}</td><td class="r kpi2">${fmtN(r.mtrx)}</td><td class="r kpi2">${fB(r.mbs)}</td><td class="r kpi2">${fB(r.nbs)}</td>`;
+  const tiles = [['Target bulan', fmtRpS(tot.t), ''], ['Actual member', fmtRpS(tot.a), 's/d ' + fmtDateS(D)], ['Ach vs target bulan', fmtPct(tot.pM, 1), ''], ['Ach vs target s/d tanggal', fmtPct(tot.pC, 1), 'bobot kumulatif ' + fmtPct(cw, 1)], ['Porsi member', fmtPct(tot.share, 1), 'dari total sales'], ['Member bertransaksi', fmtN(tot.mem), 'nama customer unik']];
+  const top = [...CU.values()].map(x => ({ cn: x.cn, v: x.v, trx: x.trx.size, st: [...x.st].map(sName).join(', '), last: x.last })).sort((a, b) => b.v - a.v);
+  view.innerHTML = `<div class="stack">
+    <div class="filters" style="margin:0"><label class="small muted" for="eaDate">Tanggal</label><input type="date" id="eaDate" class="inp" value="${D}" max="${maxD}">
+      <div class="seg" role="group" aria-label="Format angka"><button data-rpf="0" class="${rpFull() ? '' : 'on'}">Ringkas (jt)</button><button data-rpf="1" class="${rpFull() ? 'on' : ''}">Penuh</button></div></div>
+    ${Object.keys(T).length ? '' : '<div class="note">Target Sales Member EAC ' + esc(fmtMonth(m)) + ' belum diupload. Isi sheet Target EAC di template lalu upload di Kelola data.</div>'}
+    ${App.lines.some(l => l.d >= from && l.d <= D && l.cn === undefined) ? '<div class="note">Sebagian data bulan ini diupload sebelum nama customer ikut disimpan. Upload ulang Item DSR bulan ini agar Sales Member EAC lengkap.</div>' : ''}
+    <div class="kpis">${tiles.map(([a, b, c]) => `<div class="kpi"><span>${a}</span><b>${b}</b><small>${c}</small></div>`).join('')}</div>
+    <div class="rp-wrap"><table class="rp" style="min-width:1080px">
+      <thead><tr><th rowspan="2" class="nmh s" data-eas="name">Site</th><th colspan="6">Sales Member EAC</th><th colspan="5">Profil member</th></tr>
+      <tr>${sh('t', 'Target bulan')}${sh('ct', 'Target s/d tgl')}${sh('a', 'Actual')}${sh('d', 'Diff')}${sh('pM', '%Ach bulan')}${sh('pC', '%Ach s/d tgl')}${sh('share', 'Porsi member')}${sh('mem', 'Member')}${sh('mtrx', 'Trx member')}${sh('mbs', 'Basket member')}${sh('nbs', 'Basket non-member')}</tr></thead>
+      <tbody>${srt.map(r => `<tr data-store="${esc(r.c)}" style="cursor:pointer"><td class="nm">${esc(r.c)} · ${esc(r.name)}</td>${line(r)}</tr>`).join('') || '<tr><td colspan="12" style="text-align:center;padding:24px">Belum ada data.</td></tr>'}</tbody>
+      <tfoot><tr><td class="nm" style="background:#0B1B4A;color:#fff">TOTAL JATENG 01</td>${line(tot).replace(/ dpos| dneg| kpi2/g, '')}</tr></tfoot>
+    </table></div>
+    <div class="legend"><span>${rpFull() ? '' : 'Target, Actual & Diff dalam juta rupiah. '}Target s/d tanggal = target bulan × bobot kumulatif. Porsi member = sales member ÷ total sales toko. Basket = sales ÷ jumlah transaksi.</span></div>
+    <section class="card"><div class="card-h"><h3>Sales member harian</h3><p class="small muted">batang = sales member, garis = porsi member</p></div><div class="chart-box"><canvas id="cEac"></canvas></div></section>
+    ${App.admin ? `<section class="card"><div class="card-h"><h3>Member dengan belanja terbesar</h3><p class="small muted">hanya terlihat oleh admin · ${fmtN(top.length)} member</p></div><div id="eaTop"></div></section>` : ''}
+  </div>`;
+  const dl = []; for (let d = from; d <= D; d = addDays(d, 1)) dl.push(d);
+  mkDual($('#cEac'), dl.map(fmtDateS), dl.map(d => (daily.get(d) || {}).mv || 0), dl.map(d => { const x = daily.get(d); return x && x.v ? x.mv / x.v * 100 : null; }), 'Sales member', 'Porsi member (%)', v => fmtRpS(v), v => fmtX(v, 1) + '%');
+  if (App.admin) $('#eaTop').innerHTML = tbl('eacTop', { rows: top, sort: { k: 'v', dir: 'desc' }, limit: 20, cols: [
+    { k: 'cn', label: 'Nama customer', h: r => `<span class="nm">${esc(r.cn)}</span><span class="sub">${esc(r.st)}</span>` },
+    { k: 'trx', label: 'Transaksi', r: 1, h: r => fmtN(r.trx) }, { k: 'v', label: 'Sales', r: 1, h: r => fmtRpS(r.v) }, { k: 'last', label: 'Terakhir belanja', r: 1, h: r => fmtDateS(r.last) }] });
+}
+
 /* ================= halaman: per toko ================= */
 function pageStore(view) {
   const codes = storeCodes(); if (!App.ui.store || !codes.includes(App.ui.store)) App.ui.store = codes[0];
@@ -1560,9 +1769,11 @@ function pageAdmin(view) {
   const codes = storeCodes().filter(c => sType(c) !== 'bz' || monthTarget(c, tm) || (App.index.sales[tm] || {})[c] || (App.tgtDetail[tm] || {})[c]);
   const allCodes = storeCodes();
   view.innerHTML = `<div class="stack">${permNote}
-    <section class="card"><div class="card-h"><h3>Upload data</h3><p class="small muted">Item DSR Report, Export by Bin (stok), target bulanan, dan bobot harian. Semua tersimpan di spreadsheet master.</p></div>
+    <section class="card"><div class="card-h"><h3>Upload data</h3><p class="small muted">Item DSR Report, Export by Bin (stok), target bulanan, target OmniChannel, dan bobot harian. Semua tersimpan di spreadsheet master.</p></div>
       <label class="drop" id="drop"><input type="file" id="fileIn" multiple accept=".xlsx,.xls,.csv"><b>Pilih file</b><span class="small muted">atau seret file ke sini. Toko dikenali otomatis dari kolom Location.</span></label>
       <div class="pend" id="pend"></div>
+      <div class="note" style="margin-top:12px;display:flex;flex-wrap:wrap;gap:10px;align-items:center"><span><b>Template target bulanan</b> — satu file berisi sheet Target Sales, Target OmniChannel, Bobot Harian, dan Target EAC (Jan–Des), sudah terisi daftar toko & tanggal. Isi angkanya, lalu upload sekali.</span>
+        <input type="month" id="tplM" class="inp sm" value="${esc(addMonths((App.lastDate || todayISO()).slice(0, 7), (+(App.lastDate || todayISO()).slice(8)) >= 20 ? 1 : 0))}"><button class="btn sm primary" id="tplBtn">Download template</button></div>
       <div class="row-act"><button class="btn primary" id="saveBtn" ${App.pending.some(p => !p.err) ? '' : 'disabled'}>Simpan ke database</button><button class="btn" id="clrBtn" ${App.pending.length ? '' : 'disabled'}>Kosongkan daftar</button><span id="saveMsg" class="small muted"></span></div>
       <p class="small muted" style="margin-top:10px">File yang diupload bersamaan digabung otomatis, jadi DSR boleh dipecah per toko, per tanggal, atau per bagian. Tanggal yang sama untuk toko yang sama di upload berikutnya akan diganti dengan data baru, jadi aman upload ulang. Untuk stok, yang disimpan hanya snapshot terbaru tiap toko.</p></section>
     <section class="card"><div class="card-h"><h3>Kelengkapan data</h3><select id="covM" class="inp sm">${months.map(m => `<option value="${m}" ${m === cm ? 'selected' : ''}>${fmtMonth(m)}</option>`).join('') || '<option>Belum ada</option>'}</select></div><div id="cov" style="overflow-x:auto"></div></section>
@@ -1593,14 +1804,14 @@ function pageAdmin(view) {
   renderPending(); renderCoverage(cm);
   $('#logT').innerHTML = tbl('log', { rows: App.log.slice().reverse(), limit: 15, empty: 'Belum ada upload.', cols: [
     { k: 'at', label: 'Waktu', h: r => esc(new Date(r.at).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })) },
-    { k: 'kind', label: 'Jenis', h: r => ({ DSR: 'Penjualan', INV: 'Stok', TGT: 'Target', WGT: 'Bobot harian', SR: 'Sales Report', DEL: 'Hapus' }[r.kind] || r.kind) }, { k: 'file', label: 'File', h: r => `<span class="small">${esc(r.file)}</span>` },
+    { k: 'kind', label: 'Jenis', h: r => ({ DSR: 'Penjualan', INV: 'Stok', TGT: 'Target', OMT: 'Target Omni', EAC: 'Target EAC', WGT: 'Bobot harian', SR: 'Sales Report', DEL: 'Hapus' }[r.kind] || r.kind) }, { k: 'file', label: 'File', h: r => `<span class="small">${esc(r.file)}</span>` },
     { k: 'stores', label: 'Toko', r: 1 }, { k: 'info', label: 'Isi', h: r => esc(r.info) + (r.removed ? ' <span class="badge b-DS">sudah dihapus</span>' : '') },
     { k: 'x', label: '', ns: 1, h: r => r.id && r.scope && !r.removed ? `<button class="btn sm danger" data-dellog="${esc(r.id)}">Hapus data file ini</button>` : '' }] });
 }
 /* hapus semua data yang dimasukkan oleh satu file (dikerjakan di spreadsheet) */
 async function deleteByLog(id) {
   const e = App.log.find(x => x.id === id); if (!e || !e.scope) return;
-  const what = { DSR: 'penjualan (Item DSR)', INV: 'stok', TGT: 'target', WGT: 'bobot harian' }[e.kind] || 'data';
+  const what = { DSR: 'penjualan (Item DSR)', INV: 'stok', TGT: 'target', OMT: 'target OmniChannel', EAC: 'target Member EAC', WGT: 'bobot harian' }[e.kind] || 'data';
   if (!confirm(`Hapus data ${what} dari file "${e.file}"?\n${e.info}\n\nCatatan: kalau toko & tanggal yang sama pernah diupload ulang dari file lain, data itu ikut terhapus. Tidak bisa dibatalkan.`)) return;
   try { toast('Menghapus data di spreadsheet…', 15000); await apiPost({ a: 'deleteLog', id }); await loadAll(); toast('Data dari file itu sudah dihapus'); render(); }
   catch (er) { console.error(er); toast('Gagal menghapus: ' + errMsg(er)); }
@@ -1617,6 +1828,15 @@ function renderPending() {
     if (p.kind === 'WGT') {
       const warn = p.days !== dim(p.month) ? ` <b style="color:var(--warn)">hanya ${p.days} dari ${dim(p.month)} hari</b>` : '';
       return `<div class="pend-i"><span class="k">Bobot harian</span><div><div class="f">${esc(p.file)}</div><div class="d">${fmtMonth(p.month)} · ${p.days} hari · total ${fmtPct(p.rawSum, 2)}${warn}</div></div><button class="btn sm" data-rmp="${i}">Hapus</button></div>`;
+    }
+    if (p.kind === 'EAC') {
+      const R = eacResolve(p), ms = Object.keys(R).sort(), tot = ms.reduce((a, m) => a + Object.values(R[m]).reduce((x, v) => x + v, 0), 0);
+      return `<div class="pend-i"><span class="k">Target EAC</span><div><div class="f">${esc(p.file)}</div><div class="d">${p.rows} toko · ${ms.length ? fmtMonth(ms[0]) + (ms.length > 1 ? ' – ' + fmtMonth(ms[ms.length - 1]) : '') : 'tidak ada angka'} · total ${fmtRpS(tot)} · tahun <input type="number" class="inp sm" style="width:84px" data-pyear="${i}" value="${p.year || +(App.lastDate || todayISO()).slice(0, 4)}"></div></div><button class="btn sm" data-rmp="${i}">Hapus</button></div>`;
+    }
+    if (p.kind === 'OMT') {
+      const sum = k => Object.values(p.data).reduce((a, o) => a + (o[k] || 0), 0);
+      const mOpt = ` · bulan <input type="month" class="inp sm" data-pmonth="${i}" value="${esc(p.month || '')}">${p.needMonth ? ' <b style="color:var(--warn)">pilih bulan</b>' : ' <span class="small">(cek, sesuaikan bila perlu)</span>'}`;
+      return `<div class="pend-i"><span class="k">Target Omni</span><div><div class="f">${esc(p.file)}</div><div class="d">${p.rows} toko${mOpt} · EA ${fmtRpS(sum('ea'))} · Voucher ${fmtRpS(sum('ev'))} · Tax Inv ${fmtRpS(sum('ti'))} · EASAP ${fmtRpS(sum('es'))}</div></div><button class="btn sm" data-rmp="${i}">Hapus</button></div>`;
     }
     if (p.kind === 'TGT') {
       const ms = Object.keys(p.data);
@@ -1648,7 +1868,13 @@ async function addFiles(files) {
   if (typeof XLSX === 'undefined') { toast('Pembaca Excel belum termuat. Muat ulang halaman.'); return; }
   $('#saveMsg').textContent = 'Membaca file…';
   for (const f of files) {
-    try { const buf = await f.arrayBuffer(); const p = parseWorkbook(buf, f.name); App.pending.push(p); }
+    try {
+      const buf = await f.arrayBuffer();
+      for (const p of parseWorkbookAll(buf, f.name)) {
+        if ((p.kind === 'OMT' || p.kind === 'TGT') && p.needMonth && !p.month) p.month = (App.lastDate || todayISO()).slice(0, 7);
+        App.pending.push(p);
+      }
+    }
     catch (e) { App.pending.push({ file: f.name, err: e.message || String(e) }); }
     renderPending();
   }
@@ -1659,7 +1885,7 @@ const hhmm = t => pad(Math.floor((t || 0) / 100)) + ':' + pad((t || 0) % 100);
 async function saveAll() {
   const items = App.pending.filter(p => !p.err); if (!items.length) return;
   const btn = $('#saveBtn'), msg = $('#saveMsg');
-  const noMonth = items.find(p => p.kind === 'TGT' && p.needMonth && !p.month);
+  const noMonth = items.find(p => (p.kind === 'TGT' || p.kind === 'OMT') && p.needMonth && !p.month);
   if (noMonth) { msg.textContent = 'Pilih bulan untuk file target ' + noMonth.file + ' dulu.'; return; }
   btn.disabled = true;
   const say = t => { msg.textContent = t; };
@@ -1714,6 +1940,21 @@ async function saveAll() {
       }
       logs.push({ id: uid(), scope: { months: ms, codes: Object.keys(p.names) }, at: now, kind: 'TGT', file: p.file, stores: p.rows, info: 'target ' + ms.map(fmtMonth).join(', ') });
     }
+    /* --- target OmniChannel --- */
+    for (const p of items.filter(p => p.kind === 'OMT')) {
+      say('Menyimpan target OmniChannel…');
+      const rows = Object.keys(p.data).map(c => { const o = p.data[c]; return [c, p.names[c] || '', o.ea || 0, o.ev || 0, o.ti || 0, o.es || 0]; });
+      await withRetry(() => apiPost({ a: 'omniTarget', month: p.month, rows }));
+      logs.push({ id: uid(), scope: { months: [p.month], codes: Object.keys(p.data) }, at: now, kind: 'OMT', file: p.file, stores: p.rows, info: 'target OmniChannel ' + fmtMonth(p.month) });
+    }
+    /* --- target Sales Member EAC --- */
+    for (const p of items.filter(p => p.kind === 'EAC')) {
+      say('Menyimpan target Member EAC…');
+      const R = eacResolve(p), rows = [];
+      for (const m in R) for (const c in R[m]) rows.push([m, c, p.names[c] || '', R[m][c]]);
+      if (rows.length) await withRetry(() => apiPost({ a: 'eacTarget', rows }));
+      logs.push({ id: uid(), scope: { months: Object.keys(R), codes: Object.keys(p.names) }, at: now, kind: 'EAC', file: p.file, stores: p.rows, info: 'target Member EAC ' + Object.keys(R).sort().map(fmtMonth).join(', ') });
+    }
     /* --- bobot harian --- */
     for (const p of items.filter(p => p.kind === 'WGT')) {
       say('Menyimpan bobot harian…');
@@ -1756,6 +1997,42 @@ async function deleteStoreMonth() {
   if (!confirm(`Hapus semua data penjualan ${sName(c)} di ${fmtMonth(m)}? Tidak bisa dibatalkan.`)) return;
   try { toast('Menghapus…', 15000); await apiPost({ a: 'deleteStoreMonth', code: c, m }); await loadAll(); toast('Data dihapus'); render(); }
   catch (e) { toast('Gagal menghapus: ' + errMsg(e)); }
+}
+/* template target bulanan: Target Sales + Target OmniChannel + Bobot Harian dalam satu file */
+async function downloadTemplate(m) {
+  if (!m || typeof XLSX === 'undefined') return;
+  const codes = storeCodes().filter(c => sType(c) !== 'bz' || (App.tgtDetail[m] || {})[c] || (App.omni[m] || {})[c]);
+  const fullName = c => (App.stores[c] && App.stores[c].name) || c;
+  const T = App.tgtDetail[m] || {}, O = App.omni[m] || {}, W = App.weights[m] || {};
+  const label = fmtMonth(m), n = dim(m);
+  /* Target Sales (format sama dengan file target kantor) */
+  const ts = [['', '', '', '', '', label], ['REGIONAL', 'SALES DISTRICT', 'SUB DISTRICT', 'SITE CODE', 'SITE NAME', 'Offline', 'EA', 'WAB', 'Eiger', 'Outlive', 'Total']];
+  codes.forEach((c, i) => { const t = T[c] || {}; const r = ts.length + 1; ts.push(['REG 03', 'JAWA TENGAH', 'JATENG 01', c, fullName(c), t.offline || null, t.ea || null, t.wab || null, { f: `F${r}+G${r}+H${r}` }, t.outlive || null, { f: `I${r}+J${r}` }]); });
+  /* Target OmniChannel (format sama dengan sheet monitoring) */
+  const os = [['Site Name', label], ['', '① ENDLESS AISLE', '② EIGERINDO VOUCHER', '③ TAX INVOICE', '④ EASAP', 'TOTAL'], ['', 'Target', 'Target', 'Target', 'Target', 'Target']];
+  codes.forEach(c => { const o = O[c] || {}; const r = os.length + 1; os.push([c + ' - ' + fullName(c), o.ea || null, o.ev || null, o.ti || null, o.es || null, { f: `SUM(B${r}:E${r})` }]); });
+  /* Bobot harian */
+  const ws3 = [[label], ['Date', 'Day', 'Daily Ratio', 'Cumm. Ratio']];
+  for (let d = 1; d <= n; d++) { const iso = m + '-' + pad(d), r = ws3.length + 1; ws3.push([iso, ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][dowOf(iso)], W[d] != null ? W[d] : null, { f: d === 1 ? `C${r}` : `D${r - 1}+C${r}` }]); }
+  ws3.push(['TOTAL', '', { f: `SUM(C3:C${n + 2})` }, '']);
+  /* Target Sales Member EAC: satu tahun penuh (Jan–Des), angka yang sudah ada ikut terisi */
+  const yr = m.slice(0, 4), MS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+  const es = [['Target Sales Member EAC ' + yr], ['Kode Site', 'STORE NAME', ...MS]];
+  codes.forEach(c => es.push([c, fullName(c), ...MS.map((_, i) => { const v = (App.eac[yr + '-' + pad(i + 1)] || {})[c]; return v || null; })]));
+  const wb = XLSX.utils.book_new();
+  const mk = (aoa, cols, pctCols, numCols) => {
+    const ws = XLSX.utils.aoa_to_sheet(aoa); ws['!cols'] = cols.map(w => ({ wch: w }));
+    const rg = XLSX.utils.decode_range(ws['!ref']);
+    for (let R = 0; R <= rg.e.r; R++) for (let C = 0; C <= rg.e.c; C++) { const a = XLSX.utils.encode_cell({ r: R, c: C }); if (!ws[a]) { if ((pctCols.includes(C) || numCols.includes(C)) && R >= 2) ws[a] = { t: 'z' }; continue; } if (pctCols.includes(C) && R >= 2) ws[a].z = '0.00%'; if (numCols.includes(C) && R >= 2) ws[a].z = '#,##0'; }
+    return ws;
+  };
+  XLSX.utils.book_append_sheet(wb, mk(ts, [9, 15, 13, 10, 40, 14, 14, 14, 14, 14, 14], [], [5, 6, 7, 8, 9, 10]), 'Target Sales');
+  XLSX.utils.book_append_sheet(wb, mk(os, [44, 18, 20, 16, 14, 16], [], [1, 2, 3, 4, 5]), 'Target OmniChannel');
+  XLSX.utils.book_append_sheet(wb, mk(ws3, [12, 12, 12, 13], [2, 3], []), 'Bobot Harian');
+  XLSX.utils.book_append_sheet(wb, mk(es, [10, 40, ...MS.map(() => 14)], [], MS.map((_, i) => i + 2)), 'Target EAC');
+  const out = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+  (await getDownloads()).save({ filename: `Template_Target_Jateng01_${m}.xlsx`, data: new Blob([out]) });
+  toast('Template ' + label + ' diunduh. Isi angkanya lalu upload di sini.');
 }
 async function rebuildCache() {
   const el = $('#rebuildMsg'); if (el) el.textContent = 'Memproses ulang data di spreadsheet… (bisa 1–2 menit)';
@@ -1860,6 +2137,9 @@ document.addEventListener('click', async e => {
   const sm = t.closest('[data-store]'); if (sm) { App.ui.store = sm.dataset.store; go('toko'); return; }
   const hg = t.closest('[data-hgo]'); if (hg) { App.ui.stTab = 'list'; App.ui.stStore = hg.dataset.hgo; App.ui.stStatus = ''; go('stok'); return; }
   const rps = t.closest('[data-rps]'); if (rps) { const k = rps.dataset.rps; const s0 = App.ui.rpSort || { k: 'mAch', dir: 'desc' }; App.ui.rpSort = s0.k === k ? { k, dir: s0.dir === 'asc' ? 'desc' : 'asc' } : { k, dir: (k === 'c' || k === 'name') ? 'asc' : 'desc' }; render(); return; }
+  const eas = t.closest('[data-eas]'); if (eas) { const k = eas.dataset.eas; const s0 = App.ui.eaSort || { k: 'pC', dir: 'desc' }; App.ui.eaSort = s0.k === k ? { k, dir: s0.dir === 'asc' ? 'desc' : 'asc' } : { k, dir: k === 'name' ? 'asc' : 'desc' }; render(); return; }
+  const oms = t.closest('[data-oms]'); if (oms) { const k = oms.dataset.oms; const s0 = App.ui.omSort || { k: 'totP', dir: 'desc' }; App.ui.omSort = s0.k === k ? { k, dir: s0.dir === 'asc' ? 'desc' : 'asc' } : { k, dir: k === 'name' ? 'asc' : 'desc' }; render(); return; }
+  if (t.id === 'omXls') { exportOmni(); return; }
   const rpf = t.closest('[data-rpf]'); if (rpf) { App.ui.rpFull = rpf.dataset.rpf === '1'; render(); return; }
   const rpv = t.closest('[data-rpv]'); if (rpv) { App.ui.rpVal = rpv.dataset.rpv; render(); return; }
   if (t.id === 'rpXls') { exportReport(); return; }
@@ -1868,6 +2148,7 @@ document.addEventListener('click', async e => {
   if (t.id === 'admLink' || t.id === 'loginBtn') { e.preventDefault(); if (App.admin) go('admin'); else openLogin(); return; }
   if (t.id === 'logoutBtn') { App.adminPw = ''; App.admin = false; LS.set('dash_admin', ''); toast('Kamu sudah keluar'); App.page = 'report'; render(); return; }
   if (t.id === 'rebuildBtn') { rebuildCache(); return; }
+  if (t.id === 'tplBtn') { downloadTemplate(($('#tplM') || {}).value); return; }
   if (t.id === 'lgCancel' || t.classList.contains('modal-ov')) { closeLogin(); return; }
   if (t.id === 'lgGo') { doLogin(); return; }
   if (t.id === 'saveBtn') { saveAll(); return; }
@@ -1887,6 +2168,8 @@ document.addEventListener('change', async e => {
   const t = e.target;
   if (App.page === 'settings' && settingsChange(t)) return;
   if (t.id === 'perSel' || t.id === 'rFrom' || t.id === 'rTo') { await onPeriodChange(); return; }
+  if (t.id === 'eaDate') { if (t.value) { App.ui.eaDate = t.value; render(); } return; }
+  if (t.id === 'omM') { App.ui.omM = t.value; render(); return; }
   if (t.id === 'tdStore') { App.ui.tdStore = t.value; App.ui.more = {}; render(); return; }
   if (t.id === 'prStore') { App.ui.prStore = t.value; App.ui.more = {}; render(); return; }
   if (t.id === 'prDate') { if (t.value) { App.ui.prDate = t.value; render(); } return; }
@@ -1902,6 +2185,7 @@ document.addEventListener('change', async e => {
   if (t.id === 'typeSel') { App.ui.typeF = t.value; App.ui.more = {}; App.cache.tr = null; render(); return; }
   if (t.id === 'rpDate') { if (t.value) { App.ui.rpDate = t.value; render(); } return; }
   if (t.id === 'fileIn') { const fs = [...t.files]; t.value = ''; await addFiles(fs); return; }
+  if (t.dataset && t.dataset.pyear !== undefined) { const p = App.pending[+t.dataset.pyear]; if (p && +t.value > 2000) { p.year = +t.value; renderPending(); } return; }
   if (t.dataset && t.dataset.pmonth !== undefined) { const p = App.pending[+t.dataset.pmonth]; if (p) p.month = t.value; return; }
   if (t.id === 'tgtB') { saveBasis(t.value); return; }
   if (t.dataset && t.dataset.pdate !== undefined) { const p = App.pending[+t.dataset.pdate]; if (p && t.value) { p.date = t.value; p.dateFromName = true; } return; }

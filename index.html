@@ -133,6 +133,10 @@ footer strong{color:var(--navy)}
   .tbl{font-size:12.5px}.tbl th,.tbl td{padding:7px 8px}
   .tbl-wrap,.rp-wrap{max-height:70vh}
   .pc .th{width:34px;height:34px}
+  .ra-tiles{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  .ra-tile{padding:10px}.ra-tile b{font-size:14px;line-height:1.2}.ra-tile span,.ra-tile small{font-size:11px}
+  .pt-tiles{gap:8px}.pt-tile{padding:10px 12px}
+  .seg{flex-wrap:wrap}
   main.wrap{padding-top:16px}
   .credit .ver{display:none}
   .brandbar img{height:26px}
@@ -250,10 +254,18 @@ table.tbl{width:100%;border-collapse:collapse;font-size:13.5px}
 .filters{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:14px}
 .filters label{font-weight:700}
 .chart-box{position:relative;height:270px}
+/* tata letak otomatis: kartu berdampingan menyesuaikan tinggi.
+   kartu grafik melebar mengisi tinggi baris; kartu berisi tabel/daftar tidak dipaksa memanjang (tidak ada ruang kosong di dalam kartu) */
+.grid > .card,.grid > .stack > .card{display:flex;flex-direction:column}
+.grid > .card > .chart-box,.grid > .stack > .card > .chart-box{flex:1 1 auto;min-height:200px;height:auto}
+.grid > .stack{display:flex;flex-direction:column}
+.grid > .stack > .card{flex:1 1 auto}
+.donut{flex:none}
+.cat-box{height:230px;overflow:auto;margin-top:10px;border-radius:8px}
 
 .empty-state{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:46px 24px;text-align:center;max-width:640px;margin:20px auto}
 .empty-state h2{margin:0 0 6px;font-size:18px;color:var(--navy);font-weight:800}
-.note{display:flex;gap:10px;background:var(--navy-tint);border:1px solid var(--line-strong);border-left:4px solid var(--orange);border-radius:8px;padding:10px 14px;font-size:13px}
+.note{display:block;background:var(--navy-tint);border:1px solid var(--line-strong);border-left:4px solid var(--orange);border-radius:8px;padding:10px 14px;font-size:13px}
 
 /* admin */
 .drop{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;border:2px dashed var(--line-strong);border-radius:12px;padding:28px 18px;text-align:center;cursor:pointer;background:var(--surface);transition:border-color .15s ease,background .15s ease}
@@ -1257,8 +1269,8 @@ function renderNav() {
 }
 function renderPeriod() {
   const box = $('#periodBox');
-  const tsel = hasTypes() && App.page !== 'toko' ? `<label class="small muted" for="typeSel">Jenis toko</label><select id="typeSel" class="inp"><option value="">Semua toko</option>${['rg', 'bz', 'ot'].filter(t => storeCodes().some(c => sType(c) === t)).map(t => `<option value="${t}" ${App.ui.typeF === t ? 'selected' : ''}>${TYPE_LABEL[t]}</option>`).join('')}</select>` : '';
-  if (['report', 'promo', 'omni', 'eac', 'lost', 'detention', 'growth'].includes(App.page)) { box.innerHTML = tsel; return; }
+  const tsel = hasTypes() && App.page !== 'toko' && !scopeOn() ? `<label class="small muted" for="typeSel">Jenis toko</label><select id="typeSel" class="inp"><option value="">Semua toko</option>${['rg', 'bz', 'ot'].filter(t => storeCodes().some(c => sType(c) === t)).map(t => `<option value="${t}" ${App.ui.typeF === t ? 'selected' : ''}>${TYPE_LABEL[t]}</option>`).join('')}</select>` : '';
+  if (['report', 'promo', 'omni', 'eac', 'lost', 'detention', 'growth', 'stok'].includes(App.page)) { box.innerHTML = tsel; return; }
   if (!App.lastDate || App.page === 'admin' || App.page === 'settings') { box.innerHTML = ''; return; }
   const L = App.lastDate, cm = L.slice(0, 7);
   const months = Object.keys(App.index.sales).sort().reverse().filter(m => m !== cm);
@@ -1289,6 +1301,15 @@ async function refreshForPeriod() {
 }
 
 function destroyCharts() { App.charts.forEach(c => { try { c.destroy(); } catch (e) { } }); App.charts = []; }
+/* mode toko: semua pilihan toko di halaman dikunci ke toko terpilih supaya tidak membingungkan */
+const SCOPED_SELECTS = ['tdStore', 'prStore', 'raStore', 'ptStore', 'psStore', 'dtStore', 'lsStore', 'pst', 'hst', 'trs', 'stSel'];
+function lockScopedSelects(view) {
+  if (!scopeOn()) return;
+  for (const id of SCOPED_SELECTS) { const sel = view.querySelector('#' + id); if (!sel) continue;
+    [...sel.options].forEach(o => { if (o.value !== App.ui.scope) o.remove(); });
+    if (!sel.options.length) sel.add(new Option(sName(App.ui.scope), App.ui.scope));
+    sel.value = App.ui.scope; sel.disabled = true; sel.title = 'Mode toko — ganti lewat tombol di kanan atas'; }
+}
 function setHead(t, sub) { if (scopeOn() && !String(t).includes(sName(App.ui.scope))) t += ' · ' + sName(App.ui.scope); $('#pageTitle').textContent = t; $('#pageSub').textContent = sub || ''; }
 function render() {
   destroyCharts(); App.tables = {};
@@ -1301,7 +1322,7 @@ function render() {
   }
   if (!App.lastDate && !['admin', 'stok', 'report', 'settings', 'lost', 'detention'].includes(App.page)) { App.page = srLast() ? 'report' : 'stok'; }
   const fn = { area: pageArea, report: pageReport, trend: pageTrend, promo: pagePromo, omni: pageOmni, eac: pageEac, ra: pageRA, pareto: pagePareto, lost: pageLost, promostock: pagePromoStock, detention: pageDetention, growth: pageGrowth, toko: pageStore, produk: pageProduct, stok: pageStock, admin: pageAdmin, settings: pageSettings }[App.page] || pageReport;
-  try { fn(view); if ((App.loadWarn || []).length) view.insertAdjacentHTML('afterbegin', `<div class="note" style="margin-bottom:14px">Sebagian data belum termuat (${esc(App.loadWarn.join(', '))}). Tekan <b>Muat ulang</b> di kanan atas untuk mencoba lagi.</div>`); } catch (e) { console.error(e); view.innerHTML = `<div class="empty-state"><h2>Halaman gagal ditampilkan</h2><p class="muted">${esc(e.message)}</p></div>`; }
+  try { fn(view); lockScopedSelects(view); if ((App.loadWarn || []).length) view.insertAdjacentHTML('afterbegin', `<div class="note" style="margin-bottom:14px">Sebagian data belum termuat (${esc(App.loadWarn.join(', '))}). Tekan <b>Muat ulang</b> di kanan atas untuk mencoba lagi.</div>`); } catch (e) { console.error(e); view.innerHTML = `<div class="empty-state"><h2>Halaman gagal ditampilkan</h2><p class="muted">${esc(e.message)}</p></div>`; }
 }
 
 /* ================= komponen ================= */
@@ -1885,7 +1906,7 @@ function pageRA(view) {
   const maxU = Math.max(2, ...[...byDay.values()].map(y => y.trx.size ? y.q / y.trx.size : 0));
   const tileHtml = (arr, cls) => arr.map(([lbl, r, f]) => `<div class="ra-tile ${cls}"><span>${lbl}</span><b>${r ? esc(r.sp) : '–'}</b><small>${r ? f(r) + ' · ' + esc(sName(r.s)) : 'belum ada'}</small></div>`).join('');
   view.innerHTML = `<div class="stack">
-    <div class="filters" style="margin:0"><label class="small muted" for="raStore">Location</label><select id="raStore" class="inp"><option value="">Semua toko</option>${codes.map(c => `<option value="${esc(c)}" ${c === st ? 'selected' : ''}>${esc(c)} - ${esc(sName(c))}</option>`).join('')}</select>
+    <div class="filters" style="margin:0"><label class="small muted" for="raStore">Toko</label><select id="raStore" class="inp"><option value="">Semua toko</option>${codes.map(c => `<option value="${esc(c)}" ${c === st ? 'selected' : ''}>${esc(c)} - ${esc(sName(c))}</option>`).join('')}</select>
       <label class="small muted" for="raMin">Min. transaksi untuk peringkat</label><input type="number" id="raMin" class="inp sm" style="width:80px" min="0" value="${minT}">
       <span style="flex:1"></span><button class="btn" id="raXls">Download Excel</button></div>
     <div class="ra-tiles">${tileHtml(tiles, '')}</div>
@@ -1945,9 +1966,9 @@ function pagePareto(view) {
   gens.forEach(x => { run += x.v; x.cum = totV ? run / totV : 0; x.share = totV ? x.v / totV : 0; x.cls = x.cum - x.share < .8 ? 'A' : x.cum - x.share < .95 ? 'B' : 'C'; if (x.cls === 'A') n80++; });
   const cnt = c => gens.filter(x => x.cls === c).length;
   view.innerHTML = `<div class="stack">
-    <div class="filters" style="margin:0"><label class="small muted" for="ptStore">Location</label><select id="ptStore" class="inp"><option value="">Semua toko</option>${codes.map(c => `<option value="${esc(c)}" ${c === st ? 'selected' : ''}>${esc(c)} - ${esc(sName(c))}</option>`).join('')}</select></div>
+    <div class="filters" style="margin:0"><label class="small muted" for="ptStore">Toko</label><select id="ptStore" class="inp"><option value="">Semua toko</option>${codes.map(c => `<option value="${esc(c)}" ${c === st ? 'selected' : ''}>${esc(c)} - ${esc(sName(c))}</option>`).join('')}</select></div>
     <div class="pt-tiles">${tile('Trans', fmtN(A.trx), gr(A.trx, B.trx))}${tile('Quantity', fmtN(A.q), gr(A.q, B.q))}${tile('UPT', A.upt == null ? '–' : fmtX(A.upt, 2), gr(A.upt, B.upt))}${tile('Basket Size', A.bs == null ? '–' : fmtRpS(A.bs).replace('Rp ', ''), gr(A.bs, B.bs))}</div>
-    <div class="grid g4">${[['gd', 'Category Gender'], ['l2', 'Category Lv. 2'], ['l3', 'Category Lv. 3'], ['l4', 'Category Lv. 4']].map(([k, t]) => `<section class="card"><div class="card-h"><h3>${t}</h3></div><div class="donut"><canvas id="dn_${k}"></canvas></div><div id="tb_${k}" style="margin-top:10px"></div></section>`).join('')}</div>
+    <div class="grid g4">${[['gd', 'Category Gender'], ['l2', 'Category Lv. 2'], ['l3', 'Category Lv. 3'], ['l4', 'Category Lv. 4']].map(([k, t]) => `<section class="card"><div class="card-h"><h3>${t}</h3></div><div class="donut"><canvas id="dn_${k}"></canvas></div><div id="tb_${k}" class="cat-box"></div></section>`).join('')}</div>
     <section class="card"><div class="card-h"><h3>Pareto produk (generic)</h3><p class="small muted"><b>${fmtN(n80)}</b> dari ${fmtN(gens.length)} generic (${fmtPct(gens.length ? n80 / gens.length : null, 0)}) menghasilkan 80% sales</p></div>
       <div class="chart-box"><canvas id="cPareto"></canvas></div>
       <div class="legend"><span><span class="abc A">A</span> penyumbang 80% sales pertama (${fmtN(cnt('A'))} generic)</span><span><span class="abc B">B</span> 15% berikutnya (${fmtN(cnt('B'))})</span><span><span class="abc C">C</span> 5% terakhir (${fmtN(cnt('C'))})</span></div></section>
@@ -2024,7 +2045,7 @@ function pageLost(view) {
   const stockAll = a => { let t = 0; const per = []; for (const c of storeCodes()) { const s = stockByArt(c).get(a); if (s && s.t > 0) { t += s.t; per.push([c, s.t]); } } per.sort((x, y) => y[1] - x[1]); return { t, per }; };
   view.innerHTML = `<div class="stack">
     <div class="filters" style="margin:0"><label class="small muted" for="lsM">Bulan</label><select id="lsM" class="inp">${months.map(x => `<option value="${x}" ${x === m ? 'selected' : ''}>${fmtMonth(x)}</option>`).join('')}</select>
-      <label class="small muted" for="lsStore">Location</label><select id="lsStore" class="inp"><option value="">Semua toko</option>${codes.map(c => `<option value="${esc(c)}" ${c === st ? 'selected' : ''}>${esc(c)} - ${esc(sName(c))}</option>`).join('')}</select>
+      <label class="small muted" for="lsStore">Toko</label><select id="lsStore" class="inp"><option value="">Semua toko</option>${codes.map(c => `<option value="${esc(c)}" ${c === st ? 'selected' : ''}>${esc(c)} - ${esc(sName(c))}</option>`).join('')}</select>
       <span style="flex:1"></span>${App.admin ? '<button class="btn" data-go="admin">Input lost sales</button>' : ''}<button class="btn" id="lsXls">Download Excel</button></div>
     <div class="pt-tiles" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr))">
       <div class="pt-tile"><span>Total Lost Sales</span><b>${fmtRpS(T.v)}</b>${gtxt(gr(T.v, P.v))}</div>
@@ -2036,7 +2057,10 @@ function pageLost(view) {
     ${fixed ? `<div class="note">${fixed} baris punya harga di bawah Rp1.000 (kemungkinan salah input), jadi nilainya dihitung dari harga master artikel.</div>` : ''}
     <div class="grid g2">
       <section class="card"><div class="card-h"><h3>Lost sales harian</h3><p class="small muted">batang = nilai, garis = jumlah input</p></div><div class="chart-box"><canvas id="lsDay"></canvas></div></section>
-      <section class="card"><div class="card-h"><h3>Alasan lost sales</h3><p class="small muted">dikelompokkan dari kolom Reason</p></div><div class="chart-box"><canvas id="lsRs"></canvas></div></section>
+      <div class="stack">
+        <section class="card"><div class="card-h"><h3>Alasan lost sales</h3><p class="small muted">dikelompokkan dari kolom Reason</p></div><div class="chart-box" style="min-height:200px"><canvas id="lsRs"></canvas></div></section>
+        <section class="card"><div class="card-h"><h3>Type</h3><p class="small muted">NOI / NOS</p></div><div class="chart-box" style="min-height:150px"><canvas id="lsTy"></canvas></div></section>
+      </div>
     </div>
     <div class="grid g2">
       <section class="card"><div class="card-h"><h3>Per toko</h3><p class="small muted">klik untuk filter</p></div><div id="lsStoreT"></div></section>
@@ -2046,10 +2070,7 @@ function pageLost(view) {
       </div>
     </div>
     <section class="card"><div class="card-h"><h3>Artikel paling sering dicari tapi tidak terlayani</h3><p class="small muted">dengan stok area saat ini, untuk bahan transfer / order</p></div><div id="lsArtT"></div></section>
-    <div class="grid g2">
-      <section class="card"><div class="card-h"><h3>Type</h3></div><div class="donut"><canvas id="lsTy"></canvas></div></section>
-      <section class="card"><div class="card-h"><h3>Alasan asli (Reason)</h3></div><div id="lsRawT"></div></section>
-    </div>
+    <section class="card"><div class="card-h"><h3>Alasan asli (Reason)</h3><p class="small muted">teks asli dari input toko beserta kelompoknya</p></div><div id="lsRawT"></div></section>
     ${App.admin ? '<section class="card"><div class="card-h"><h3>Detail input</h3><p class="small muted">hanya admin</p></div><div id="lsDetT"></div></section>' : ''}
   </div>`;
   const ink = css('--muted');
@@ -2059,7 +2080,7 @@ function pageLost(view) {
   hbar('#lsL3', byL3, css('--bad')); hbar('#lsL4', byL4.slice(0, 10), css('--orange'));
   if (typeof Chart !== 'undefined') {
     App.charts.push(new Chart($('#lsRs'), { type: 'doughnut', data: { labels: byRs.map(x => x.k), datasets: [{ data: byRs.map(x => x.n), backgroundColor: PAL, borderWidth: 1 }] }, options: { maintainAspectRatio: false, cutout: '55%', plugins: { legend: { position: 'right', labels: { color: ink, boxWidth: 10, font: { size: 11 } } }, tooltip: { callbacks: { label: c => c.label + ': ' + c.parsed + ' input · ' + fmtRpS(byRs[c.dataIndex].v) } } } } }));
-    App.charts.push(new Chart($('#lsTy'), { type: 'doughnut', data: { labels: byTy.map(x => x.k), datasets: [{ data: byTy.map(x => x.n), backgroundColor: PAL, borderWidth: 1 }] }, options: { maintainAspectRatio: false, cutout: '55%', plugins: { legend: { position: 'bottom', labels: { color: ink, boxWidth: 10 } }, tooltip: { callbacks: { label: c => c.label + ': ' + c.parsed + ' input · ' + fmtRpS(byTy[c.dataIndex].v) } } } } }));
+    App.charts.push(new Chart($('#lsTy'), { type: 'doughnut', data: { labels: byTy.map(x => x.k), datasets: [{ data: byTy.map(x => x.n), backgroundColor: PAL, borderWidth: 1 }] }, options: { maintainAspectRatio: false, cutout: '55%', plugins: { legend: { position: 'right', labels: { color: ink, boxWidth: 10 } }, tooltip: { callbacks: { label: c => c.label + ': ' + c.parsed + ' input · ' + fmtRpS(byTy[c.dataIndex].v) } } } } }));
   }
   $('#lsStoreT').innerHTML = tbl('lsStore', { rows: byStore.map(g => ({ c: g.k, name: sName(g.k), q: g.q, v: g.v, n: g.n, ratio: salesBy.get(g.k) ? g.v / salesBy.get(g.k) : null })), sort: { k: 'q', dir: 'desc' }, limit: 40, onRow: r => { App.ui.lsStore = r.c; render(); window.scrollTo(0, 0); }, cols: [
     { k: 'c', label: 'Site', h: r => `<span class="tn">${esc(r.c)}</span>` }, { k: 'name', label: 'Location name', h: r => `<b class="small">${esc(r.name)}</b>` },
@@ -2122,7 +2143,7 @@ function pagePromoStock(view) {
   /* per artikel-warna */
   const byK = new Map(); for (const r of F) { const x = byK.get(r.key) || { key: r.key, art: r.art, n: r.n, color: r.key.split('.').slice(1).join('.'), d: r.d, p: r.p, l4: r.l4, pcs: 0, stores: new Set(), rs: [] }; x.pcs += r.t; x.stores.add(r.c); x.rs.push(r); byK.set(r.key, x); }
   view.innerHTML = `<div class="stack">
-    <div class="filters" style="margin:0"><label class="small muted" for="psStore">Location</label><select id="psStore" class="inp"><option value="">Semua toko</option>${codes.map(c => `<option value="${esc(c)}" ${c === st ? 'selected' : ''}>${esc(c)} - ${esc(sName(c))}</option>`).join('')}</select>
+    <div class="filters" style="margin:0"><label class="small muted" for="psStore">Toko</label><select id="psStore" class="inp"><option value="">Semua toko</option>${codes.map(c => `<option value="${esc(c)}" ${c === st ? 'selected' : ''}>${esc(c)} - ${esc(sName(c))}</option>`).join('')}</select>
       <label class="small muted" for="psD">Diskon</label><select id="psD" class="inp"><option value="">Semua</option>${discs.map(d => `<option value="${d}" ${String(d) === String(U.psD) ? 'selected' : ''}>${d}%</option>`).join('')}</select>
       <label class="small muted" for="psL2">MC Lv2</label><select id="psL2" class="inp"><option value="">Semua</option>${l2s.map(x => `<option ${x === U.psL2 ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select>
       <span class="small muted">Terjual = ${esc(R.label.toLowerCase())}</span></div>
@@ -2136,15 +2157,15 @@ function pagePromoStock(view) {
     <section class="card"><div class="card-h"><h3>Detail stok per MC Lv2 › Lv3 › Lv4</h3><p class="small muted">klik baris untuk membuka / menutup</p></div>
       <div class="tbl-wrap"><table class="tbl tree"><thead><tr><th>Kategori</th><th class="r">Artikel</th><th class="r">Stok (pcs)</th><th class="r">% stok</th><th class="r">Nilai stok</th><th class="r">Terjual</th><th class="r">Sales</th><th class="r">Cover (bln)</th></tr></thead><tbody>${trs || '<tr><td colspan="8" class="empty">Tidak ada stok barang promo.</td></tr>'}</tbody></table></div>
       <div class="row-act"><button class="btn sm" id="psAll">Buka semua</button><button class="btn sm" id="psNone">Tutup semua</button></div></section>
-    <div class="grid g2">
+    ${byS.size > 1 ? `<div class="grid g2">
       <section class="card"><div class="card-h"><h3>Stok per besaran diskon</h3></div><div class="chart-box"><canvas id="psDisc"></canvas></div></section>
       <section class="card"><div class="card-h"><h3>Per toko</h3><p class="small muted">klik untuk filter</p></div><div id="psStoreT"></div></section>
-    </div>
+    </div>` : `<section class="card"><div class="card-h"><h3>Stok per besaran diskon</h3></div><div class="chart-box" style="height:240px"><canvas id="psDisc"></canvas></div></section>`}
     <section class="card"><div class="card-h"><h3>Artikel DCNP/SMDS</h3><p class="small muted">${fmtN(byK.size)} artikel-warna · klik untuk detail</p></div><div id="psArtT"></div></section>
     <p class="small muted">List promo diambil otomatis dari Katalog Produk (${esc(MS.promo.source || '')}, dibuat ${esc(MS.promo.generated || '')}). Stok = stok terakhir per toko dari Export by Bin. Cover = stok ÷ rata-rata terjual per bulan pada periode terpilih.</p>
   </div>`;
   if (typeof Chart !== 'undefined') { const ds = [...byD.keys()].sort((a, b) => a - b); App.charts.length; mkDual($('#psDisc'), ds.map(d => d + '%'), ds.map(d => byD.get(d).pcs), ds.map(d => byD.get(d).val), 'Stok (pcs)', 'Nilai stok', v => fmtN(v), v => fmtRpS(v)); }
-  $('#psStoreT').innerHTML = tbl('psStore', { rows: [...byS.entries()].map(([c, x]) => ({ c, name: sName(c), pcs: x.pcs, val: x.val, n: x.keys.size, share: storePcs(c) ? x.pcs / storePcs(c) : null })), sort: { k: 'pcs', dir: 'desc' }, limit: 40, onRow: r => { App.ui.psStore = r.c; render(); window.scrollTo(0, 0); }, cols: [
+  if ($('#psStoreT')) $('#psStoreT').innerHTML = tbl('psStore', { rows: [...byS.entries()].map(([c, x]) => ({ c, name: sName(c), pcs: x.pcs, val: x.val, n: x.keys.size, share: storePcs(c) ? x.pcs / storePcs(c) : null })), sort: { k: 'pcs', dir: 'desc' }, limit: 40, onRow: r => { App.ui.psStore = r.c; render(); window.scrollTo(0, 0); }, cols: [
     { k: 'name', label: 'Toko', h: r => `<span class="nm">${esc(r.name)}</span><span class="sub">${esc(r.c)}</span>` }, { k: 'n', label: 'Artikel', r: 1, h: r => fmtN(r.n) }, { k: 'pcs', label: 'Stok', r: 1, h: r => fmtN(r.pcs) },
     { k: 'share', label: '% stok toko', r: 1, h: r => fmtPct(r.share, 1) }, { k: 'val', label: 'Nilai', r: 1, h: r => fmtRpS(r.val) }] });
   $('#psArtT').innerHTML = tbl('psArt', { rows: [...byK.values()].map(x => { const sd = soldOf(x.rs); return { art: x.art, n: x.n, color: x.color, d: x.d, p: x.p, l4: x.l4, pcs: x.pcs, ns: x.stores.size, q: sd.q, val: x.pcs * x.p }; }), sort: { k: 'pcs', dir: 'desc' }, limit: 30, onRow: r => openProduct(r.art, st || null), cols: [
@@ -2436,13 +2457,11 @@ function pageStore(view) {
     <section class="card"><div class="card-h"><h3>Growth vs tahun lalu</h3><p class="small muted" id="sgSub">memuat data tahun lalu…</p></div><div id="sgBox"></div></section>
     <div class="grid g2">
       <section class="card"><div class="card-h"><h3>Penjualan harian</h3></div><div class="chart-box"><canvas id="trend"></canvas></div></section>
-      <section class="card"><div class="card-h"><h3>Kesehatan stok</h3><p class="small muted">${H && H.hasStock ? 'penjualan ' + H.days + ' hari data terakhir vs stok' : 'stok toko ini belum diupload'}</p></div><div id="hl"></div></section>
-    </div>
-    <section class="card"><div class="card-h"><h3>Produk terlaris</h3><p class="small muted">per artikel, klik untuk detail</p></div><div id="prodT"></div></section>
-    <div class="grid g2">
-      <section class="card"><div class="card-h"><h3>Sales person</h3></div><div id="spT"></div></section>
       <section class="card"><div class="card-h"><h3>Kategori</h3></div><div id="cats"></div></section>
     </div>
+    <section class="card"><div class="card-h"><h3>Kesehatan stok</h3><p class="small muted">${H && H.hasStock ? 'penjualan ' + H.days + ' hari data terakhir vs stok' : 'stok toko ini belum diupload'}</p></div><div id="hl"></div></section>
+    <section class="card"><div class="card-h"><h3>Produk terlaris</h3><p class="small muted">per artikel, klik untuk detail</p></div><div id="prodT"></div></section>
+    <section class="card"><div class="card-h"><h3>Sales person</h3></div><div id="spT"></div></section>
   </div>`;
   trendChart($('#trend'), R, cur, prev, c);
   storeGrowth(c, last && last < R.to ? last : R.to);
@@ -3076,6 +3095,7 @@ document.addEventListener('input', e => {
 });
 document.addEventListener('change', async e => {
   const t = e.target;
+  if (t.closest && (t.closest('.filters') || t.closest('.phead') || t.closest('.card-h'))) App.ui.more = {};
   if (App.page === 'settings' && settingsChange(t)) return;
   if (t.id === 'perSel' || t.id === 'rFrom' || t.id === 'rTo') { await onPeriodChange(); return; }
   if (t.id === 'dtStore') { App.ui.dtStore = t.value; App.ui.more = {}; render(); return; }

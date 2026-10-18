@@ -299,6 +299,16 @@ table.tbl{width:100%;border-collapse:collapse;font-size:13.5px}
 .tree tr.lv1,.tree tr.lv2{cursor:pointer}
 .tree .car{display:inline-block;width:14px;color:var(--muted)}
 .disc{display:inline-block;background:var(--orange);color:#fff;font-weight:800;font-size:11px;border-radius:5px;padding:1px 6px}
+.dt-row{display:grid;grid-template-columns:minmax(150px,220px) minmax(0,1fr) minmax(0,1fr);gap:14px;align-items:center;padding:6px 4px;border-bottom:1px solid var(--line);cursor:pointer}
+.dt-row:hover{background:var(--navy-tint)}
+.dt-row .nm{font-weight:700;font-size:13px;line-height:1.2}.dt-row .nm small{display:block;font-weight:500;color:var(--muted);font-size:11px}
+.dt-bar{display:grid;grid-template-columns:52px minmax(0,1fr);gap:8px;align-items:center;font-size:12px}
+.dt-bar b{font-family:var(--font-mono);text-align:right}
+.dt-track{position:relative;height:10px;background:var(--navy-tint);border-radius:999px}
+.dt-track i{position:absolute;left:0;top:0;bottom:0;border-radius:999px}
+.dt-track u{position:absolute;top:-4px;bottom:-4px;left:95%;width:2px;background:var(--ink);opacity:.5}
+.lv-ok{background:var(--ok)}.lv-mid{background:var(--orange)}.lv-low{background:var(--bad)}
+@media (max-width:640px){.dt-row{grid-template-columns:1fr}}
 .ra-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
 .ra-tile{background:#0F3192;color:#fff;border-radius:10px;padding:12px 16px;text-align:center}
 .ra-tile span{display:block;font-size:12px;font-weight:600;color:#C9D3F0}
@@ -509,7 +519,8 @@ function parseInv(rows, hi, h, fileName) {
   const C = {
     name: colIdx(h, 'skuname', 'itemname'), sku: colIdx(h, 'skucode', 'sku'), zone: colIdx(h, 'zonecode', 'zone'),
     c2: colIdx(h, 'mclv2'), c3: colIdx(h, 'mclv3', 'categorylv3'), c4: colIdx(h, 'mclv4', 'categorylv4'),
-    cat: colIdx(h, 'bincategory'), tq: colIdx(h, 'totalqty', 'totalquantity'), loc: colIdx(h, 'location')
+    cat: colIdx(h, 'bincategory'), tq: colIdx(h, 'totalqty', 'totalquantity'), loc: colIdx(h, 'location'),
+    bin: colIdx(h, 'bincode'), av: colIdx(h, 'availableqty', 'availqty', 'available')
   };
   if (C.sku < 0 || C.tq < 0 || C.loc < 0) throw new Error('Kolom wajib Export by Bin tidak lengkap (SKU Code, Total Qty, Location).');
   const clean = v => { const s = String(v ?? '').trim(); return /^\d+$/.test(s) ? '' : s; };
@@ -523,8 +534,15 @@ function parseInv(rows, hi, h, fileName) {
     const loc = parseLoc(r[C.loc]); if (!loc) continue;
     const S = stores[loc.code] || (stores[loc.code] = { code: loc.code, name: loc.name, items: {}, meta: {}, pcs: 0 });
     const q = numV(r[C.tq]);
-    const e = S.items[sku] || (S.items[sku] = [0, 0, 0]);
+    const e = S.items[sku] || (S.items[sku] = [0, 0, 0, 0, 0, 0]);
     e[0] += q; if (/sales|pos|display/i.test(zone)) e[1] += q; else e[2] += q;
+    /* Detention Stock: gudang = zone Warehouse dengan Available Qty > 0; selling area = zone Sales Area atau bin awalan S (SA-, SB-, …); bin Booking (SA-BO) diabaikan */
+    const z = zone.trim().toLowerCase(), bin = C.bin >= 0 ? String(r[C.bin] ?? '').trim() : '';
+    const booking = /^SA-BO/i.test(bin) || z === 'booking area';
+    if (!booking) {
+      if (z === 'warehouse') { const av = C.av >= 0 ? numV(r[C.av]) : q; if (av > 0) e[3] += av; }
+      if (z === 'sales area' || /^S[A-Z]-/i.test(bin)) { e[4] += Math.max(0, q); e[5] = 1; }
+    }
     S.pcs += q;
     if (!S.meta[sku]) S.meta[sku] = [String(r[C.name] ?? '').trim(), clean(r[C.c3]), clean(r[C.c4]), clean(r[C.c2])];
     n++;
@@ -1122,7 +1140,7 @@ const ICON = {
 };
 const NAV = [
   { k: 'sales', label: 'Sales Performance', icon: 'area', items: [['report', 'Monitoring Sales', 'Achievement, UPT & basket size'], ['trend', 'Sales Trend', 'Jam, hari, UPT & basket harian'], ['promo', 'Kontribusi Promo', 'Porsi tiap promo terhadap sales'], ['omni', 'Monitoring OmniChannel', 'EA, Eigerindo Voucher, Tax Invoice, EASAP'], ['eac', 'Sales Member EAC', 'KPI penjualan ke member'], ['ra', 'RA Performance', 'Transaksi, UPT & basket per sales person'], ['pareto', 'Product Pareto', 'Kontribusi kategori & produk (80/20)']] },
-  { k: 'inv', label: 'Inventory', icon: 'produk', items: [['produk', 'Produk', 'Penjualan & stok per artikel'], ['stok', 'Kesehatan Produk', 'SSR, dead stock, saran transfer'], ['promostock', 'Stok DCNP/SMDS', 'Stok barang diskon per MC Lv2–Lv4']] },
+  { k: 'inv', label: 'Inventory', icon: 'produk', items: [['produk', 'Produk', 'Penjualan & stok per artikel'], ['stok', 'Kesehatan Produk', 'SSR, dead stock, saran transfer'], ['promostock', 'Stok DCNP/SMDS', 'Stok barang diskon per MC Lv2–Lv4'], ['detention', 'Detention Stock', '% generic & varian terdisplay per toko']] },
   { k: 'lost', label: 'Lost Sales', icon: 'lost' },
   { k: 'admin', label: 'Kelola data', icon: 'admin', admin: 1 },
   { k: 'settings', label: 'Pengaturan', icon: 'settings', admin: 1 }
@@ -1141,7 +1159,7 @@ function renderNav() {
 function renderPeriod() {
   const box = $('#periodBox');
   const tsel = hasTypes() && App.page !== 'toko' ? `<label class="small muted" for="typeSel">Jenis toko</label><select id="typeSel" class="inp"><option value="">Semua toko</option>${['rg', 'bz', 'ot'].filter(t => storeCodes().some(c => sType(c) === t)).map(t => `<option value="${t}" ${App.ui.typeF === t ? 'selected' : ''}>${TYPE_LABEL[t]}</option>`).join('')}</select>` : '';
-  if (['report', 'promo', 'omni', 'eac', 'lost'].includes(App.page)) { box.innerHTML = tsel; return; }
+  if (['report', 'promo', 'omni', 'eac', 'lost', 'detention'].includes(App.page)) { box.innerHTML = tsel; return; }
   if (!App.lastDate || App.page === 'admin' || App.page === 'settings') { box.innerHTML = ''; return; }
   const L = App.lastDate, cm = L.slice(0, 7);
   const months = Object.keys(App.index.sales).sort().reverse().filter(m => m !== cm);
@@ -1183,7 +1201,7 @@ function render() {
     return;
   }
   if (!App.lastDate && !['admin', 'stok', 'report', 'settings', 'lost'].includes(App.page)) { App.page = srLast() ? 'report' : 'stok'; }
-  const fn = { area: pageArea, report: pageReport, trend: pageTrend, promo: pagePromo, omni: pageOmni, eac: pageEac, ra: pageRA, pareto: pagePareto, lost: pageLost, promostock: pagePromoStock, toko: pageStore, produk: pageProduct, stok: pageStock, admin: pageAdmin, settings: pageSettings }[App.page] || pageReport;
+  const fn = { area: pageArea, report: pageReport, trend: pageTrend, promo: pagePromo, omni: pageOmni, eac: pageEac, ra: pageRA, pareto: pagePareto, lost: pageLost, promostock: pagePromoStock, detention: pageDetention, toko: pageStore, produk: pageProduct, stok: pageStock, admin: pageAdmin, settings: pageSettings }[App.page] || pageReport;
   try { fn(view); } catch (e) { console.error(e); view.innerHTML = `<div class="empty-state"><h2>Halaman gagal ditampilkan</h2><p class="muted">${esc(e.message)}</p></div>`; }
 }
 
@@ -2010,6 +2028,91 @@ function pagePromoStock(view) {
     { k: 'pcs', label: 'Stok', r: 1, h: r => `<b>${fmtN(r.pcs)}</b>` }, { k: 'ns', label: 'Toko', r: 1, h: r => fmtN(r.ns) }, { k: 'q', label: 'Terjual', r: 1, h: r => fmtN(r.q) }, { k: 'val', label: 'Nilai stok', r: 1, h: r => fmtRpS(r.val) }] });
 }
 
+/* ================= halaman: Detention Stock (logika repo Detention Stock, sudut pandang BM) ================= */
+const DET_TARGET = 0.95;
+const detColor = sku => { const p = String((App.sku[sku] || [])[0] || '').split(','); return p.length >= 3 ? p[p.length - 2].trim().toUpperCase() : colorOfSku(sku); };
+const detMC = (art, sku) => { const M = artMaster(art), d = App.sku[sku] || []; return { l2: (M && M.l2) || d[3] || '–', l3: (M && M.l3) || d[1] || '–', l4: (M && M.l4) || d[2] || '–' }; };
+function detOf(c) {
+  const k = 'det:' + c; if (App.cache[k]) return App.cache[k];
+  const S = App.stock[c]; if (!S) return null;
+  const items = S.items; if (!Object.values(items).some(e => e.length >= 6)) return (App.cache[k] = { old: true, date: S.date });
+  const G = new Map(), V = new Map();
+  for (const sku in items) {
+    const e = items[sku], g = artOf(sku); if (/^(98|81)/.test(g)) continue;
+    const col = detColor(sku), vk = g + '|' + col;
+    let x = G.get(g); if (!x) G.set(g, x = { g, sku, wh: 0, sa: false, saQ: 0, whCols: new Set(), saCols: new Set() });
+    let y = V.get(vk); if (!y) V.set(vk, y = { g, col, sku, wh: 0, sa: false });
+    if (e[3] > 0) { x.wh += e[3]; x.whCols.add(col); y.wh += e[3]; }
+    if (e[5]) { x.sa = true; x.saQ += e[4] || 0; x.saCols.add(col); y.sa = true; }
+  }
+  const gw = [...G.values()].filter(x => x.wh > 0), vw = [...V.values()].filter(y => y.wh > 0);
+  const gs = gw.filter(x => x.sa).length, vs = vw.filter(y => y.sa).length;
+  return (App.cache[k] = { date: S.date, gW: gw.length, gS: gs, gP: gw.length ? gs / gw.length : 1, vW: vw.length, vS: vs, vP: vw.length ? vs / vw.length : 1, G: gw, V: vw });
+}
+const lvCls = p => p >= DET_TARGET ? 'lv-ok' : p >= .8 ? 'lv-mid' : 'lv-low';
+function pageDetention(view) {
+  const U = App.ui, codes = activeStores().filter(c => App.stock[c]);
+  setHead('Detention Stock', 'Persentase generic & varian yang sudah terdisplay di selling area · target 95%');
+  if (!codes.length) { view.innerHTML = '<div class="empty-state"><h2>Belum ada data stok</h2><p class="muted">Upload Export by Bin di Kelola data.</p></div>'; return; }
+  const st = U.dtStore && codes.includes(U.dtStore) ? U.dtStore : '';
+  const basis = U.dtBasis || 'g', lvl = U.dtLvl || 'l3';
+  const D = codes.map(c => ({ c, ...(detOf(c) || {}) }));
+  const ok = D.filter(d => !d.old), old = D.filter(d => d.old);
+  const sum = ok.reduce((a, d) => { a.gW += d.gW; a.gS += d.gS; a.vW += d.vW; a.vS += d.vS; return a; }, { gW: 0, gS: 0, vW: 0, vS: 0 });
+  const areaG = sum.gW ? sum.gS / sum.gW : null, areaV = sum.vW ? sum.vS / sum.vW : null;
+  const reach = ok.filter(d => (basis === 'g' ? d.gP : d.vP) >= DET_TARGET).length;
+  const worst = ok.slice().sort((a, b) => (basis === 'g' ? a.gP - b.gP : a.vP - b.vP))[0];
+  const bar = (p, lbl) => `<div class="dt-bar"><b>${fmtPct(p, 1)}</b><div class="dt-track" title="${lbl}"><i class="${lvCls(p)}" style="width:${Math.min(100, p * 100)}%"></i><u></u></div></div>`;
+  /* breakdown per MC (area atau toko terpilih) */
+  const scope = st ? ok.filter(d => d.c === st) : ok;
+  const MC = new Map();
+  for (const d of scope) { const list = basis === 'g' ? d.G : d.V; for (const x of list) { const mc = detMC(x.g, x.sku)[lvl]; const m = MC.get(mc) || { k: mc, w: 0, s: 0 }; m.w++; if (x.sa) m.s++; MC.set(mc, m); } }
+  const mcRows = [...MC.values()].map(m => ({ ...m, miss: m.w - m.s, p: m.w ? m.s / m.w : 1 }));
+  const sel = st ? ok.find(d => d.c === st) : null;
+  view.innerHTML = `<div class="stack">
+    <div class="filters" style="margin:0"><label class="small muted" for="dtStore">Toko</label><select id="dtStore" class="inp"><option value="">Semua toko (BM)</option>${codes.map(c => `<option value="${esc(c)}" ${c === st ? 'selected' : ''}>${esc(c)} - ${esc(sName(c))}</option>`).join('')}</select>
+      <div class="seg" role="group" aria-label="Basis"><button data-dtb="g" class="${basis === 'g' ? 'on' : ''}">Generic</button><button data-dtb="v" class="${basis === 'v' ? 'on' : ''}">Varian (generic + warna)</button></div>
+      <span style="flex:1"></span><button class="btn" id="dtXls">Download Excel</button></div>
+    ${old.length ? `<div class="note">${old.length} toko masih memakai data stok format lama (${old.map(d => esc(sName(d.c))).join(', ')}). Upload ulang Export by Bin toko tersebut agar ikut terhitung.</div>` : ''}
+    <div class="pt-tiles" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr))">
+      <div class="pt-tile" style="background:${areaG != null && areaG >= DET_TARGET ? '#13806F' : '#0F3192'}"><span>Generic terdisplay${st ? '' : ' (area)'}</span><b>${fmtPct(st && sel ? sel.gP : areaG, 1)}</b><small>${fmtN(st && sel ? sel.gS : sum.gS)} dari ${fmtN(st && sel ? sel.gW : sum.gW)} generic di gudang</small></div>
+      <div class="pt-tile" style="background:${areaV != null && areaV >= DET_TARGET ? '#13806F' : '#0F3192'}"><span>Varian terdisplay${st ? '' : ' (area)'}</span><b>${fmtPct(st && sel ? sel.vP : areaV, 1)}</b><small>${fmtN(st && sel ? sel.vS : sum.vS)} dari ${fmtN(st && sel ? sel.vW : sum.vW)} varian di gudang</small></div>
+      <div class="pt-tile"><span>Toko capai target 95%</span><b>${reach} / ${ok.length}</b><small>basis ${basis === 'g' ? 'generic' : 'varian'}</small></div>
+      <div class="pt-tile" style="background:#0B1B4A"><span>Toko terendah</span><b style="font-size:19px">${worst ? esc(sName(worst.c)) : '–'}</b><small>${worst ? fmtPct(basis === 'g' ? worst.gP : worst.vP, 1) : ''}</small></div>
+    </div>
+    <section class="card"><div class="card-h"><h3>Coverage display per toko</h3><p class="small muted">kiri = generic · kanan = varian · garis = target 95% · klik toko untuk detail</p></div>
+      <div>${ok.slice().sort((a, b) => (basis === 'g' ? a.gP - b.gP : a.vP - b.vP)).map(d => `<div class="dt-row" data-dtstore="${esc(d.c)}"><div class="nm">${esc(sName(d.c))}<small>${esc(d.c)} · stok per ${fmtDateS(d.date)}</small></div>${bar(d.gP, 'Generic')}${bar(d.vP, 'Varian')}</div>`).join('')}</div></section>
+    <section class="card"><div class="card-h"><h3>Rekap per toko</h3></div><div id="dtStoreT"></div></section>
+    <section class="card"><div class="card-h"><h3>% terdisplay per MC${st ? ' · ' + esc(sName(st)) : ' · semua toko'}</h3>
+      <div class="seg" role="group" aria-label="Level MC">${[['l2', 'MC Lv2'], ['l3', 'MC Lv3'], ['l4', 'MC Lv4']].map(([k, l]) => `<button data-dtl="${k}" class="${lvl === k ? 'on' : ''}">${l}</button>`).join('')}</div></div><div id="dtMcT"></div></section>
+    ${sel ? `<section class="card"><div class="card-h"><h3>${basis === 'g' ? 'Generic' : 'Varian'} belum terdisplay · ${esc(sName(st))}</h3><p class="small muted">ada stok tersedia di gudang, belum ada di selling area</p></div><div id="dtMissT"></div></section>` : '<p class="small muted">Pilih satu toko (atau klik toko di grafik) untuk melihat daftar artikel yang belum terdisplay.</p>'}
+    <p class="small muted">Logika sama dengan tools Detention Stock: dihitung dari Export by Bin. Gudang = zone Warehouse dengan Available Qty &gt; 0. Terdisplay = ada di zone Sales Area atau bin Selling area (awalan S, mis. SA-, SB-). Bin Booking (SA-BO) dan artikel bukan barang jual (kode awalan 98 & 81) tidak dihitung. % = terdisplay ÷ yang ada di gudang.</p>
+  </div>`;
+  $('#dtStoreT').innerHTML = tbl('dtStore', { rows: ok.map(d => ({ c: d.c, name: sName(d.c), date: d.date, gW: d.gW, gS: d.gS, gM: d.gW - d.gS, gP: d.gP, vW: d.vW, vS: d.vS, vM: d.vW - d.vS, vP: d.vP })), sort: { k: basis === 'g' ? 'gP' : 'vP', dir: 'asc' }, limit: 40, onRow: r => { App.ui.dtStore = r.c; render(); window.scrollTo(0, 0); }, cols: [
+    { k: 'name', label: 'Toko', h: r => `<span class="nm">${esc(r.name)}</span><span class="sub">${esc(r.c)} · ${fmtDateS(r.date)}</span>` },
+    { k: 'gW', label: 'Generic gudang', r: 1, h: r => fmtN(r.gW) }, { k: 'gS', label: 'Terdisplay', r: 1, h: r => fmtN(r.gS) }, { k: 'gM', label: 'Belum', r: 1, h: r => `<b style="color:${r.gM ? 'var(--bad)' : 'inherit'}">${fmtN(r.gM)}</b>` }, { k: 'gP', label: '% generic', r: 1, h: r => `<b style="color:${r.gP >= DET_TARGET ? 'var(--ok)' : r.gP >= .8 ? 'var(--orange-deep)' : 'var(--bad)'}">${fmtPct(r.gP, 1)}</b>` },
+    { k: 'vW', label: 'Varian gudang', r: 1, h: r => fmtN(r.vW) }, { k: 'vM', label: 'Belum', r: 1, h: r => fmtN(r.vM) }, { k: 'vP', label: '% varian', r: 1, h: r => `<b style="color:${r.vP >= DET_TARGET ? 'var(--ok)' : r.vP >= .8 ? 'var(--orange-deep)' : 'var(--bad)'}">${fmtPct(r.vP, 1)}</b>` }] });
+  $('#dtMcT').innerHTML = tbl('dtMc', { rows: mcRows, sort: { k: 'p', dir: 'asc' }, limit: 30, cols: [
+    { k: 'k', label: 'MC', h: r => `<b class="small">${esc(r.k)}</b>` }, { k: 'w', label: basis === 'g' ? 'Generic gudang' : 'Varian gudang', r: 1, h: r => fmtN(r.w) }, { k: 's', label: 'Terdisplay', r: 1, h: r => fmtN(r.s) },
+    { k: 'miss', label: 'Belum', r: 1, h: r => fmtN(r.miss) }, { k: 'p', label: '% terdisplay', ns: 0, h: r => `<div style="min-width:160px">${bar(r.p, r.k)}</div>` }] });
+  if (sel) {
+    const list = (basis === 'g' ? sel.G : sel.V).filter(x => !x.sa).map(x => { const mc = detMC(x.g, x.sku); return { art: x.g, name: artInfo(x.g).name, col: basis === 'g' ? [...x.whCols].join(', ') : x.col, wh: x.wh, l3: mc.l3, l4: mc.l4, part: basis === 'g' ? '' : (sel.G.find(g => g.g === x.g && g.sa) ? 'warna lain sudah dipajang' : 'generic belum dipajang') }; });
+    $('#dtMissT').innerHTML = tbl('dtMiss', { rows: list, sort: { k: 'wh', dir: 'desc' }, limit: 30, onRow: r => openProduct(r.art, st), cols: [
+      { k: 'name', label: 'Artikel', h: r => prodCell(r.art, r.name, r.art + ' · ' + r.l3 + ' › ' + r.l4) }, { k: 'col', label: basis === 'g' ? 'Warna di gudang' : 'Warna', h: r => `<span class="small">${esc(r.col || '–')}</span>${r.part ? `<span class="sub">${esc(r.part)}</span>` : ''}` },
+      { k: 'wh', label: 'Qty gudang', r: 1, h: r => `<b>${fmtN(r.wh)}</b>` }] });
+  }
+  App.ui.dtLast = { ok, mcRows, basis, lvl, st };
+}
+async function exportDetention() {
+  const X = App.ui.dtLast; if (!X || typeof XLSX === 'undefined') return;
+  const a1 = [['Toko', 'Kode', 'Stok per', 'Generic gudang', 'Generic terdisplay', '% generic', 'Varian gudang', 'Varian terdisplay', '% varian'], ...X.ok.map(d => [sName(d.c), d.c, d.date, d.gW, d.gS, Math.round(d.gP * 10000) / 10000, d.vW, d.vS, Math.round(d.vP * 10000) / 10000])];
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(a1), 'Per toko');
+  const miss = [['Toko', 'Generic', 'Nama', 'Warna', 'Qty gudang', 'MC Lv3', 'MC Lv4']];
+  for (const d of X.ok) for (const x of d.G) if (!x.sa) { const mc = detMC(x.g, x.sku); miss.push([sName(d.c), x.g, artInfo(x.g).name, [...x.whCols].join(', '), x.wh, mc.l3, mc.l4]); }
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(miss), 'Generic belum display');
+  (await getDownloads()).save({ filename: `Detention_Stock_Jateng01_${todayISO()}.xlsx`, data: new Blob([XLSX.write(wb, { bookType: 'xlsx', type: 'array' })]) });
+}
+
 /* ================= halaman: per toko ================= */
 function pageStore(view) {
   const codes = storeCodes(); if (!App.ui.store || !codes.includes(App.ui.store)) App.ui.store = codes[0];
@@ -2382,7 +2485,7 @@ async function saveAll() {
     for (const p of items.filter(p => p.kind === 'INV')) {
       say('Menyimpan stok ke spreadsheet…');
       const stores = {};
-      for (const S of Object.values(p.stores)) stores[S.code] = { name: S.name, rows: Object.keys(S.items).map(k => { const mt = S.meta[k] || []; const e = S.items[k]; return [k, mt[0] || '', mt[3] || '', mt[1] || '', mt[2] || '', e[0], e[1], e[2]]; }) };
+      for (const S of Object.values(p.stores)) stores[S.code] = { name: S.name, rows: Object.keys(S.items).map(k => { const mt = S.meta[k] || []; const e = S.items[k]; return [k, mt[0] || '', mt[3] || '', mt[1] || '', mt[2] || '', e[0], e[1], e[2], e[3] || 0, e[4] || 0, e[5] || 0]; }) };
       const r = await withRetry(() => apiPost({ a: 'stock', date: p.date, stores }));
       const stScope = {}; for (const c in stores) if (!(r.skipped || []).includes(c)) stScope[c] = p.date;
       logs.push({ id: uid(), scope: { stock: stScope }, at: now, kind: 'INV', file: p.file, stores: Object.keys(p.stores).length, info: 'stok per ' + fmtDate(p.date) + ((r.skipped || []).length ? `, ${r.skipped.length} toko dilewati (sudah ada stok lebih baru)` : '') });
@@ -2606,6 +2709,10 @@ document.addEventListener('click', async e => {
   if (t.id === 'omXls') { exportOmni(); return; }
   if (t.id === 'raXls') { exportRA(); return; }
   if (t.id === 'lsXls') { exportLost(); return; }
+  if (t.id === 'dtXls') { exportDetention(); return; }
+  const dts = t.closest('[data-dtstore]'); if (dts) { App.ui.dtStore = dts.dataset.dtstore; render(); window.scrollTo(0, 0); return; }
+  const dtb = t.closest('[data-dtb]'); if (dtb) { App.ui.dtBasis = dtb.dataset.dtb; App.ui.more = {}; render(); return; }
+  const dtl = t.closest('[data-dtl]'); if (dtl) { App.ui.dtLvl = dtl.dataset.dtl; render(); return; }
   const pst = t.closest('[data-pstog]'); if (pst) { const o = App.ui.psOpen || (App.ui.psOpen = {}); o[pst.dataset.pstog] = !o[pst.dataset.pstog]; render(); return; }
   if (t.id === 'psAll' || t.id === 'psNone') { const o = App.ui.psOpen = {}; if (t.id === 'psAll') $$('[data-pstog]').forEach(x => { o[x.dataset.pstog] = true; }); if (t.id === 'psAll') { render(); $$('[data-pstog]').forEach(x => { o[x.dataset.pstog] = true; }); } render(); return; }
   const rpf = t.closest('[data-rpf]'); if (rpf) { App.ui.rpFull = rpf.dataset.rpf === '1'; render(); return; }
@@ -2639,6 +2746,7 @@ document.addEventListener('change', async e => {
   const t = e.target;
   if (App.page === 'settings' && settingsChange(t)) return;
   if (t.id === 'perSel' || t.id === 'rFrom' || t.id === 'rTo') { await onPeriodChange(); return; }
+  if (t.id === 'dtStore') { App.ui.dtStore = t.value; App.ui.more = {}; render(); return; }
   if (t.id === 'psStore') { App.ui.psStore = t.value; App.ui.more = {}; render(); return; }
   if (t.id === 'psD') { App.ui.psD = t.value; render(); return; }
   if (t.id === 'psL2') { App.ui.psL2 = t.value; render(); return; }

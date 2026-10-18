@@ -64,6 +64,10 @@ img,svg,canvas{max-width:100%}
 .data-chip{margin-left:auto;display:inline-flex;align-items:center;gap:10px;background:#EEF2FB;color:#0F3192;border-radius:999px;padding:5px 6px 5px 14px;font-size:12.5px;font-weight:600;white-space:nowrap}
 .data-chip button{border:0;background:#0F3192;color:#fff;border-radius:999px;padding:4px 12px;font-size:12px;font-weight:700}
 .data-chip button:hover{background:#0A2470}
+.data-chip button.sc{background:#fff;color:#0F3192;border:1px solid #C8D0E0;max-width:200px;overflow:hidden;text-overflow:ellipsis}
+.data-chip button.og{background:#E46636}
+.data-chip .scc{display:none}
+html,body{overflow-x:hidden}
 .nav{display:flex;flex-wrap:wrap;gap:2px;margin:0 -6px}
 .nav-g{position:relative}
 .nav-g > button .car{font-size:10px;margin-left:2px;opacity:.7}
@@ -93,6 +97,19 @@ footer{border-top:1px solid var(--line);background:var(--surface);color:var(--mu
 footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;padding-top:14px;padding-bottom:16px}
 footer strong{color:var(--navy)}
 @media (max-width:640px){
+  .brandbar .row1{gap:10px;padding-top:9px;padding-bottom:6px}
+  .brandbar .row1 > svg{width:26px;height:26px}
+  .data-chip{padding:3px;gap:4px;background:transparent}
+  .data-chip .dinfo,.data-chip .t{display:none}
+  .data-chip button{padding:6px 10px;font-size:12px;min-height:32px}
+  .data-chip button{flex:none}
+  .data-chip button.sc{max-width:none;white-space:nowrap;padding:6px 9px}
+  .data-chip .scn{display:none}.data-chip .scc{display:inline}
+  .brandbar img{height:24px}
+  .nav{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;margin:0 -12px;padding:0 6px}
+  .nav::-webkit-scrollbar{display:none}
+  .nav > *{flex:none}
+  .credit .wrap{font-size:11.5px}
   .wrap{padding:0 12px}
   .card{padding:14px 14px}
   .card-h h3{font-size:15.5px}
@@ -377,7 +394,7 @@ table.rp{border-collapse:separate;border-spacing:0;font-size:12px;width:100%;min
 </style>
 </head>
 <body>
-<div class="credit"><div class="wrap"><span><span class="dot"></span>Monitoring Penjualan <strong>Area Jateng 01</strong></span><span class="ver">PT. Eigerindo MPI &middot; Regional 3</span></div></div>
+<div class="credit"><div class="wrap"><span><span class="dot"></span>Dashboard ini dibuat oleh <strong>Fany Dzikri Hakim</strong></span><span class="ver">Monitoring Penjualan Area Jateng 01 &middot; PT. Eigerindo MPI</span></div></div>
 <header class="brandbar" id="brandbar">
   <div class="wrap">
     <div class="row1">
@@ -395,7 +412,7 @@ table.rp{border-collapse:separate;border-spacing:0;font-size:12px;width:100%;min
   <div class="period" id="periodBox"></div>
 </div></section>
 <main class="wrap"><div id="view"><div class="loading"><span class="spin"></span>Memuat data area…</div></div></main>
-<footer><div class="wrap"><span><strong>Monitoring Penjualan Jateng 01</strong> &middot; PT. Eigerindo MPI</span><span>Data dari spreadsheet master, diperbarui setiap admin mengunggah Item DSR &middot; <a href="#" id="admLink" style="color:var(--navy);font-weight:700">Kelola data (admin)</a></span></div></footer>
+<footer><div class="wrap"><span><strong>Monitoring Penjualan Jateng 01</strong> &middot; PT. Eigerindo MPI &middot; dibuat oleh <strong>Fany Dzikri Hakim</strong></span><span>Data dari spreadsheet master, diperbarui setiap admin mengunggah Item DSR &middot; <a href="#" id="admLink" style="color:var(--navy);font-weight:700">Kelola data (admin)</a></span></div></footer>
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -1190,7 +1207,7 @@ function renderNav() {
   if (om && window.innerWidth < 700) { const b = om.previousElementSibling.getBoundingClientRect(); Object.assign(om.style, { position: 'fixed', left: '10px', right: '10px', top: (b.bottom + 4) + 'px', minWidth: '0' }); }
   const L = App.lastDate;
   const RL = repLast();
-  $('#sideFoot').innerHTML = `<button id="scopeBtn" title="Ganti mode tampilan" style="background:#fff;color:#0F3192;border:1px solid #C8D0E0">${App.ui.scope ? '🏬 ' + esc(sName(App.ui.scope)) : '🏢 Branch'} ▾</button><span>${App.ui.scope ? '' : storeCodes().length + ' site · '}data s/d ${RL ? fmtDate(RL) : '–'}</span><button id="reloadBtn">Muat ulang</button>${App.admin ? `<button id="logoutBtn" style="background:#E46636">Keluar</button>` : `<button id="loginBtn" style="background:#E46636">Masuk admin</button>`}`;
+  $('#sideFoot').innerHTML = `<button id="scopeBtn" class="sc" title="Ganti mode tampilan">${App.ui.scope ? '🏬 <span class="scn">' + esc(sName(App.ui.scope)) + '</span><span class="scc">' + esc(App.ui.scope) + '</span>' : '🏢 Branch'} ▾</button><span class="dinfo">${App.ui.scope ? '' : storeCodes().length + ' site · '}data s/d ${RL ? fmtDate(RL) : '–'}</span><button id="reloadBtn" title="Muat ulang data" aria-label="Muat ulang">⟳<span class="t"> Muat ulang</span></button>${App.admin ? `<button id="logoutBtn" class="og" title="Keluar dari admin">Keluar</button>` : `<button id="loginBtn" class="og" title="Masuk admin">Admin</button>`}`;
 }
 function renderPeriod() {
   const box = $('#periodBox');

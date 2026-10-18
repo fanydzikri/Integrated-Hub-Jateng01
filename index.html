@@ -858,7 +858,7 @@ async function loadStock() {
 }
 async function loadDetHist() {
   App.detMc = {};
-  try { const C = await api('det'); App.detHist = (C.rows || []).map(r => ({ d: r[0], c: r[1], gW: r[2], gS: r[3], vW: r[4], vS: r[5] })); } catch (e) { App.detHist = []; }
+  try { const C = await api('det'); App.detHist = (C.rows || []).map(r => ({ d: r[0], c: r[1], gW: r[2], gS: r[3], vW: r[4], vS: r[5], note: r[6] || '' })); } catch (e) { App.detHist = []; }
 }
 async function loadLost() {
   try { const C = await api('lost'); App.lost = (C.rows || []).map(r => ({ d: r[0], t: r[1], s: r[2], cn: r[3], mc: r[4], sku: r[5], name: r[6], q: r[7] || 0, price: r[8] || 0, amt: r[9] || 0, reason: r[10], type: r[11], by: r[12] })); }
@@ -2104,7 +2104,7 @@ function pageDetention(view) {
     <section class="card"><div class="card-h"><h3>Coverage display per toko</h3><p class="small muted">kiri = generic · kanan = varian · garis = target 95% · klik toko untuk detail</p></div>
       <div>${ok.slice().sort((a, b) => (basis === 'g' ? a.gP - b.gP : a.vP - b.vP)).map(d => `<div class="dt-row" data-dtstore="${esc(d.c)}"><div class="nm">${esc(sName(d.c))}<small>${esc(d.c)} · stok per ${fmtDateS(d.date)}</small></div>${bar(d.gP, 'Generic')}${bar(d.vP, 'Varian')}</div>`).join('')}</div></section>
     <section class="card"><div class="card-h"><h3>Progress harian ${basis === 'g' ? 'generic' : 'varian'} terdisplay${st ? ' · ' + esc(sName(st)) : ' · area'}</h3><p class="small muted">dari ringkasan yang tersimpan setiap upload Export by Bin</p></div><div class="chart-box"><canvas id="dtTrend"></canvas></div><div id="dtHistNote"></div></section>
-    <section class="card"><div class="card-h"><h3>% ${basis === 'g' ? 'generic' : 'varian'} terdisplay per toko per tanggal</h3><p class="small muted">hijau ≥ 95% · oranye 80–95% · merah &lt; 80%</p></div><div class="rp-wrap" style="max-height:60vh"><div id="dtMatrix"></div></div></section>
+    <section class="card"><div class="card-h"><h3>% ${basis === 'g' ? 'generic' : 'varian'} terdisplay per toko per tanggal</h3><p class="small muted">hijau ≥ 95% · oranye 80–95% · merah &lt; 80% · * = hari libur, disamakan dengan data tarikan terdekat</p></div><div class="rp-wrap" style="max-height:60vh"><div id="dtMatrix"></div></div></section>
     ${st ? `<section class="card"><div class="card-h"><h3>Progress per MC · ${esc(sName(st))}</h3><div class="seg" role="group" aria-label="Level MC trend">${[['MC Lv2', 'Lv2'], ['MC Lv3', 'Lv3']].map(([k, l]) => `<button data-dtml="${k}" class="${(U.dtMcLv || 'MC Lv3') === k ? 'on' : ''}">${l}</button>`).join('')}</div></div><div class="rp-wrap" style="max-height:50vh"><div id="dtMcHist"><p class="muted small" style="padding:12px">Memuat…</p></div></div></section>` : ''}
     <section class="card"><div class="card-h"><h3>Rekap per toko</h3></div><div id="dtStoreT"></div></section>
     <section class="card"><div class="card-h"><h3>% terdisplay per MC${st ? ' · ' + esc(sName(st)) : ' · semua toko'}</h3>
@@ -2141,7 +2141,7 @@ function pageDetention(view) {
   }
   $('#dtHistNote').innerHTML = dates.length <= 1 ? '<p class="small muted" style="margin:8px 0 0">Riwayat mulai terbentuk setelah update ini: setiap kali Export by Bin diupload, ringkasan % hari itu disimpan. Upload juga file tanggal-tanggal sebelumnya bila ingin mengisi riwayat ke belakang.</p>' : '';
   const dl = dates.slice(-31).reverse();
-  const cell = r => { if (!r || !r[pk[0]]) return '<td class="muted">–</td>'; const v = r[pk[1]] / r[pk[0]]; return `<td style="background:${v >= DET_TARGET ? 'var(--ok-bg)' : v >= .8 ? 'var(--orange-tint)' : 'var(--bad-bg)'};color:${v >= DET_TARGET ? 'var(--ok)' : v >= .8 ? 'var(--orange-deep)' : 'var(--bad)'}" title="${r[pk[1]]} / ${r[pk[0]]}">${fmtX(v * 100, 1)}</td>`; };
+  const cell = r => { if (!r || !r[pk[0]]) return '<td class="muted">–</td>'; const v = r[pk[1]] / r[pk[0]]; return `<td style="background:${v >= DET_TARGET ? 'var(--ok-bg)' : v >= .8 ? 'var(--orange-tint)' : 'var(--bad-bg)'};color:${v >= DET_TARGET ? 'var(--ok)' : v >= .8 ? 'var(--orange-deep)' : 'var(--bad)'};${r.note ? 'font-style:italic;opacity:.75' : ''}" title="${r[pk[1]]} / ${r[pk[0]]}${r.note ? ' · ' + esc(r.note) : ''}">${fmtX(v * 100, 1)}${r.note ? '*' : ''}</td>`; };
   $('#dtMatrix').innerHTML = dl.length ? `<table class="mx"><thead><tr><th class="nm">Toko</th>${dl.map(d => `<th>${fmtDateS(d)}</th>`).join('')}</tr></thead><tbody>${codes.map(c => `<tr data-dtstore="${esc(c)}" style="cursor:pointer"><td class="nm">${esc(sName(c))}<small>${esc(c)}</small></td>${dl.map(d => cell(H.find(r => r.c === c && r.d === d))).join('')}</tr>`).join('')}</tbody></table>` : '<p class="muted small" style="padding:12px">Belum ada riwayat.</p>';
   if (st) {
     const lvSel = U.dtMcLv || 'MC Lv3';
@@ -2462,7 +2462,12 @@ function renderPending() {
       return `<div class="pend-i"><span class="k dsr">Penjualan</span><div><div class="f">${esc(p.file)}</div><div class="d">${esc(names)} · ${p.from === p.to ? fmtDate(p.from) : fmtDate(p.from) + ' – ' + fmtDate(p.to)} · ${fmtN(p.rows)} baris · bruto ${fmtRp(net)}</div></div><button class="btn sm" data-rmp="${i}">Hapus</button></div>`;
     }
     const pcs = st.reduce((s, x) => s + x.pcs, 0);
-    return `<div class="pend-i"><span class="k inv">Stok</span><div><div class="f">${esc(p.file)}</div><div class="d">${esc(names)} · ${fmtN(pcs)} pcs · ${fmtN(p.rows)} baris bin · tanggal stok <input type="date" class="inp sm" data-pdate="${i}" value="${esc(p.date)}">${p.dateFromName ? '' : ' <b style="color:var(--warn)">cek tanggal</b>'}</div></div><button class="btn sm" data-rmp="${i}">Hapus</button></div>`;
+    return `<div class="pend-i"><span class="k inv">Stok</span><div><div class="f">${esc(p.file)}</div><div class="d">${esc(names)} · ${fmtN(pcs)} pcs · ${fmtN(p.rows)} baris bin · tanggal stok <input type="date" class="inp sm" data-pdate="${i}" value="${esc(p.date)}">${p.dateFromName ? '' : ' <b style="color:var(--warn)">cek tanggal</b>'}</div>
+      <div class="d" style="margin-top:6px;display:flex;flex-wrap:wrap;gap:6px;align-items:center">Juga dipakai untuk detention tanggal:
+        ${(p.extra || []).map(d => `<span class="chip flat" style="display:inline-flex;gap:4px;align-items:center">${fmtDateS(d)} <a href="#" data-pxrm="${i}|${d}" style="color:var(--bad);text-decoration:none;font-weight:800">×</a></span>`).join('') || '<span class="muted">–</span>'}
+        <input type="date" class="inp sm" data-pxadd="${i}" style="width:140px" title="Tambah tanggal libur yang disamakan dengan stok ini">
+        <button class="btn sm" data-pxgap="${i}" title="Tanggal antara upload terakhir dan tanggal stok ini">Isi hari kosong sebelumnya</button>
+        <button class="btn sm" data-pxwe="${i}" title="Sabtu & Minggu setelah tanggal stok ini">+ Sabtu–Minggu berikutnya</button></div></div><button class="btn sm" data-rmp="${i}">Hapus</button></div>`;
   }).join('');
   const sb = $('#saveBtn'); if (sb) sb.disabled = !App.pending.some(p => !p.err);
   const cb = $('#clrBtn'); if (cb) cb.disabled = !App.pending.length;
@@ -2540,9 +2545,13 @@ async function saveAll() {
       const r = await withRetry(() => apiPost({ a: 'stock', date: p.date, stores }));
       /* ringkasan detention harian: disimpan untuk semua toko di file, termasuk file tanggal lama (untuk riwayat) */
       const snaps = Object.values(p.stores).filter(S => Object.values(S.items).some(e => e.length >= 6)).map(S => detSnapshot(p.date, S.code, S.items, S.meta));
-      if (snaps.length) { say('Menyimpan ringkasan detention harian…'); await withRetry(() => apiPost({ a: 'detSnap', rows: snaps.map(x => x.row), mc: snaps.flatMap(x => x.mc) })); }
+      const extra = (p.extra || []).filter(d => d !== p.date), note = 'disamakan dengan data ' + fmtDate(p.date);
+      const detRows = snaps.map(x => x.row.concat([''])), detMc = snaps.flatMap(x => x.mc);
+      for (const d of extra) for (const x of snaps) { detRows.push([d, ...x.row.slice(1), note]); x.mc.forEach(m => detMc.push([d, ...m.slice(1)])); }
+      if (snaps.length) { say('Menyimpan ringkasan detention harian' + (extra.length ? ` (+${extra.length} tanggal libur)` : '') + '…'); await withRetry(() => apiPost({ a: 'detSnap', rows: detRows, mc: detMc })); }
+      p.detPairs = extra.flatMap(d => snaps.map(x => x.row[1] + '|' + d));
       const stScope = {}; for (const c in stores) if (!(r.skipped || []).includes(c)) stScope[c] = p.date;
-      logs.push({ id: uid(), scope: { stock: stScope }, at: now, kind: 'INV', file: p.file, stores: Object.keys(p.stores).length, info: 'stok per ' + fmtDate(p.date) + ((r.skipped || []).length ? `, ${r.skipped.length} toko dilewati (sudah ada stok lebih baru)` : '') });
+      logs.push({ id: uid(), scope: { stock: stScope, det: p.detPairs || [] }, at: now, kind: 'INV', file: p.file, stores: Object.keys(p.stores).length, info: 'stok per ' + fmtDate(p.date) + ((p.extra || []).length ? ', juga untuk ' + p.extra.map(fmtDateS).join(', ') : '') + ((r.skipped || []).length ? `, ${r.skipped.length} toko dilewati (sudah ada stok lebih baru)` : '') });
     }
     /* --- target --- */
     for (const p of items.filter(p => p.kind === 'TGT')) {
@@ -2774,6 +2783,11 @@ document.addEventListener('click', async e => {
   const rpv = t.closest('[data-rpv]'); if (rpv) { App.ui.rpVal = rpv.dataset.rpv; render(); return; }
   if (t.id === 'rpXls') { exportReport(); return; }
   const tb = t.closest('[data-sttab]'); if (tb) { App.ui.stTab = tb.dataset.sttab; render(); return; }
+  const pxr = t.closest('[data-pxrm]'); if (pxr) { e.preventDefault(); const [i, d] = pxr.dataset.pxrm.split('|'); const p = App.pending[+i]; if (p) { p.extra = (p.extra || []).filter(x => x !== d); renderPending(); } return; }
+  const pxg = t.closest('[data-pxgap]'); if (pxg) { const p = App.pending[+pxg.dataset.pxgap]; if (p) { const codes = Object.keys(p.stores); const add = new Set(p.extra || []);
+      for (const c of codes) { const last = (App.detHist || []).filter(r => r.c === c && r.d < p.date).reduce((a, r) => r.d > a ? r.d : a, ''); if (!last) continue; for (let d = addDays(last, 1); d < p.date; d = addDays(d, 1)) add.add(d); }
+      p.extra = [...add].sort(); if (!p.extra.length) toast('Tidak ada hari kosong sebelum tanggal ini (atau belum ada riwayat).'); renderPending(); } return; }
+  const pxw = t.closest('[data-pxwe]'); if (pxw) { const p = App.pending[+pxw.dataset.pxwe]; if (p) { const add = new Set(p.extra || []); for (let k = 1; k <= 7; k++) { const d = addDays(p.date, k), w = dowOf(d); if (w === 6 || w === 0) add.add(d); if (w === 0) break; } p.extra = [...add].sort(); renderPending(); } return; }
   const rp = t.closest('[data-rmp]'); if (rp) { App.pending.splice(+rp.dataset.rmp, 1); renderPending(); return; }
   if (t.id === 'admLink' || t.id === 'loginBtn') { e.preventDefault(); if (App.admin) go('admin'); else openLogin(); return; }
   if (t.id === 'logoutBtn') { App.adminPw = ''; App.admin = false; LS.set('dash_admin', ''); toast('Kamu sudah keluar'); App.page = 'report'; render(); return; }
@@ -2832,6 +2846,7 @@ document.addEventListener('change', async e => {
   if (t.dataset && t.dataset.pyear !== undefined) { const p = App.pending[+t.dataset.pyear]; if (p && +t.value > 2000) { p.year = +t.value; renderPending(); } return; }
   if (t.dataset && t.dataset.pmonth !== undefined) { const p = App.pending[+t.dataset.pmonth]; if (p) p.month = t.value; return; }
   if (t.id === 'tgtB') { saveBasis(t.value); return; }
+  if (t.dataset && t.dataset.pxadd !== undefined) { const p = App.pending[+t.dataset.pxadd]; if (p && t.value && t.value !== p.date) { p.extra = [...new Set([...(p.extra || []), t.value])].sort(); renderPending(); } return; }
   if (t.dataset && t.dataset.pdate !== undefined) { const p = App.pending[+t.dataset.pdate]; if (p && t.value) { p.date = t.value; p.dateFromName = true; } return; }
 });
 document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeDrawer(); closeLogin(); if (App.ui.navOpen) { App.ui.navOpen = null; renderNav(); } } });

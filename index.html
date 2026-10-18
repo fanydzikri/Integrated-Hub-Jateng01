@@ -1205,7 +1205,7 @@ function transfers() {
     for (const n of need) for (const g of give) {
       if (n.want <= 0) break; if (g.ex <= 0 || g.c === n.c) continue;
       const qty = Math.min(n.want, g.ex); n.want -= qty; g.ex -= qty;
-      out.push({ art: a, name: artInfo(a).name, c3: artInfo(a).c3, from: g.c, fromK: g.k, fromStock: g.stock, to: n.c, toK: n.k, toStock: n.stock, toRate: n.rate, qty });
+      out.push({ art: a, name: artInfo(a).name, c3: artInfo(a).c3, c4: artInfo(a).c4, from: g.c, fromK: g.k, fromStock: g.stock, fromRate: g.rate, fromCover: g.cover, to: n.c, toK: n.k, toStock: n.stock, toRate: n.rate, toCover: n.cover, qty });
     }
   }
   out.sort((p, q) => q.qty - p.qty);
@@ -1243,7 +1243,7 @@ const ICON = {
 };
 const NAV = [
   { k: 'sales', label: 'Sales Performance', icon: 'area', items: [['report', 'Monitoring Sales', 'Achievement, UPT & basket size'], ['trend', 'Sales Trend', 'Jam, hari, UPT & basket harian'], ['promo', 'Kontribusi Promo', 'Porsi tiap promo terhadap sales'], ['omni', 'Monitoring OmniChannel', 'EA, Eigerindo Voucher, Tax Invoice, EASAP'], ['eac', 'Sales Member EAC', 'KPI penjualan ke member'], ['ra', 'RA Performance', 'Transaksi, UPT & basket per sales person'], ['pareto', 'Product Pareto', 'Kontribusi kategori & produk (80/20)'], ['growth', 'Growth vs Tahun Lalu', 'Harian, MTD & YTD dibanding tahun lalu']] },
-  { k: 'inv', label: 'Inventory', icon: 'produk', items: [['produk', 'Produk', 'Penjualan & stok per artikel'], ['stok', 'Kesehatan Produk', 'SSR, dead stock, saran transfer'], ['promostock', 'Stok DCNP/SMDS', 'Stok barang diskon per MC Lv2–Lv4'], ['detention', 'Detention Stock', '% generic & varian terdisplay per toko']] },
+  { k: 'inv', label: 'Inventory', icon: 'produk', items: [['produk', 'Produk', 'Penjualan & stok per artikel'], ['transfer', 'Saran Transfer Stok', 'Pindahkan stok dari toko yang menumpuk ke toko yang butuh'], ['promostock', 'Stok DCNP/SMDS', 'Stok barang diskon per MC Lv2–Lv4'], ['detention', 'Detention Stock', '% generic & varian terdisplay per toko']] },
   { k: 'lost', label: 'Lost Sales', icon: 'lost' },
   { k: 'admin', label: 'Kelola data', icon: 'admin', admin: 1 },
   { k: 'settings', label: 'Pengaturan', icon: 'settings', admin: 1 }
@@ -1270,7 +1270,7 @@ function renderNav() {
 function renderPeriod() {
   const box = $('#periodBox');
   const tsel = hasTypes() && App.page !== 'toko' && !scopeOn() ? `<label class="small muted" for="typeSel">Jenis toko</label><select id="typeSel" class="inp"><option value="">Semua toko</option>${['rg', 'bz', 'ot'].filter(t => storeCodes().some(c => sType(c) === t)).map(t => `<option value="${t}" ${App.ui.typeF === t ? 'selected' : ''}>${TYPE_LABEL[t]}</option>`).join('')}</select>` : '';
-  if (['report', 'promo', 'omni', 'eac', 'lost', 'detention', 'growth', 'stok'].includes(App.page)) { box.innerHTML = tsel; return; }
+  if (['report', 'promo', 'omni', 'eac', 'lost', 'detention', 'growth', 'stok', 'transfer'].includes(App.page)) { box.innerHTML = tsel; return; }
   if (!App.lastDate || App.page === 'admin' || App.page === 'settings') { box.innerHTML = ''; return; }
   const L = App.lastDate, cm = L.slice(0, 7);
   const months = Object.keys(App.index.sales).sort().reverse().filter(m => m !== cm);
@@ -1302,7 +1302,7 @@ async function refreshForPeriod() {
 
 function destroyCharts() { App.charts.forEach(c => { try { c.destroy(); } catch (e) { } }); App.charts = []; }
 /* mode toko: semua pilihan toko di halaman dikunci ke toko terpilih supaya tidak membingungkan */
-const SCOPED_SELECTS = ['tdStore', 'prStore', 'raStore', 'ptStore', 'psStore', 'dtStore', 'lsStore', 'pst', 'hst', 'trs', 'stSel'];
+const SCOPED_SELECTS = ['tfStore', 'tdStore', 'prStore', 'raStore', 'ptStore', 'psStore', 'dtStore', 'lsStore', 'pst', 'hst', 'trs', 'stSel'];
 function lockScopedSelects(view) {
   if (!scopeOn()) return;
   for (const id of SCOPED_SELECTS) { const sel = view.querySelector('#' + id); if (!sel) continue;
@@ -1320,8 +1320,9 @@ function render() {
     view.innerHTML = `<div class="empty-state"><h2>Belum ada data di dashboard</h2><p class="muted">${App.admin ? 'Upload file Item DSR Report dan Export by Bin dari semua toko di halaman Kelola data. Setelah tersimpan, semua orang yang membuka link ini langsung melihat datanya tanpa upload.' : 'Admin area belum mengunggah data. Coba buka lagi nanti.'}</p>${App.admin ? '<button class="btn primary" data-go="admin">Buka Kelola data</button>' : '<p class="small muted">Kamu admin? <a href="#" id="admLink" style="color:var(--navy);font-weight:700">Masuk sebagai admin</a> untuk upload.</p>'}</div>`;
     return;
   }
-  if (!App.lastDate && !['admin', 'stok', 'report', 'settings', 'lost', 'detention'].includes(App.page)) { App.page = srLast() ? 'report' : 'stok'; }
-  const fn = { area: pageArea, report: pageReport, trend: pageTrend, promo: pagePromo, omni: pageOmni, eac: pageEac, ra: pageRA, pareto: pagePareto, lost: pageLost, promostock: pagePromoStock, detention: pageDetention, growth: pageGrowth, toko: pageStore, produk: pageProduct, stok: pageStock, admin: pageAdmin, settings: pageSettings }[App.page] || pageReport;
+  if (App.page === 'stok') App.page = 'transfer';
+  if (!App.lastDate && !['admin', 'report', 'settings', 'lost', 'detention'].includes(App.page)) { App.page = srLast() ? 'report' : 'detention'; }
+  const fn = { area: pageArea, report: pageReport, trend: pageTrend, promo: pagePromo, omni: pageOmni, eac: pageEac, ra: pageRA, pareto: pagePareto, lost: pageLost, promostock: pagePromoStock, detention: pageDetention, growth: pageGrowth, transfer: pageTransfer, toko: pageStore, produk: pageProduct, stok: pageStock, admin: pageAdmin, settings: pageSettings }[App.page] || pageReport;
   try { fn(view); lockScopedSelects(view); if ((App.loadWarn || []).length) view.insertAdjacentHTML('afterbegin', `<div class="note" style="margin-bottom:14px">Sebagian data belum termuat (${esc(App.loadWarn.join(', '))}). Tekan <b>Muat ulang</b> di kanan atas untuk mencoba lagi.</div>`); } catch (e) { console.error(e); view.innerHTML = `<div class="empty-state"><h2>Halaman gagal ditampilkan</h2><p class="muted">${esc(e.message)}</p></div>`; }
 }
 
@@ -2424,6 +2425,60 @@ function pageGrowth(view) {
   }
 }
 
+/* ================= halaman: Saran Transfer Stok ================= */
+function pageTransfer(view) {
+  const U = App.ui, S0 = SET(), H = health();
+  setHead('Saran Transfer Stok', `Berdasarkan stok terakhir tiap toko & penjualan ${S0.windowDays} hari terakhir · target cover ${S0.targetCover} bulan`);
+  if (!App.lastDate || !Object.keys(App.stock).length) { view.innerHTML = '<div class="empty-state"><h2>Belum bisa menghitung saran transfer</h2><p class="muted">Butuh data Item DSR dan Export by Bin (stok) tiap toko.</p></div>'; return; }
+  const codes = activeStores().filter(c => App.stock[c]);
+  const sc = scopeOn() ? App.ui.scope : '';
+  const st = sc || (U.tfStore && codes.includes(U.tfStore) ? U.tfStore : ''), dir = U.tfDir || '';
+  let all = transfers().filter(r => (typeOk(r.from) || typeOk(r.to)));
+  if (sc) all = all.filter(r => r.from === sc || r.to === sc);
+  const c3s = [...new Set(all.map(r => r.c3))].sort();
+  let rows = all.filter(r => (!st || (dir === 'out' ? r.from === st : dir === 'in' ? r.to === st : (r.from === st || r.to === st))) && (!U.tfC3 || r.c3 === U.tfC3));
+  if (U.tfQ) { const q = U.tfQ.toLowerCase(); rows = rows.filter(r => (r.name + ' ' + r.art).toLowerCase().includes(q)); }
+  const why = (k, cover) => k === 'DS' ? `tidak terjual ${S0.windowDays} hari` : k === 'SM' ? `stok cukup ${cover == null ? '>' : fmtX(cover, 1)} bln` : k === 'HB' ? 'stok habis' : `stok tinggal ${cover == null ? '<1' : fmtX(cover, 1)} bln`;
+  const tot = rows.reduce((a, r) => { a.q += r.qty; a.arts.add(r.art); a.from.add(r.from); a.to.add(r.to); return a; }, { q: 0, arts: new Set(), from: new Set(), to: new Set() });
+  const per = new Map(); for (const r of rows) { const a = per.get(r.from) || { c: r.from, outQ: 0, outN: 0, inQ: 0, inN: 0 }; a.outQ += r.qty; a.outN++; per.set(r.from, a); const b = per.get(r.to) || { c: r.to, outQ: 0, outN: 0, inQ: 0, inN: 0 }; b.inQ += r.qty; b.inN++; per.set(r.to, b); }
+  const thin = codes.filter(c => (H.stores[c] || {}).days < 14);
+  view.innerHTML = `<div class="stack">
+    <div class="filters" style="margin:0"><label class="small muted" for="tfStore">Toko</label><select id="tfStore" class="inp"><option value="">Semua toko</option>${codes.map(c => `<option value="${esc(c)}" ${c === st ? 'selected' : ''}>${esc(c)} - ${esc(sName(c))}</option>`).join('')}</select>
+      <div class="seg" role="group" aria-label="Arah transfer"><button data-tfd="" class="${!dir ? 'on' : ''}">Semua</button><button data-tfd="out" class="${dir === 'out' ? 'on' : ''}">Kirim dari toko</button><button data-tfd="in" class="${dir === 'in' ? 'on' : ''}">Terima ke toko</button></div>
+      <select id="tfC3" class="inp"><option value="">Semua kategori</option>${c3s.map(c => `<option ${c === U.tfC3 ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select>
+      <input id="tfQ" class="inp" type="search" placeholder="Cari artikel" value="${esc(U.tfQ || '')}" style="flex:1 1 180px">
+      <button class="btn" id="tfXls">Download Excel</button></div>
+    ${thin.length ? `<div class="note">${thin.length} toko belum punya cukup data penjualan (kurang dari 14 hari), sehingga belum ikut dihitung: ${thin.slice(0, 5).map(c => esc(sName(c))).join(', ')}${thin.length > 5 ? ' +' + (thin.length - 5) : ''}.</div>` : ''}
+    <div class="pt-tiles" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr))">
+      <div class="pt-tile"><span>Saran transfer</span><b>${fmtN(rows.length)}</b><small>baris artikel</small></div>
+      <div class="pt-tile"><span>Total qty</span><b>${fmtN(tot.q)} pcs</b><small>${fmtN(tot.arts.size)} artikel</small></div>
+      <div class="pt-tile"><span>Toko pengirim</span><b>${fmtN(tot.from.size)}</b><small>stoknya menumpuk</small></div>
+      <div class="pt-tile" style="background:#0B1B4A"><span>Toko penerima</span><b>${fmtN(tot.to.size)}</b><small>stoknya habis / menipis</small></div>
+    </div>
+    <section class="card"><div class="card-h"><h3>Daftar saran transfer</h3><p class="small muted">klik baris untuk melihat stok artikel di semua toko</p></div><div id="tfT"></div>
+      <p class="small muted" style="margin:10px 0 0">Saran per artikel (semua size & warna). Cek size & warna yang tersedia di toko pengirim sebelum transfer. Toko penerima diprioritaskan yang penjualannya paling tinggi.</p></section>
+    ${per.size > 1 ? `<section class="card"><div class="card-h"><h3>Ringkasan per toko</h3><p class="small muted">klik toko untuk filter</p></div><div id="tfPer"></div></section>` : ''}
+    <p class="small muted">Cara hitung: toko penerima = artikel yang laku (rata-rata terjual ≥ 0,5 pcs/bulan) tetapi stoknya habis atau tinggal sedikit; kebutuhannya = ${S0.targetCover} bulan penjualan dikurangi stok yang ada. Toko pengirim = artikel yang stoknya menumpuk (tidak terjual ${S0.windowDays} hari atau stoknya cukup untuk berbulan-bulan); yang bisa dikirim = stok dikurangi ${S0.targetCover} bulan penjualan, sisakan 1 pcs untuk display.</p>
+  </div>`;
+  $('#tfT').innerHTML = tbl('tfT', { rows, sort: { k: 'qty', dir: 'desc' }, limit: 40, onRow: r => openProduct(r.art, null), empty: 'Tidak ada saran transfer untuk filter ini.', cols: [
+    { k: 'name', label: 'Artikel', h: r => prodCell(r.art, r.name, r.art + ' · ' + r.c3 + (r.c4 ? ' › ' + r.c4 : '')) },
+    { k: 'from', label: 'Dari toko', v: r => sName(r.from), h: r => `<b class="small">${esc(sName(r.from))}</b><span class="sub">stok ${fmtN(r.fromStock)} · jual ${fmtX(r.fromRate, 1)}/bln · ${why(r.fromK, r.fromCover)}</span>` },
+    { k: 'to', label: 'Ke toko', v: r => sName(r.to), h: r => `<b class="small">${esc(sName(r.to))}</b><span class="sub">stok ${fmtN(r.toStock)} · jual ${fmtX(r.toRate, 1)}/bln · ${why(r.toK, r.toCover)}</span>` },
+    { k: 'qty', label: 'Saran qty', r: 1, h: r => `<b>${fmtN(r.qty)}</b>` }] });
+  if ($('#tfPer')) $('#tfPer').innerHTML = tbl('tfPer', { rows: [...per.values()].map(x => ({ ...x, name: sName(x.c) })), sort: { k: 'outQ', dir: 'desc' }, limit: 40, onRow: r => { App.ui.tfStore = r.c; render(); window.scrollTo(0, 0); }, cols: [
+    { k: 'name', label: 'Toko', h: r => `<span class="nm">${esc(r.name)}</span><span class="sub">${esc(r.c)}</span>` },
+    { k: 'outQ', label: 'Kirim (pcs)', r: 1, h: r => fmtN(r.outQ) }, { k: 'outN', label: 'Artikel dikirim', r: 1, h: r => fmtN(r.outN) },
+    { k: 'inQ', label: 'Terima (pcs)', r: 1, h: r => fmtN(r.inQ) }, { k: 'inN', label: 'Artikel diterima', r: 1, h: r => fmtN(r.inN) }] });
+  App.ui.tfLast = { rows, why };
+}
+async function exportTransfer() {
+  const X = App.ui.tfLast; if (!X || typeof XLSX === 'undefined') return;
+  const aoa = [['Kode Artikel', 'Nama Artikel', 'Kategori Lv3', 'Kategori Lv4', 'Dari Kode', 'Dari Toko', 'Stok Pengirim', 'Jual/bln Pengirim', 'Keterangan Pengirim', 'Ke Kode', 'Ke Toko', 'Stok Penerima', 'Jual/bln Penerima', 'Keterangan Penerima', 'Saran Qty'],
+    ...X.rows.map(r => [r.art, r.name, r.c3, r.c4 || '', r.from, sName(r.from), r.fromStock, Math.round(r.fromRate * 10) / 10, X.why(r.fromK, r.fromCover), r.to, sName(r.to), r.toStock, Math.round(r.toRate * 10) / 10, X.why(r.toK, r.toCover), r.qty])];
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), 'Saran Transfer');
+  (await getDownloads()).save({ filename: `Saran_Transfer_Jateng01_${App.lastDate || todayISO()}.xlsx`, data: new Blob([XLSX.write(wb, { bookType: 'xlsx', type: 'array' })]) });
+}
+
 /* ================= halaman: per toko ================= */
 function pageStore(view) {
   const codes = storeCodes(); if (!App.ui.store || !codes.includes(App.ui.store)) App.ui.store = codes[0];
@@ -2459,24 +2514,23 @@ function pageStore(view) {
       <section class="card"><div class="card-h"><h3>Penjualan harian</h3></div><div class="chart-box"><canvas id="trend"></canvas></div></section>
       <section class="card"><div class="card-h"><h3>Kategori</h3></div><div id="cats"></div></section>
     </div>
-    <section class="card"><div class="card-h"><h3>Kesehatan stok</h3><p class="small muted">${H && H.hasStock ? 'penjualan ' + H.days + ' hari data terakhir vs stok' : 'stok toko ini belum diupload'}</p></div><div id="hl"></div></section>
     <section class="card"><div class="card-h"><h3>Produk terlaris</h3><p class="small muted">per artikel, klik untuk detail</p></div><div id="prodT"></div></section>
     <section class="card"><div class="card-h"><h3>Sales person</h3></div><div id="spT"></div></section>
   </div>`;
   trendChart($('#trend'), R, cur, prev, c);
   storeGrowth(c, last && last < R.to ? last : R.to);
-  if (H && H.hasStock) {
+  if ($('#hl') && H && H.hasStock) {
     const tot = HKEYS.reduce((s, k) => s + H.stock[k], 0) || 1;
     $('#hl').innerHTML = `<div class="bars">${HKEYS.map(k => `<div class="bar-r"><span>${badge(k)}</span><span class="t"><i style="width:${H.stock[k] / tot * 100}%;background:${hColor(k)}"></i></span><b>${fmtN(H.count[k])} art. <span class="muted small">${k === 'HB' ? '' : fmtN(H.stock[k]) + ' pcs'}</span></b></div>`).join('')}</div>
       ${H.days < 30 ? `<p class="note small" style="margin-top:12px">Data penjualan toko ini baru ${H.days} hari, jadi status dead stock & slow moving belum akurat.</p>` : ''}
       <div class="row-act"><button class="btn sm" data-hgo="${esc(c)}">Lihat daftar artikel</button></div>`;
-  } else $('#hl').innerHTML = '<p class="muted">Upload Export by Bin untuk toko ini agar status stok terlihat.</p>';
+  } else if ($('#hl')) $('#hl').innerHTML = '<p class="muted">Upload Export by Bin untuk toko ini agar status stok terlihat.</p>';
   $('#prodT').innerHTML = tbl('sprod', {
     rows: prods, sort: { k: 'n', dir: 'desc' }, limit: 15, onRow: r => openProduct(r.art, c),
     cols: [
       { k: 'name', label: 'Produk', h: r => prodCell(r.art, r.name, r.art + ' · ' + r.c3 + ' › ' + r.c4) },
       { k: 'q', label: 'Qty', r: 1, h: r => fmtN(r.q) }, { k: 'n', label: VLL(), r: 1, h: r => fmtRp(r.n) },
-      { k: 'stock', label: 'Stok', r: 1, h: r => r.stock == null ? '–' : fmtN(r.stock) }, { k: 'k', label: 'Status', h: r => badge(r.k) }
+      { k: 'stock', label: 'Stok', r: 1, h: r => r.stock == null ? '–' : fmtN(r.stock) }
     ]
   });
   $('#spT').innerHTML = tbl('sp', {
@@ -2540,8 +2594,8 @@ function openProduct(art, store) {
     ${colorThumbs ? `<p class="small muted" style="margin:6px 0 0">Warna tersedia di master:</p><div class="gal" style="margin-top:4px">${colorThumbs}</div>` : ''}
     <p class="muted small">${esc(R.label)}</p>
     <h3 style="font-family:var(--font-head);margin:18px 0 8px">Per toko</h3>
-    <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Toko</th><th class="r">Qty</th><th class="r">${VL()}</th><th class="r">Stok</th><th class="r">Jual/bln</th><th>Status</th></tr></thead><tbody>
-    ${per.sort((a, b) => b.q - a.q || b.stock - a.stock).map(r => `<tr><td><span class="nm">${esc(r.name)}</span><span class="sub">${esc(r.c)}</span></td><td class="r">${fmtN(r.q)}</td><td class="r">${fmtRpS(r.n)}</td><td class="r">${fmtN(r.stock)}</td><td class="r">${fmtX(r.rate)}</td><td>${badge(r.k)}</td></tr>`).join('') || '<tr><td colspan="6" class="empty">Tidak ada penjualan atau stok.</td></tr>'}
+    <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Toko</th><th class="r">Qty</th><th class="r">${VL()}</th><th class="r">Stok</th><th class="r">Jual/bln</th></tr></thead><tbody>
+    ${per.sort((a, b) => b.q - a.q || b.stock - a.stock).map(r => `<tr><td><span class="nm">${esc(r.name)}</span><span class="sub">${esc(r.c)}</span></td><td class="r">${fmtN(r.q)}</td><td class="r">${fmtRpS(r.n)}</td><td class="r">${fmtN(r.stock)}</td><td class="r">${fmtX(r.rate)}</td></tr>`).join('') || '<tr><td colspan="5" class="empty">Tidak ada penjualan atau stok.</td></tr>'}
     </tbody></table></div>
     <h3 style="font-family:var(--font-head);margin:18px 0 8px">Varian ${store ? 'di ' + esc(sName(store)) : 'se-area'}</h3>
     <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Varian</th><th class="r">Qty</th><th class="r">${VL()}</th><th class="r">Stok</th></tr></thead><tbody>
@@ -2947,7 +3001,7 @@ async function rebuildCache() {
 function pageSettings(view) {
   if (!App.admin) { App.page = 'report'; openLogin(); return render(); }
   const S = SET(), H = health(), U = App.ui;
-  setHead('Pengaturan', 'Logika perhitungan mengikuti standar dashboard toko EIGER. Berlaku untuk semua yang membuka dashboard.');
+  setHead('Pengaturan', 'Berlaku untuk semua yang membuka dashboard.');
   const codes = storeCodes().filter(c => App.stock[c]);
   if (!U.setStore || !codes.includes(U.setStore)) U.setStore = codes[0] || '';
   const T = U.setStore && H.stores[U.setStore] ? H.stores[U.setStore].th : null;
@@ -2955,15 +3009,8 @@ function pageSettings(view) {
   const ovRows = Object.entries(App.overrides || {}).map(([a, o]) => ({ art: a, name: artInfo(a).name, status: o.status || '', hidden: !!o.hidden }));
   const num = (id, label, v, min, max, step = 1) => `<div class="fld"><label for="${id}">${label}</label><input class="inp" type="number" id="${id}" value="${v}" min="${min}" max="${max}" step="${step}"></div>`;
   view.innerHTML = `<div class="stack">
-    <section class="card"><div class="card-h"><h3>Klasifikasi kesehatan stok (berdasarkan SSR)</h3></div>
-      <p class="small muted" style="margin-top:0">SSR (stock to sales ratio) = stok ÷ rata-rata penjualan per bulan. Ambang dihitung otomatis per toko dari sebaran SSR produk yang terjual dan punya stok (kuartil 25%, 50%, 75%), sama seperti dashboard toko. Kalau datanya kurang dari 8 produk, dipakai 1 / 2 / 4 bulan.</p>
-      ${codes.length ? `<div class="filters"><label for="setStore">Lihat ambang toko</label><select id="setStore" class="inp">${codes.map(c => `<option value="${esc(c)}" ${c === U.setStore ? 'selected' : ''}>${esc(sName(c))}</option>`).join('')}</select></div>` : '<p class="muted">Ambang per toko muncul setelah stok & penjualan diupload.</p>'}
-      ${T ? `<div class="kpis"><div class="kpi"><span>Laku sekali</span><b>SSR ≤ ${fmtX(T.t1)}</b><small>dan qty ≥ ${fmtN(T.q50)} pcs</small></div><div class="kpi"><span>Laku</span><b>SSR ≤ ${fmtX(T.t2)}</b><small>dan qty ≥ ${fmtN(T.q25)} pcs</small></div><div class="kpi"><span>Cukup laku</span><b>SSR ≤ ${fmtX(T.t3)}</b><small>bulan stok</small></div><div class="kpi"><span>Slow moving</span><b>SSR &gt; ${fmtX(T.t3)}</b><small>bulan stok</small></div><div class="kpi"><span>Statement</span><b>${T.aspHi ? fmtRpS(T.aspHi) : '–'}</b><small>harga rata-rata minimal</small></div></div>` : ''}
-      <ul class="small" style="line-height:1.7;margin:14px 0"><li><b>Dead stock:</b> ada stok tapi tidak terjual dalam ${S.windowDays} hari terakhir.</li><li><b>National promo:</b> ≥ ${S.promoShare}% qty terjual lewat promo markdown (nama promo mengandung SMDS / DCNP / flush out / sale, atau diskon ≥ 25%), dan SSR di atas batas laku.</li><li><b>Statement:</b> harga rata-rata di persentil ${S.statementPct} ke atas, volume terbatas, stok tidak berlebih.</li><li><b>Discontinue:</b> tidak bisa dideteksi dari file, tandai manual di bawah.</li><li><b>Stok habis:</b> terjual dalam periode tapi stoknya 0 (tambahan khusus area, dipakai untuk saran transfer).</li></ul>
-      <label class="small" style="display:flex;gap:8px;align-items:center;font-weight:700"><input type="checkbox" id="sAuto" ${S.autoThreshold ? 'checked' : ''}> Ambang otomatis per toko (disarankan)</label>
-      <div class="grid3 ${S.autoThreshold ? 'dim' : ''}" style="margin-top:10px">${num('m1', 'Laku sekali ≤ (bulan)', S.manual.t1, .1, 12, .1)}${num('m2', 'Laku ≤ (bulan)', S.manual.t2, .1, 12, .1)}${num('m3', 'Cukup laku ≤ (bulan)', S.manual.t3, .1, 24, .1)}</div>${S.autoThreshold ? '' : '<div class="row-act"><button class="btn primary sSave">Simpan ambang manual</button></div>'}</section>
     <section class="card"><div class="card-h"><h3>Parameter analisis</h3></div>
-      <div class="grid3">${num('sWin', 'Jendela penjualan (hari)', S.windowDays, 14, 365)}${num('sCov', 'Target cover transfer (bulan)', S.targetCover, .5, 6, .5)}${num('sPro', 'Batas national promo (% qty promo)', S.promoShare, 10, 100)}${num('sStm', 'Persentil harga statement', S.statementPct, 50, 99)}</div>
+      <div class="grid3">${num('sWin', 'Jendela penjualan untuk saran transfer (hari)', S.windowDays, 14, 365)}${num('sCov', 'Target cover transfer (bulan)', S.targetCover, .5, 6, .5)}</div>
       <div class="fld" style="margin-top:12px"><label for="sBrand">Brand dikecualikan (pisahkan koma)</label><input class="inp" id="sBrand" value="${esc(S.excludeBrands)}"></div>
       <div class="fld" style="margin-top:12px"><label for="sKw">Kata kunci nama produk dikecualikan</label><input class="inp" id="sKw" value="${esc(S.excludeKeywords)}"></div>
       <label class="small" style="display:flex;gap:8px;align-items:center;font-weight:700;margin-top:12px"><input type="checkbox" id="sExSales" ${S.excludeSales !== false ? 'checked' : ''}> Keluarkan produk di atas dari total penjualan di semua menu</label>
@@ -2977,14 +3024,14 @@ function pageSettings(view) {
       ${stats.length ? `<p class="small muted" style="margin-top:0">Retur, reversal, dan revisi bernilai negatif atau saling meniadakan, jadi semua status dihitung agar total sama dengan laporan. Matikan status tertentu hanya jika perlu.</p><div class="chips">${stats.map(x => `<label><input type="checkbox" data-bs="${esc(x)}" ${S.billStatuses[x] === false ? '' : 'checked'}> ${esc(x || '(kosong)')}</label>`).join('')}</div>` : '<p class="muted">Muncul setelah Item DSR diupload.</p>'}</section>
     <section class="card"><div class="card-h"><h3>Tipe transaksi yang dihitung</h3></div>
       ${types.length ? `<p class="small muted" style="margin-top:0">Matikan Wholesale Offline jika penjualan grosir membuat ranking produk tidak mewakili penjualan harian.</p><div class="chips">${types.map(x => `<label><input type="checkbox" data-tt="${esc(x)}" ${S.txTypes[x] === false ? '' : 'checked'}> ${esc(x || '(kosong)')}</label>`).join('')}</div>` : '<p class="muted">Muncul setelah Item DSR diupload.</p>'}</section>
-    <section class="card"><div class="card-h"><h3>Klasifikasi manual & produk disembunyikan</h3><p class="small muted">Berlaku untuk semua toko</p></div>
-      <div class="grid3"><div class="fld" style="grid-column:span 2"><label for="ovCodes">Kode artikel (9 digit) atau SKU, satu per baris atau pisah koma</label><textarea class="inp" id="ovCodes" rows="3" placeholder="910005461&#10;910005462"></textarea></div>
-      <div class="fld"><label for="ovSt">Set menjadi</label><select class="inp" id="ovSt">${HKEYS.filter(k => k !== 'HB').map(k => `<option value="${k}" ${k === 'DC' ? 'selected' : ''}>${HEALTH[k].label}</option>`).join('')}<option value="__hide">Sembunyikan dari analisis</option></select><div class="row-act"><button class="btn primary" id="ovApply">Terapkan</button></div></div></div>
+    <section class="card"><div class="card-h"><h3>Produk dikecualikan dari analisis</h3><p class="small muted">Berlaku untuk semua toko</p></div>
+      <p class="small muted" style="margin-top:0">Tempel kode artikel (9 digit) atau SKU yang tidak boleh masuk perhitungan sales & analisis produk (selain paper bag/voucher yang sudah otomatis dikecualikan). Monitoring OmniChannel tetap menghitungnya.</p>
+      <div class="grid3"><div class="fld" style="grid-column:span 2"><label for="ovCodes">Kode artikel atau SKU, satu per baris atau pisah koma</label><textarea class="inp" id="ovCodes" rows="3" placeholder="910005461&#10;910005462"></textarea></div>
+      <div class="fld"><label>&nbsp;</label><select class="inp" id="ovSt" hidden><option value="__hide" selected>Sembunyikan</option></select><button class="btn primary" id="ovApply">Kecualikan</button></div></div>
       <div id="ovT" style="margin-top:12px"></div></section>
   </div>`;
-  $('#ovT').innerHTML = tbl('ovt', { rows: ovRows, limit: 20, empty: 'Belum ada pengaturan manual.', cols: [
+  $('#ovT').innerHTML = tbl('ovt', { rows: ovRows.filter(r => r.hidden), limit: 20, empty: 'Belum ada artikel yang dikecualikan.', cols: [
     { k: 'art', label: 'Artikel', h: r => `<span class="tn">${esc(r.art)}</span>` }, { k: 'name', label: 'Produk' },
-    { k: 'status', label: 'Status manual', h: r => r.status ? badge(r.status) : '–' }, { k: 'hidden', label: 'Disembunyikan', h: r => r.hidden ? 'Ya' : '–' },
     { k: 'x', label: '', ns: 1, h: r => `<button class="btn sm danger" data-ovrm="${esc(r.art)}">Hapus</button>` }] });
 }
 async function saveSettings(patch, msg) {
@@ -3000,9 +3047,9 @@ function settingsClick(t) {
   if (t.classList && t.classList.contains('sSave')) {
     const g = id => +($('#' + id) || {}).value;
     const p = {
-      windowDays: clampN(g('sWin') || 90, 14, 365), targetCover: clampN(g('sCov') || 2, .5, 6), promoShare: clampN(g('sPro') || 60, 10, 100), statementPct: clampN(g('sStm') || 75, 50, 99),
+      windowDays: clampN(g('sWin') || 90, 14, 365), targetCover: clampN(g('sCov') || 2, .5, 6), promoShare: SET().promoShare, statementPct: SET().statementPct,
       excludeBrands: $('#sBrand').value, excludeKeywords: $('#sKw').value, excludeSales: !!($('#sExSales') || {}).checked, achGreen: clampN(g('sGreen') || 100, 1, 300), achYellow: clampN(g('sYellow') || 95, 0, 300), defaultValue: $('#sVal').value,
-      manual: { t1: g('m1') || 1, t2: g('m2') || 2, t3: g('m3') || 4 }
+      manual: SET().manual
     };
     if (p.achYellow > p.achGreen) p.achYellow = p.achGreen;
     App.ui.rpVal = null; saveSettings(p); return true;
@@ -3040,12 +3087,14 @@ document.addEventListener('click', async e => {
   const mr = t.closest('[data-more]'); if (mr) { const [id, n] = mr.dataset.more.split('|'); App.ui.more[id] = +n; render(); return; }
   const row = t.closest('[data-row]'); if (row) { const [id, i] = row.dataset.row.split('|'); const T = App.tables[id]; if (T && T.onRow) T.onRow(T.rows[+i]); return; }
   const sm = t.closest('[data-store]'); if (sm) { App.ui.store = sm.dataset.store; go('toko'); return; }
-  const hg = t.closest('[data-hgo]'); if (hg) { App.ui.stTab = 'list'; App.ui.stStore = hg.dataset.hgo; App.ui.stStatus = ''; go('stok'); return; }
+  const hg = t.closest('[data-hgo]'); if (hg) { App.ui.tfStore = hg.dataset.hgo; go('transfer'); return; }
   const rps = t.closest('[data-rps]'); if (rps) { const k = rps.dataset.rps; const s0 = App.ui.rpSort || { k: 'mAch', dir: 'desc' }; App.ui.rpSort = s0.k === k ? { k, dir: s0.dir === 'asc' ? 'desc' : 'asc' } : { k, dir: (k === 'c' || k === 'name') ? 'asc' : 'desc' }; render(); return; }
   const eas = t.closest('[data-eas]'); if (eas) { const k = eas.dataset.eas; const s0 = App.ui.eaSort || { k: 'pC', dir: 'desc' }; App.ui.eaSort = s0.k === k ? { k, dir: s0.dir === 'asc' ? 'desc' : 'asc' } : { k, dir: k === 'name' ? 'asc' : 'desc' }; render(); return; }
   const oms = t.closest('[data-oms]'); if (oms) { const k = oms.dataset.oms; const s0 = App.ui.omSort || { k: 'totP', dir: 'desc' }; App.ui.omSort = s0.k === k ? { k, dir: s0.dir === 'asc' ? 'desc' : 'asc' } : { k, dir: k === 'name' ? 'asc' : 'desc' }; render(); return; }
   if (t.id === 'omXls') { exportOmni(); return; }
   if (t.id === 'eaXls') { exportEac(); return; }
+  if (t.id === 'tfXls') { exportTransfer(); return; }
+  const tfd = t.closest('[data-tfd]'); if (tfd) { App.ui.tfDir = tfd.dataset.tfd; App.ui.more = {}; render(); return; }
   const gws = t.closest('[data-gws]'); if (gws) { const k = gws.dataset.gws; const s0 = App.ui.gwSort || { k: 'yG', dir: 'asc' }; App.ui.gwSort = s0.k === k ? { k, dir: s0.dir === 'asc' ? 'desc' : 'asc' } : { k, dir: k === 'name' ? 'asc' : 'desc' }; render(); return; }
   const gwb = t.closest('[data-gwb]'); if (gwb) { App.ui.gwBasis = gwb.dataset.gwb; render(); return; }
   if (t.id === 'raXls') { exportRA(); return; }
@@ -3090,7 +3139,7 @@ let qTimer;
 document.addEventListener('input', e => {
   const t = e.target;
   const deb = (key) => { App.ui[key] = t.value; App.ui.more = {}; clearTimeout(qTimer); qTimer = setTimeout(() => { const pos = t.selectionStart; const id = t.id; render(); const n = document.getElementById(id); if (n) { n.focus(); try { n.setSelectionRange(pos, pos); } catch (er) { } } }, 300); };
-  if (t.id === 'pq') deb('prodQ'); else if (t.id === 'hq') deb('stQ'); else if (t.id === 'trq') deb('trQ');
+  if (t.id === 'pq') deb('prodQ'); else if (t.id === 'hq') deb('stQ'); else if (t.id === 'trq') deb('trQ'); else if (t.id === 'tfQ') deb('tfQ');
   else if (t.dataset && t.dataset.tgt !== undefined) { const sum = $$('[data-tgt]').reduce((s, i) => s + (Number(String(i.value).replace(/[^0-9]/g, '')) || 0), 0); const el = $('#tgtSum'); if (el) el.textContent = fmtRp(sum); }
 });
 document.addEventListener('change', async e => {
@@ -3105,6 +3154,8 @@ document.addEventListener('change', async e => {
   if (t.id === 'lsM') { App.ui.lsM = t.value; render(); return; }
   if (t.id === 'lsStore') { App.ui.lsStore = t.value; App.ui.more = {}; render(); return; }
   if (t.id === 'ptStore') { App.ui.ptStore = t.value; App.ui.more = {}; render(); return; }
+  if (t.id === 'tfStore') { App.ui.tfStore = t.value; render(); return; }
+  if (t.id === 'tfC3') { App.ui.tfC3 = t.value; render(); return; }
   if (t.id === 'gwDate') { if (t.value) { App.ui.gwDate = t.value; render(); } return; }
   if (t.id === 'gwLfl') { App.ui.gwLfl = t.checked; render(); return; }
   if (t.id === 'gwComp') { App.ui.gwComp = t.checked; render(); return; }

@@ -67,7 +67,10 @@ img,svg,canvas{max-width:100%}
 .data-chip button.sc{background:#fff;color:#0F3192;border:1px solid #C8D0E0;max-width:200px;overflow:hidden;text-overflow:ellipsis}
 .data-chip button.og{background:#E46636}
 .data-chip .scc{display:none}
-html,body{overflow-x:hidden}
+body{overflow-x:clip}
+.nav-float{display:block!important;position:fixed;left:10px;right:10px;z-index:90;min-width:0}
+.nav-float button{background:none;border:0;cursor:pointer;font-family:inherit}
+.nav-float button.on,.nav-float button:active{background:#EEF2FB}
 .nav{display:flex;flex-wrap:wrap;gap:2px;margin:0 -6px}
 .nav-g{position:relative}
 .nav-g > button .car{font-size:10px;margin-left:2px;opacity:.7}
@@ -106,7 +109,8 @@ footer strong{color:var(--navy)}
   .data-chip button.sc{max-width:none;white-space:nowrap;padding:6px 9px}
   .data-chip .scn{display:none}.data-chip .scc{display:inline}
   .brandbar img{height:24px}
-  .nav{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;margin:0 -12px;padding:0 6px}
+  .nav{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin:0 -12px;padding:0 6px}
+  .nav-g.open .nav-m{display:none}
   .nav::-webkit-scrollbar{display:none}
   .nav > *{flex:none}
   .credit .wrap{font-size:11.5px}
@@ -1202,9 +1206,14 @@ function renderNav() {
     ? `<div class="nav-g ${open === g.k ? 'open' : ''}"><button data-navg="${g.k}" class="${cur === g.k ? 'on' : ''}" aria-haspopup="true" aria-expanded="${open === g.k}"><svg viewBox="0 0 24 24" aria-hidden="true">${ICON[g.icon]}</svg>${g.label}<span class="car">▼</span></button>
       <div class="nav-m" role="menu">${g.items.map(([k, l, d]) => `<button role="menuitem" data-go="${k}" class="${App.page === k ? 'on' : ''}">${l}<small>${d}</small></button>`).join('')}</div></div>`
     : `<button data-go="${g.k}" class="${App.page === g.k ? 'on' : ''}"><svg viewBox="0 0 24 24" aria-hidden="true">${ICON[g.icon]}</svg>${g.label}</button>`).join('');
-  /* di HP: menu dropdown selebar layar supaya tidak terpotong */
+  /* di HP: menu dropdown ditampilkan di luar baris menu (yang bisa digeser), supaya tidak terpotong di Safari/Chrome HP */
+  const old = $('#navFloat'); if (old) old.remove();
   const om = $('.nav-g.open .nav-m');
-  if (om && window.innerWidth < 700) { const b = om.previousElementSibling.getBoundingClientRect(); Object.assign(om.style, { position: 'fixed', left: '10px', right: '10px', top: (b.bottom + 4) + 'px', minWidth: '0' }); }
+  if (om && window.innerWidth <= 640) {
+    const f = document.createElement('div'); f.id = 'navFloat'; f.className = 'nav-m nav-float'; f.setAttribute('role', 'menu'); f.innerHTML = om.innerHTML;
+    f.style.top = (Math.max(0, $('#brandbar').getBoundingClientRect().bottom) + 4) + 'px';
+    document.body.appendChild(f);
+  }
   const L = App.lastDate;
   const RL = repLast();
   $('#sideFoot').innerHTML = `<button id="scopeBtn" class="sc" title="Ganti mode tampilan">${App.ui.scope ? '🏬 <span class="scn">' + esc(sName(App.ui.scope)) + '</span><span class="scc">' + esc(App.ui.scope) + '</span>' : '🏢 Branch'} ▾</button><span class="dinfo">${App.ui.scope ? '' : storeCodes().length + ' site · '}data s/d ${RL ? fmtDate(RL) : '–'}</span><button id="reloadBtn" title="Muat ulang data" aria-label="Muat ulang">⟳<span class="t"> Muat ulang</span></button>${App.admin ? `<button id="logoutBtn" class="og" title="Keluar dari admin">Keluar</button>` : `<button id="loginBtn" class="og" title="Masuk admin">Admin</button>`}`;
@@ -2810,13 +2819,14 @@ function settingsChange(t) {
 }
 
 /* ================= navigasi & event ================= */
-function go(page) { App.page = page; App.ui.navOpen = null; closeDrawer(); render(); window.scrollTo(0, 0); }
+function go(page) { App.page = page; App.ui.navOpen = null; const f = $('#navFloat'); if (f) f.remove(); closeDrawer(); render(); window.scrollTo(0, 0); }
+window.addEventListener('resize', () => { if (App.ui.navOpen) renderNav(); });
 document.addEventListener('click', async e => {
   const t = e.target;
   if (App.page === 'settings' && settingsClick(t)) return;
   const dl = t.closest && t.closest('[data-dellog]'); if (dl) { deleteByLog(dl.dataset.dellog); return; }
   const ng = t.closest('[data-navg]'); if (ng) { App.ui.navOpen = App.ui.navOpen === ng.dataset.navg ? null : ng.dataset.navg; renderNav(); return; }
-  if (App.ui.navOpen && !t.closest('.nav-g')) { App.ui.navOpen = null; renderNav(); }
+  if (App.ui.navOpen && !t.closest('.nav-g') && !t.closest('#navFloat')) { App.ui.navOpen = null; renderNav(); }
   const g = t.closest('[data-go]'); if (g) { go(g.dataset.go); return; }
   if (t.closest('[data-close]') || t.id === 'ov') { closeDrawer(); return; }
   const srt = t.closest('[data-sort]'); if (srt) { const [id, k] = srt.dataset.sort.split('|'); const s = App.ui.sorts[id]; App.ui.sorts[id] = s && s.k === k ? { k, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { k, dir: 'desc' }; render(); return; }

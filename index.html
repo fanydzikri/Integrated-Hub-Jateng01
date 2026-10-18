@@ -836,7 +836,7 @@ const DEFAULT_SETTINGS = {
   windowDays: 90, targetCover: 2, promoShare: 60, statementPct: 75,
   autoThreshold: true, manual: { t1: 1, t2: 2, t3: 4 },
   excludeBrands: 'Z, SERVICE', excludeKeywords: 'PAPER BAG, VOUCHER, REPARASI, PACKING, FREE GIFT',
-  billStatuses: {}, txTypes: {}, achGreen: 100, achYellow: 95, defaultValue: 'g'
+  billStatuses: {}, txTypes: {}, achGreen: 100, achYellow: 95, defaultValue: 'g', excludeSales: true
 };
 const splitList = v => String(v || '').split(',').map(x => x.trim().toUpperCase()).filter(Boolean);
 function quantile(arr, p) { if (!arr.length) return 0; const pos = (arr.length - 1) * p, lo = Math.floor(pos), hi = Math.ceil(pos); return arr[lo] + (arr[hi] - arr[lo]) * (pos - lo); }
@@ -1004,7 +1004,9 @@ function srDaily(c, iso) {
 }
 function srLast() { let L = null; for (const m in App.sr) { const M = App.sr[m]; const ds = [...(M.days || []), ...(M.cums || [])]; if (ds.length) { const iso = m + '-' + pad(Math.max(...ds)); if (!L || iso > L) L = iso; } } return L; }
 const repLast = () => { const a = App.lastDate, b = srLast(); return !a ? b : !b ? a : (a > b ? a : b); };
-const linesIn = (from, to, store) => App.lines.filter(l => l.d >= from && l.d <= to && (store ? l.s === store : typeOk(l.s)) && lineOk(l));
+/* produk yang dikecualikan (paper bag, voucher, artikel disembunyikan, dll.) tidak ikut total penjualan di semua menu, kecuali Monitoring OmniChannel */
+const salesOk = l => !(SET().excludeSales !== false && isPB(l.sku));
+const linesIn = (from, to, store) => App.lines.filter(l => l.d >= from && l.d <= to && (store ? l.s === store : typeOk(l.s)) && lineOk(l) && salesOk(l));
 function agg(lines) {
   const mk = () => ({ n: 0, g: 0, nn: 0, q: 0, trx: new Set() });
   const by = new Map(), tot = mk();
@@ -1422,7 +1424,7 @@ function reportData(D, val) {
   const mk = () => ({ v: 0, q: 0, trx: new Set() });
   const cum = new Map(), dd = new Map();
   for (const l of App.lines) {
-    if (l.d < from || l.d > D || !lineOk(l)) continue;
+    if (l.d < from || l.d > D || !lineOk(l) || !salesOk(l)) continue;
     const v = val === 'g' ? l.g : l.n, k = l.d + '|' + l.o;
     let a = cum.get(l.s); if (!a) cum.set(l.s, a = mk()); a.v += v; if (!isPB(l.sku)) a.q += l.q; if (l.q > 0) a.trx.add(k);
     if (l.d === D) { let b = dd.get(l.s); if (!b) dd.set(l.s, b = mk()); b.v += v; if (!isPB(l.sku)) b.q += l.q; if (l.q > 0) b.trx.add(k); }
@@ -1783,7 +1785,7 @@ function pageEac(view) {
   const S = new Map(); const mk = () => ({ v: 0, mv: 0, dv: 0, dmv: 0, mtrx: new Set(), ntrx: new Set(), nv: 0, mem: new Set() });
   const daily = new Map(); const CU = new Map();
   for (const l of App.lines) {
-    if (l.d < from || l.d > D || !lineOk(l) || !typeOk(l.s)) continue;
+    if (l.d < from || l.d > D || !lineOk(l) || !typeOk(l.s) || !salesOk(l)) continue;
     let x = S.get(l.s); if (!x) S.set(l.s, x = mk());
     const v = l.g, mem = isMember(l), k = l.d + '|' + l.o;
     x.v += v; if (l.d === D) x.dv += v;
@@ -2803,7 +2805,8 @@ function pageSettings(view) {
       <div class="grid3">${num('sWin', 'Jendela penjualan (hari)', S.windowDays, 14, 365)}${num('sCov', 'Target cover transfer (bulan)', S.targetCover, .5, 6, .5)}${num('sPro', 'Batas national promo (% qty promo)', S.promoShare, 10, 100)}${num('sStm', 'Persentil harga statement', S.statementPct, 50, 99)}</div>
       <div class="fld" style="margin-top:12px"><label for="sBrand">Brand dikecualikan (pisahkan koma)</label><input class="inp" id="sBrand" value="${esc(S.excludeBrands)}"></div>
       <div class="fld" style="margin-top:12px"><label for="sKw">Kata kunci nama produk dikecualikan</label><input class="inp" id="sKw" value="${esc(S.excludeKeywords)}"></div>
-      <p class="small muted">Produk yang dikecualikan (juga SKU berawalan 81 atau ES) tidak dihitung di qty, UPT, produk, dan kesehatan stok, tapi nilai rupiahnya tetap masuk total penjualan.</p><div class="row-act"><button class="btn primary sSave">Simpan pengaturan</button></div></section>
+      <label class="small" style="display:flex;gap:8px;align-items:center;font-weight:700;margin-top:12px"><input type="checkbox" id="sExSales" ${S.excludeSales !== false ? 'checked' : ''}> Keluarkan produk di atas dari total penjualan di semua menu</label>
+      <p class="small muted" style="margin:4px 0 0">Berlaku untuk brand & kata kunci di atas, SKU berawalan 81 atau ES, dan artikel yang disembunyikan lewat "Klasifikasi manual". Produk ini tidak dihitung di sales, qty, UPT, basket, produk, dan kesehatan stok. <b>Pengecualian:</b> Monitoring OmniChannel tetap menghitung semua penjualan, sehingga Eigerindo Voucher (Category Lv.4 VOUCHER) tidak terganggu.</p><div class="row-act"><button class="btn primary sSave">Simpan pengaturan</button></div></section>
     <section class="card"><div class="card-h"><h3>Monitoring sales</h3></div>
       <div class="grid3">${num('sGreen', 'Hijau jika %Ach ≥', S.achGreen, 50, 200)}${num('sYellow', 'Kuning jika %Ach ≥', S.achYellow, 0, 200)}
       <div class="fld"><label for="sVal">Nilai sales di seluruh dashboard</label><select id="sVal" class="inp"><option value="g" ${S.defaultValue === 'g' ? 'selected' : ''}>Bruto (gross)</option><option value="n" ${S.defaultValue === 'n' ? 'selected' : ''}>Netto (net)</option></select></div></div>
@@ -2837,7 +2840,7 @@ function settingsClick(t) {
     const g = id => +($('#' + id) || {}).value;
     const p = {
       windowDays: clampN(g('sWin') || 90, 14, 365), targetCover: clampN(g('sCov') || 2, .5, 6), promoShare: clampN(g('sPro') || 60, 10, 100), statementPct: clampN(g('sStm') || 75, 50, 99),
-      excludeBrands: $('#sBrand').value, excludeKeywords: $('#sKw').value, achGreen: clampN(g('sGreen') || 100, 1, 300), achYellow: clampN(g('sYellow') || 95, 0, 300), defaultValue: $('#sVal').value,
+      excludeBrands: $('#sBrand').value, excludeKeywords: $('#sKw').value, excludeSales: !!($('#sExSales') || {}).checked, achGreen: clampN(g('sGreen') || 100, 1, 300), achYellow: clampN(g('sYellow') || 95, 0, 300), defaultValue: $('#sVal').value,
       manual: { t1: g('m1') || 1, t2: g('m2') || 2, t3: g('m3') || 4 }
     };
     if (p.achYellow > p.achGreen) p.achYellow = p.achGreen;

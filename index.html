@@ -2551,52 +2551,53 @@ function pageRO(view) {
   const codes = activeStores().filter(c => App.stock[c]), sc = scopeOn() ? App.ui.scope : '';
   const st = sc || (U.roStore && codes.includes(U.roStore) ? U.roStore : '');
   let all = computeRO().filter(x => typeOk(x.c) && (!st || x.c === st));
-  const onlyAvail = U.roAvail !== false;
   const lvl = U.roMc || {};
   const inMc = x => (!lvl.l2 || x.l2 === lvl.l2) && (!lvl.l3 || x.l3 === lvl.l3) && (!lvl.l4 || x.l4 === lvl.l4);
-  const base = onlyAvail ? all.filter(x => x.ro > 0) : all;
+  /* hanya SKU yang ada stoknya di gudang HO: toko repeat order berdasarkan stok yang tersedia di HO */
+  const base = all.filter(x => x.ro > 0);
   const S = (a, f) => a.reduce((t, x) => t + f(x), 0);
-  const tot = { n: base.length, need: S(all, x => x.need), ro: S(all, x => x.ro), short: S(all, x => x.short), val: S(all, x => x.ro * x.price), arts: new Set(all.filter(x => x.ro > 0).map(x => x.art)).size };
+  const hoOf = rs => { const seen = new Set(); let t = 0; for (const x of rs) if (!seen.has(x.sku)) { seen.add(x.sku); t += x.ho; } return t; };
+  const tot = { need: S(base, x => x.need), ro: S(base, x => x.ro), ho: hoOf(base), val: S(base, x => x.ro * x.price), arts: new Set(base.map(x => x.art)).size, stores: new Set(base.map(x => x.c)).size, skus: new Set(base.map(x => x.sku)).size };
   const age = info ? dayDiff(info.date, todayISO()) : null;
   /* helikopter: MC Lv2 › Lv3 › Lv4 */
   const tree = new Map();
-  for (const x of all) { const a = tree.get(x.l2) || { k: x.l2, rs: [], ch: new Map() }; a.rs.push(x); tree.set(x.l2, a); const b = a.ch.get(x.l3) || { k: x.l3, rs: [], ch: new Map() }; b.rs.push(x); a.ch.set(x.l3, b); const c2 = b.ch.get(x.l4) || { k: x.l4, rs: [] }; c2.rs.push(x); b.ch.set(x.l4, c2); }
+  for (const x of base) { const a = tree.get(x.l2) || { k: x.l2, rs: [], ch: new Map() }; a.rs.push(x); tree.set(x.l2, a); const b = a.ch.get(x.l3) || { k: x.l3, rs: [], ch: new Map() }; b.rs.push(x); a.ch.set(x.l3, b); const c2 = b.ch.get(x.l4) || { k: x.l4, rs: [] }; c2.rs.push(x); b.ch.set(x.l4, c2); }
   const open = U.roOpen || (U.roOpen = {});
-  const agg = rs => ({ sku: new Set(rs.map(x => x.sku)).size, need: S(rs, x => x.need), ro: S(rs, x => x.ro), short: S(rs, x => x.short), val: S(rs, x => x.ro * x.price), ls: S(rs, x => x.ls) });
+  const agg = rs => ({ sku: new Set(rs.map(x => x.sku)).size, need: S(rs, x => x.need), ro: S(rs, x => x.ro), ho: hoOf(rs), val: S(rs, x => x.ro * x.price), ls: S(rs, x => x.ls), art: new Set(rs.map(x => x.art)).size });
   const trow = (lv, id, g, sel, hasCh) => { const A = agg(g.rs); const on = sel.l2 === lvl.l2 && sel.l3 === lvl.l3 && sel.l4 === lvl.l4;
-    return `<tr class="lv${lv}" data-rotog="${esc(id)}" data-romc='${esc(JSON.stringify(sel))}' style="${on ? 'outline:2px solid var(--orange);outline-offset:-2px' : ''}"><td class="nm">${hasCh ? `<span class="car">${open[id] ? '▾' : '▸'}</span>` : ''}${esc(g.k)}</td><td class="r">${fmtN(A.sku)}</td><td class="r">${fmtN(A.need)}</td><td class="r"><b>${fmtN(A.ro)}</b></td><td class="r" style="color:${A.short ? 'var(--bad)' : 'inherit'}">${fmtN(A.short)}</td><td class="r">${fmtN(A.ls)}</td><td class="r">${fmtRpS(A.val)}</td></tr>`; };
+    return `<tr class="lv${lv}" data-rotog="${esc(id)}" data-romc='${esc(JSON.stringify(sel))}' style="${on ? 'outline:2px solid var(--orange);outline-offset:-2px' : ''}"><td class="nm">${hasCh ? `<span class="car">${open[id] ? '▾' : '▸'}</span>` : ''}${esc(g.k)}</td><td class="r">${fmtN(A.art)}</td><td class="r">${fmtN(A.sku)}</td><td class="r">${fmtN(A.ho)}</td><td class="r">${fmtN(A.need)}</td><td class="r"><b>${fmtN(A.ro)}</b></td><td class="r">${fmtN(A.ls)}</td><td class="r">${fmtRpS(A.val)}</td></tr>`; };
   let trs = '';
   for (const a of [...tree.values()].sort((x, y) => agg(y.rs).need - agg(x.rs).need)) { const ida = a.k; trs += trow(1, ida, a, { l2: a.k }, true);
     if (open[ida]) for (const b of [...a.ch.values()].sort((x, y) => agg(y.rs).need - agg(x.rs).need)) { const idb = a.k + '›' + b.k; trs += trow(2, idb, b, { l2: a.k, l3: b.k }, true);
       if (open[idb]) for (const c2 of [...b.ch.values()].sort((x, y) => agg(y.rs).need - agg(x.rs).need)) trs += trow(3, idb + '›' + c2.k, c2, { l2: a.k, l3: b.k, l4: c2.k }, false); } }
   /* artikel (setelah pilih MC) */
-  const arts = new Map(); for (const x of base.filter(inMc)) { const a = arts.get(x.art) || { art: x.art, name: artName(x.name) || x.name, l4: x.l4, need: 0, ro: 0, short: 0, ls: 0, stores: new Set(), skus: new Set(), val: 0 }; a.need += x.need; a.ro += x.ro; a.short += x.short; a.ls += x.ls; a.stores.add(x.c); a.skus.add(x.sku); a.val += x.ro * x.price; arts.set(x.art, a); }
+  const arts = new Map(); for (const x of base.filter(inMc)) { const a = arts.get(x.art) || { art: x.art, name: artName(x.name) || x.name, l4: x.l4, need: 0, ro: 0, ls: 0, stores: new Set(), skus: new Set(), rs: [], val: 0 }; a.need += x.need; a.ro += x.ro; a.ls += x.ls; a.stores.add(x.c); a.skus.add(x.sku); a.rs.push(x); a.val += x.ro * x.price; arts.set(x.art, a); }
   const mcLabel = [lvl.l2, lvl.l3, lvl.l4].filter(Boolean).join(' › ');
   view.innerHTML = `<div class="stack">
     ${!info ? `<div class="note">Stok gudang HO belum diupload. Saran tetap dihitung, tapi semua artikel akan tercatat "tidak tersedia di HO". Upload file Data Stock gudang HO di Kelola data.</div>` : age > 1 ? `<div class="note">Data stok gudang HO terakhir <b>${fmtDate(info.date)}</b> (${age} hari lalu). Upload data terbaru agar saran RO sesuai ketersediaan gudang saat ini.</div>` : ''}
     <div class="filters" style="margin:0"><label class="small muted" for="roStore">Toko</label><select id="roStore" class="inp"><option value="">Semua toko</option>${codes.map(c => `<option value="${esc(c)}" ${c === st ? 'selected' : ''}>${esc(c)} - ${esc(sName(c))}</option>`).join('')}</select>
-      <label class="small" style="display:flex;gap:6px;align-items:center;font-weight:700"><input type="checkbox" id="roAvail" ${onlyAvail ? 'checked' : ''}> Daftar artikel: hanya yang tersedia di HO</label>
+      <span class="small muted">Hanya artikel yang ada stoknya di gudang HO</span>
       <span style="flex:1"></span><button class="btn" id="roXls">Download Excel</button></div>
     <div class="pt-tiles" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr))">
-      <div class="pt-tile"><span>Kebutuhan toko</span><b>${fmtN(tot.need)} pcs</b><small>stok menipis + lost sales</small></div>
-      <div class="pt-tile" style="background:#13806F"><span>Saran RO (tersedia HO)</span><b>${fmtN(tot.ro)} pcs</b><small>${fmtN(tot.arts)} artikel · ${fmtRpS(tot.val)}</small></div>
-      <div class="pt-tile" style="background:#C0392B"><span>Tidak tersedia di HO</span><b>${fmtN(tot.short)} pcs</b><small>stok gudang kosong / kurang</small></div>
+      <div class="pt-tile" style="background:#13806F"><span>Saran repeat order</span><b>${fmtN(tot.ro)} pcs</b><small>${fmtN(tot.arts)} artikel · ${fmtN(tot.skus)} SKU · ${fmtRpS(tot.val)}</small></div>
+      <div class="pt-tile"><span>Stok gudang HO tersedia</span><b>${fmtN(tot.ho)} pcs</b><small>untuk SKU yang dibutuhkan toko</small></div>
+      <div class="pt-tile"><span>Toko yang perlu RO</span><b>${fmtN(tot.stores)}</b><small>kebutuhan ${fmtN(tot.need)} pcs</small></div>
       <div class="pt-tile" style="background:#0B1B4A"><span>Stok gudang HO</span><b>${info ? fmtDateS(info.date) : '–'}</b><small>${info ? (info.label ? info.label + ' · ' : '') + fmtN(info.skus) + ' SKU' : 'belum diupload'}</small></div>
     </div>
     <section class="card"><div class="card-h"><h3>Helikopter view: MC Lv2 › Lv3 › Lv4</h3><p class="small muted">klik ▸ untuk membuka · klik baris untuk melihat artikelnya</p></div>
-      <div class="tbl-wrap"><table class="tbl tree"><thead><tr><th>Kategori</th><th class="r">SKU</th><th class="r">Kebutuhan</th><th class="r">Saran RO</th><th class="r">Tidak ada di HO</th><th class="r">Lost sales</th><th class="r">Nilai RO</th></tr></thead><tbody>${trs || '<tr><td colspan="7" class="empty">Tidak ada kebutuhan RO.</td></tr>'}</tbody></table></div>
+      <div class="tbl-wrap"><table class="tbl tree"><thead><tr><th>Kategori</th><th class="r">Artikel</th><th class="r">SKU</th><th class="r">Stok HO</th><th class="r">Kebutuhan</th><th class="r">Saran RO</th><th class="r">Lost sales</th><th class="r">Nilai RO</th></tr></thead><tbody>${trs || '<tr><td colspan="8" class="empty">Tidak ada artikel yang perlu di-RO dan tersedia di gudang HO.</td></tr>'}</tbody></table></div>
       <div class="row-act"><button class="btn sm" id="roAll">Buka semua</button><button class="btn sm" id="roNone">Tutup semua</button>${mcLabel ? `<button class="btn sm" id="roClr">Hapus pilihan kategori (${esc(mcLabel)})</button>` : ''}</div></section>
     <section class="card"><div class="card-h"><h3>Artikel ${mcLabel ? '· ' + esc(mcLabel) : '· semua kategori'}</h3><p class="small muted">klik artikel untuk rincian per size/warna & toko</p></div><div id="roArt"></div></section>
-    <p class="small muted">Cara hitung per toko per SKU: kebutuhan = ${SET().targetCover} bulan rata-rata penjualan (${SET().windowDays} hari terakhir) + lost sales 30 hari terakhir (dari data lost sales terbaru) − stok toko − saran transfer masuk dari toko lain. Saran RO = kebutuhan yang tersedia di gudang HO (dibulatkan ke kelipatan pack), dibagi ke toko dengan penjualan tertinggi lebih dulu.</p>
+    <p class="small muted">Cara hitung per toko per SKU: kebutuhan = ${SET().targetCover} bulan rata-rata penjualan (${SET().windowDays} hari terakhir) + lost sales 30 hari terakhir (dari data lost sales terbaru) − stok toko − saran transfer masuk dari toko lain. Yang ditampilkan hanya SKU yang ada stoknya di gudang HO; saran RO = kebutuhan yang bisa dipenuhi stok HO (dibulatkan ke kelipatan pack), dibagi ke toko dengan penjualan tertinggi lebih dulu bila stok HO terbatas.</p>
   </div>`;
-  $('#roArt').innerHTML = tbl('roArt', { rows: [...arts.values()].map(a => ({ ...a, ns: a.stores.size, nsku: a.skus.size })), sort: { k: 'ro', dir: 'desc' }, limit: 30, onRow: r => openRO(r.art, st), empty: mcLabel ? 'Tidak ada artikel di kategori ini.' : 'Pilih kategori di atas atau lihat semua artikel di sini.', cols: [
+  $('#roArt').innerHTML = tbl('roArt', { rows: [...arts.values()].map(a => ({ ...a, ns: a.stores.size, nsku: a.skus.size, ho: hoOf(a.rs) })), sort: { k: 'ro', dir: 'desc' }, limit: 30, onRow: r => openRO(r.art, st), empty: mcLabel ? 'Tidak ada artikel di kategori ini.' : 'Pilih kategori di atas atau lihat semua artikel di sini.', cols: [
     { k: 'name', label: 'Artikel', h: r => prodCell(r.art, r.name, r.art + ' · ' + r.l4) }, { k: 'ns', label: 'Toko', r: 1, h: r => fmtN(r.ns) }, { k: 'nsku', label: 'SKU', r: 1, h: r => fmtN(r.nsku) },
-    { k: 'need', label: 'Kebutuhan', r: 1, h: r => fmtN(r.need) }, { k: 'ro', label: 'Saran RO', r: 1, h: r => `<b>${fmtN(r.ro)}</b>` }, { k: 'short', label: 'Tidak ada di HO', r: 1, h: r => r.short ? `<span style="color:var(--bad)">${fmtN(r.short)}</span>` : '0' },
+    { k: 'ho', label: 'Stok HO', r: 1, h: r => fmtN(r.ho) }, { k: 'need', label: 'Kebutuhan', r: 1, h: r => fmtN(r.need) }, { k: 'ro', label: 'Saran RO', r: 1, h: r => `<b>${fmtN(r.ro)}</b>` },
     { k: 'ls', label: 'Lost', r: 1, h: r => fmtN(r.ls) }, { k: 'val', label: 'Nilai RO', r: 1, h: r => fmtRpS(r.val) }] });
-  App.ui.roLast = { all, st };
+  App.ui.roLast = { all: base, st };
 }
 function openRO(art, st) {
-  const rows = computeRO().filter(x => x.art === art && typeOk(x.c) && (!st || x.c === st)).sort((a, b) => a.c.localeCompare(b.c) || a.sku.localeCompare(b.sku));
+  const rows = computeRO().filter(x => x.art === art && x.ro > 0 && typeOk(x.c) && (!st || x.c === st)).sort((a, b) => a.c.localeCompare(b.c) || a.sku.localeCompare(b.sku));
   const inf = artInfo(art), mc = rows[0] || {};
   const u = photosOf(art, mainColor(art))[0];
   openDrawer(`<p class="muted small">${esc(mc.l2 || '')} › ${esc(mc.l3 || '')} › ${esc(mc.l4 || '')} · kode ${esc(art)}</p><h2>${esc(inf.name)}</h2>
@@ -2608,8 +2609,8 @@ function openRO(art, st) {
 }
 async function exportRO() {
   const X = App.ui.roLast; if (!X || typeof XLSX === 'undefined') return;
-  const aoa = [['Kode Toko', 'Toko', 'MC Lv2', 'MC Lv3', 'MC Lv4', 'Kode Artikel', 'SKU', 'Nama', 'Stok Toko', 'Jual/bln', 'Lost 30 hari', 'Transfer masuk', 'Kebutuhan', 'Stok Gudang HO', 'Saran RO', 'Tidak tersedia', 'Harga', 'Nilai RO'],
-    ...X.all.map(x => [x.c, sName(x.c), x.l2, x.l3, x.l4, x.art, x.sku, x.name, x.stock, Math.round(x.rate * 10) / 10, x.ls, x.tr || 0, x.need, x.ho, x.ro, x.short, x.price, x.ro * x.price])];
+  const aoa = [['Kode Toko', 'Toko', 'MC Lv2', 'MC Lv3', 'MC Lv4', 'Kode Artikel', 'SKU', 'Nama', 'Stok Toko', 'Jual/bln', 'Lost 30 hari', 'Transfer masuk', 'Kebutuhan', 'Stok Gudang HO', 'Saran RO', 'Harga', 'Nilai RO'],
+    ...X.all.map(x => [x.c, sName(x.c), x.l2, x.l3, x.l4, x.art, x.sku, x.name, x.stock, Math.round(x.rate * 10) / 10, x.ls, x.tr || 0, x.need, x.ho, x.ro, x.price, x.ro * x.price])];
   const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), 'Saran RO');
   (await getDownloads()).save({ filename: `Saran_Repeat_Order_${X.st || 'Jateng01'}_${App.lastDate || todayISO()}.xlsx`, data: new Blob([XLSX.write(wb, { bookType: 'xlsx', type: 'array' })]) });
 }

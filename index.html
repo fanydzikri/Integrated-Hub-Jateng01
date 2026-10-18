@@ -893,7 +893,7 @@ async function loadAll() {
   App.tgtDetail = M.targets || {}; App.tgtBasis = M.tgtBasis || 'total'; App.targets = targetsFromDetail();
   App.omni = M.omni || {}; App.eac = M.eac || {};
   App.log = M.log || []; App.books = M.books || []; App.cells = M.cells || 0;
-  App.lines = []; App.loaded = new Set(); App.sku = {}; App.stock = {}; App.cache = {}; App.sr = {};
+  App.lines = []; App.loaded = new Set(); App.sku = {}; App.dsrSku = {}; App.stock = {}; App.cache = {}; App.sr = {};
   computeLastDate();
   App.loadWarn = [];
   /* ringkasan detention & lost sales sudah ikut di meta (server versi 12); server lama: ambil terpisah */
@@ -932,6 +932,7 @@ async function loadMonth(m) {
   if (App.loaded.has(m) || !App.index.sales[m]) return;
   const C = await api('dsr', { m });
   mergeSku(C.sku || {});
+  App.dsrSku = App.dsrSku || {}; Object.assign(App.dsrSku, C.sku || {});
   for (const c in C.stores || {}) for (const r of C.stores[c]) App.lines.push({ s: c, d: m + '-' + pad(r[0]), t: r[1], o: r[2], st: C.st[r[3]] || '', ty: C.ty[r[4]] || '', sku: r[5], q: r[6], g: r[7], n: r[8], sp: C.sp[r[9]] || '', pm: r[10] || 0, pn: (C.pn || [])[r[11]] || '', pv: r[12] || 0, cv: r[13] || 0, disc: r[14] || 0, cn: (C.cn || [])[r[15]] || '' });
   App.loaded.add(m); App.cache = {};
 }
@@ -1455,7 +1456,7 @@ const stCls = a => a == null ? '' : a >= SET().achGreen / 100 ? 'g' : a >= SET()
 const pct2 = a => a == null ? '–' : fmtPct(a, 2);
 const pct2s = a => a == null ? '–' : fmtPct(a, 2);
 /* angka tabel: ringkas (juta) atau penuh */
-const rpFull = () => !!App.ui.rpFull;
+const rpFull = () => App.ui.rpFull !== false;
 const fN = v => rpFull() ? fmtN(v) : (Math.round(v / 1e5) / 10).toLocaleString('id-ID', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 const fU = v => v == null ? '–' : fmtX(v, 2);
 const fB = v => v == null ? '–' : (rpFull() ? fmtN(v) : (v >= 1e6 ? (v / 1e6).toLocaleString('id-ID', { maximumFractionDigits: 2 }) + ' jt' : Math.round(v / 1e3).toLocaleString('id-ID') + ' rb'));
@@ -1486,7 +1487,7 @@ function pageReport(view) {
     <div class="filters" style="margin:0">
       <label class="small muted" for="rpDate">Tanggal laporan</label><input type="date" id="rpDate" class="inp" value="${D}" max="${maxD}">
       <div class="seg" role="group" aria-label="Nilai sales"><button data-rpv="n" class="${val === 'n' ? 'on' : ''}">Netto</button><button data-rpv="g" class="${val === 'g' ? 'on' : ''}">Bruto</button></div>
-      <div class="seg" role="group" aria-label="Format angka"><button data-rpf="0" class="${rpFull() ? '' : 'on'}">Ringkas (jt)</button><button data-rpf="1" class="${rpFull() ? 'on' : ''}">Penuh</button></div>
+      <div class="seg" role="group" aria-label="Format angka"><button data-rpf="1" class="${rpFull() ? 'on' : ''}">Penuh</button><button data-rpf="0" class="${rpFull() ? '' : 'on'}">Ringkas (jt)</button></div>
       <span style="flex:1"></span>
       <button class="btn" id="rpXls" hidden>Download Excel</button>
     </div>
@@ -1681,7 +1682,7 @@ function pagePromo(view) {
 const tyIs = (l, t) => String(l.ty || '').trim().toLowerCase() === t;
 const OMNI = [
   ['ea', 'Endless Aisle', l => tyIs(l, 'endless aisle')],
-  ['ev', 'Eigerindo Voucher', l => String((App.sku[l.sku] || [])[2] || '').trim().toUpperCase() === 'VOUCHER'],
+  ['ev', 'Eigerindo Voucher', l => String(((App.dsrSku || {})[l.sku] || App.sku[l.sku] || [])[2] || '').trim().toUpperCase() === 'VOUCHER'],
   ['ti', 'Tax Invoice', l => tyIs(l, 'b2b2g')],
   ['es', 'EASAP', l => tyIs(l, 'tour & travel')]
 ];
@@ -1722,8 +1723,9 @@ function pageOmni(view) {
   const head2 = heads.map(([k]) => sh(k + 'T', 'Target') + sh(k + 'A', 'Actual') + sh(k + 'D', 'Diff') + sh(k + 'P', '%Ach')).join('');
   view.innerHTML = `<div class="stack">
     <div class="filters" style="margin:0"><label class="small muted" for="omM">Bulan</label><select id="omM" class="inp">${allM.map(x => `<option value="${x}" ${x === m ? 'selected' : ''}>${fmtMonth(x)}</option>`).join('')}</select>
-      <div class="seg" role="group" aria-label="Format angka"><button data-rpf="0" class="${rpFull() ? '' : 'on'}">Ringkas (jt)</button><button data-rpf="1" class="${rpFull() ? 'on' : ''}">Penuh</button></div>
+      <div class="seg" role="group" aria-label="Format angka"><button data-rpf="1" class="${rpFull() ? 'on' : ''}">Penuh</button><button data-rpf="0" class="${rpFull() ? '' : 'on'}">Ringkas (jt)</button></div>
       <span style="flex:1"></span><button class="btn" id="omXls">Download Excel</button></div>
+    ${O.last ? gapNote(m + '-01', O.last) : ''}
     ${O.hasT ? '' : '<div class="note">Target OmniChannel ' + esc(fmtMonth(m)) + ' belum diupload. Upload file target OmniChannel di Kelola data agar Target, Diff dan %Ach terisi.</div>'}
     <div class="kpis">${heads.map(([k, l]) => `<div class="kpi"><span>${l}</span><b style="color:${O.tot[k + 'P'] == null ? 'var(--navy)' : O.tot[k + 'P'] >= G ? 'var(--ok)' : 'var(--bad)'}">${O.tot[k + 'P'] == null ? fmtRpS(O.tot[k + 'A']) : fmtPct(O.tot[k + 'P'], 1)}</b><small>${fmtRpS(O.tot[k + 'A'])}${O.tot[k + 'T'] ? ' dari target ' + fmtRpS(O.tot[k + 'T']) : ''}</small></div>`).join('')}</div>
     <div class="rp-wrap"><table class="rp" style="min-width:1250px">
@@ -1735,20 +1737,43 @@ function pageOmni(view) {
   </div>`;
   App.ui.omLast = O;
 }
+async function exportEac() {
+  const X = App.ui.eaLast; if (!X || typeof XLSX === 'undefined') return;
+  const r4 = x => x == null ? null : Math.round(x * 10000) / 10000;
+  const a1 = [['Sales Member EAC ' + fmtMonth(X.m) + ' s/d ' + fmtDate(X.D)], [], ['Kode', 'Toko', 'Target bulan', 'Target s/d tgl', 'Actual (gross)', 'Diff', '%Ach bulan', '%Ach s/d tgl', 'Porsi member', 'Member', 'Trx member'],
+    ...X.rows.map(r => [r.c, r.name, Math.round(r.t), Math.round(r.ct), Math.round(r.a), Math.round(r.d), r4(r.pM), r4(r.pC), r4(r.share), r.mem, r.mtrx])];
+  const det = [['Tanggal', 'Kode Toko', 'Nama Toko', 'Order No', 'Bill Status', 'Tipe Transaksi', 'Customer', 'SKU', 'Nama SKU', 'Qty', 'Gross', 'Net']];
+  for (const l of App.lines) { if (l.d < X.from || l.d > X.D || !lineOk(l) || !typeOk(l.s) || !isMember(l)) continue; det.push([l.d, l.s, sName(l.s), l.o, l.st || '', l.ty || '', App.admin ? l.cn : '', l.sku, (App.sku[l.sku] || [])[0] || '', l.q, l.g, l.n]); }
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(a1), 'Per toko'); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(det), 'Detail transaksi member');
+  (await getDownloads()).save({ filename: `Sales_Member_EAC_${X.D}.xlsx`, data: new Blob([XLSX.write(wb, { bookType: 'xlsx', type: 'array' })]) });
+}
 async function exportOmni() {
   const O = App.ui.omLast; if (!O || typeof XLSX === 'undefined') return;
+  const from = O.m + '-01', to = O.m + '-' + pad(dim(O.m));
   const r4 = x => x == null ? null : Math.round(x * 10000) / 10000, ks = [...OMNI.map(o => o[0]), 'tot'];
   const line = r => [r.c ? r.c + ' - ' + r.name : r.name, ...ks.flatMap(k => [Math.round(r[k + 'T']), Math.round(r[k + 'A']), Math.round(r[k + 'D']), r4(r[k + 'P'])])];
   const aoa = [['Monitoring OmniChannel ' + fmtMonth(O.m)], [], ['Site Name', ...OMNI.flatMap(o => [o[1], '', '', '']), 'TOTAL'], ['', ...ks.flatMap(() => ['Target', 'Actual', 'Diff', '%Ach'])], ...O.rows.map(line), line(Object.assign({}, O.tot, { c: '', name: 'TOTAL JATENG 01' }))];
   const ws = XLSX.utils.aoa_to_sheet(aoa); ws['!cols'] = [{ wch: 42 }, ...Array(20).fill({ wch: 13 })];
   for (let i = 4; i < aoa.length; i++) for (let j = 1; j < 21; j++) { const a = XLSX.utils.encode_cell({ r: i, c: j }); if (ws[a] && typeof ws[a].v === 'number') ws[a].z = j % 4 === 0 ? '0.00%' : '#,##0'; }
   const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'OmniChannel');
+  /* detail transaksi per channel untuk rekonsiliasi dengan file lain */
+  const det = [['Channel', 'Tanggal', 'Kode Toko', 'Nama Toko', 'Order No', 'Bill Status', 'Tipe Transaksi', 'SKU', 'Nama SKU', 'Kategori Lv4', 'Qty', 'Gross', 'Net']];
+  for (const l of App.lines) { if (l.d < from || l.d > to || !lineOk(l) || !typeOk(l.s)) continue; for (const [, lbl, f] of OMNI) if (f(l)) { const m = (App.dsrSku || {})[l.sku] || App.sku[l.sku] || []; det.push([lbl, l.d, l.s, sName(l.s), l.o, l.st || '', l.ty || '', l.sku, m[0] || '', m[2] || '', l.q, l.g, l.n]); } }
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(det), 'Detail transaksi');
   const out = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
   (await getDownloads()).save({ filename: `Monitoring_OmniChannel_${O.m}.xlsx`, data: new Blob([out]) });
 }
 
 /* ================= halaman: Sales Member EAC ================= */
 const isMember = l => !!String(l.cn || '').trim();
+/* tanggal tanpa data DSR (per toko) di rentang tertentu: membantu menjelaskan selisih dengan laporan lain */
+function dsrGaps(from, to) {
+  const out = []; const codes = activeStores().filter(c => Object.values(App.index.sales).some(M => M[c]));
+  for (let d = from; d <= to; d = addDays(d, 1)) { const M = App.index.sales[d.slice(0, 7)] || {}; const miss = codes.filter(c => !((M[c] || {}).d || []).includes(+d.slice(8))); if (miss.length) out.push({ d, miss }); }
+  return out;
+}
+const gapNote = (from, to) => { const g = dsrGaps(from, to); if (!g.length) return ''; const full = g.filter(x => x.miss.length >= activeStores().length).map(x => fmtDateS(x.d)), part = g.filter(x => x.miss.length < activeStores().length);
+  return `<div class="note">Data Item DSR belum lengkap di periode ini${full.length ? ': tanggal <b>' + full.join(', ') + '</b> belum diupload sama sekali' : ''}${part.length ? `${full.length ? ', dan ' : ': '}${part.length} tanggal lain belum lengkap untuk sebagian toko (mis. ${fmtDateS(part[0].d)}: ${part[0].miss.slice(0, 3).map(sName).join(', ')}${part[0].miss.length > 3 ? ' +' + (part[0].miss.length - 3) : ''})` : ''}. Angka actual akan lebih kecil dari laporan lain sampai datanya lengkap — cek di Kelola data › Kelengkapan data.</div>`; };
 function pageEac(view) {
   const U = App.ui, maxD = App.lastDate;
   const D = U.eaDate && U.eaDate <= maxD ? U.eaDate : maxD; U.eaDate = D;
@@ -1788,7 +1813,8 @@ function pageEac(view) {
   const top = [...CU.values()].map(x => ({ cn: x.cn, v: x.v, trx: x.trx.size, st: [...x.st].map(sName).join(', '), last: x.last })).sort((a, b) => b.v - a.v);
   view.innerHTML = `<div class="stack">
     <div class="filters" style="margin:0"><label class="small muted" for="eaDate">Tanggal</label><input type="date" id="eaDate" class="inp" value="${D}" max="${maxD}">
-      <div class="seg" role="group" aria-label="Format angka"><button data-rpf="0" class="${rpFull() ? '' : 'on'}">Ringkas (jt)</button><button data-rpf="1" class="${rpFull() ? 'on' : ''}">Penuh</button></div></div>
+      <div class="seg" role="group" aria-label="Format angka"><button data-rpf="1" class="${rpFull() ? 'on' : ''}">Penuh</button><button data-rpf="0" class="${rpFull() ? '' : 'on'}">Ringkas (jt)</button></div><span style="flex:1"></span><button class="btn" id="eaXls">Download Excel</button></div>
+    ${gapNote(from, D)}
     ${Object.keys(T).length ? '' : '<div class="note">Target Sales Member EAC ' + esc(fmtMonth(m)) + ' belum diupload. Isi sheet Target EAC di template lalu upload di Kelola data.</div>'}
     ${App.lines.some(l => l.d >= from && l.d <= D && l.cn === undefined) ? '<div class="note">Sebagian data bulan ini diupload sebelum nama customer ikut disimpan. Upload ulang Item DSR bulan ini agar Sales Member EAC lengkap.</div>' : ''}
     <div class="kpis">${tiles.map(([a, b, c]) => `<div class="kpi"><span>${a}</span><b>${b}</b><small>${c}</small></div>`).join('')}</div>
@@ -1804,6 +1830,7 @@ function pageEac(view) {
   </div>`;
   const dl = []; for (let d = from; d <= D; d = addDays(d, 1)) dl.push(d);
   mkDual($('#cEac'), dl.map(fmtDateS), dl.map(d => (daily.get(d) || {}).mv || 0), dl.map(d => { const x = daily.get(d); return x && x.v ? x.mv / x.v * 100 : null; }), 'Sales member', 'Porsi member (%)', v => fmtRpS(v), v => fmtX(v, 1) + '%');
+  App.ui.eaLast = { rows: srt, tot, from, D, m };
   if (App.admin) $('#eaTop').innerHTML = tbl('eacTop', { rows: top, sort: { k: 'v', dir: 'desc' }, limit: 20, cols: [
     { k: 'cn', label: 'Nama customer', h: r => `<span class="nm">${esc(r.cn)}</span><span class="sub">${esc(r.st)}</span>` },
     { k: 'trx', label: 'Transaksi', r: 1, h: r => fmtN(r.trx) }, { k: 'v', label: 'Sales', r: 1, h: r => fmtRpS(r.v) }, { k: 'last', label: 'Terakhir belanja', r: 1, h: r => fmtDateS(r.last) }] });
@@ -2854,6 +2881,7 @@ document.addEventListener('click', async e => {
   const eas = t.closest('[data-eas]'); if (eas) { const k = eas.dataset.eas; const s0 = App.ui.eaSort || { k: 'pC', dir: 'desc' }; App.ui.eaSort = s0.k === k ? { k, dir: s0.dir === 'asc' ? 'desc' : 'asc' } : { k, dir: k === 'name' ? 'asc' : 'desc' }; render(); return; }
   const oms = t.closest('[data-oms]'); if (oms) { const k = oms.dataset.oms; const s0 = App.ui.omSort || { k: 'totP', dir: 'desc' }; App.ui.omSort = s0.k === k ? { k, dir: s0.dir === 'asc' ? 'desc' : 'asc' } : { k, dir: k === 'name' ? 'asc' : 'desc' }; render(); return; }
   if (t.id === 'omXls') { exportOmni(); return; }
+  if (t.id === 'eaXls') { exportEac(); return; }
   if (t.id === 'raXls') { exportRA(); return; }
   if (t.id === 'lsXls') { exportLost(); return; }
   if (t.id === 'dtXls') { exportDetention(); return; }

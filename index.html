@@ -492,9 +492,10 @@ function dateFromFilename(name) {
   return m[3] + '-' + pad(mo) + '-' + pad(d);
 }
 function detectSheet(rows, fileName) {
-  for (let i = 0; i < Math.min(rows.length, 25); i++) {
+  for (let i = 0; i < Math.min(rows.length, 60); i++) {
     const h = (rows[i] || []).map(normH);
     if (h.includes('createdat') && h.includes('reason') && h.includes('locationcode')) return parseLost(rows, i, h, fileName);
+    if ((h.includes('siteid') || h.includes('kodesite') || h.includes('sitecode')) && h.includes('branch') && !h.includes('offline')) { const r = parseDaily(rows, i, h, fileName); if (r) return r; }
     if (h.includes('locationcode') && h.includes('bruto')) throw new Error('Sales Report tidak dipakai lagi. Upload Item DSR saja.');
     if (h.includes('dailyratio') || (h.some(x => x === 'date' || x === 'tanggal') && h.some(x => /ratio|bobot|weight/.test(x)) && !h.includes('orderno'))) return parseWeights(rows, i, h, fileName);
     if ((h.includes('kodesite') || h.includes('sitecode') || h.includes('kodetoko')) && h.filter(x => MON_KEY[x.slice(0, 3)] && /^[a-z]{3,9}\d{0,4}$/.test(x) && !/^(offline|eiger|total)$/.test(x)).length >= 1 && !h.includes('offline')) return parseEac(rows, i, h, fileName);
@@ -512,7 +513,7 @@ function parseWorkbookAll(buf, fileName) {
   for (const sn of wb.SheetNames) {
     const rows = XLSX.utils.sheet_to_json(wb.Sheets[sn], { header: 1, raw: true, defval: null, blankrows: false });
     const label = wb.SheetNames.length > 1 ? fileName + ' › ' + sn : fileName;
-    try { const r = detectSheet(rows, label); if (r) out.push(r); }
+    try { const r = detectSheet(rows, label); if (r && !(r.kind === 'DLY' && /kumulatif|cumulative|akumulasi/i.test(sn))) out.push(r); }
     catch (e) { errs.push({ file: label, err: e.message || String(e) }); }
   }
   if (!out.length) { if (errs.length) return errs; throw new Error('Bukan file Item DSR, Export by Bin, target, target OmniChannel, atau bobot harian.'); }
@@ -766,6 +767,23 @@ function parseLost(rows, hi, h, fileName) {
   }
   if (!keep.length) throw new Error(known.size ? `Tidak ada baris untuk toko area di file ini (${[...other.values()].reduce((a, b) => a + b, 0)} baris toko lain dilewati). Tambahkan kode site di Kelola data bila ada toko baru.` : 'Daftar toko area masih kosong.');
   return { kind: 'LST', file: fileName, rows: keep, from, to, skipped: [...other.values()].reduce((a, b) => a + b, 0), otherStores: other.size };
+}
+/* sales harian ringkas (format Report Daily Sales: Site ID | Site Name | Branch | Regional | kolom per tanggal) */
+function parseDaily(rows, hi, h, fileName) {
+  const cCode = h.findIndex(x => x === 'siteid' || x === 'kodesite' || x === 'sitecode'), cName = h.findIndex(x => x === 'sitename' || x === 'storename'), cBr = h.indexOf('branch');
+  let dates = [], dr = -1;
+  for (let i = hi; i <= Math.min(hi + 3, rows.length - 1); i++) { const ds = []; (rows[i] || []).forEach((v, j) => { if (j > cBr && isDate(v)) ds.push([j, isoOf(new Date(v.getTime() + 12 * 3600e3))]); }); if (ds.length >= 7) { dr = i; dates = ds; break; } }
+  if (dr < 0) return null;
+  const region = String((typeof App !== 'undefined' && App.region) || 'JATENG 01').toUpperCase(), known = new Set(Object.keys((typeof App !== 'undefined' && App.stores) || {}));
+  const out = [], names = {}; let total = 0, skipped = 0, from = null, to = null;
+  for (let i = dr + 1; i < rows.length; i++) {
+    const r = rows[i] || []; const code = String(r[cCode] ?? '').trim().replace(/\.0$/, ''); if (!/^\d{3,6}$/.test(code)) continue;
+    const br = String(r[cBr] ?? '').trim().toUpperCase(); if (br !== region && !known.has(code)) { skipped++; continue; }
+    names[code] = String(r[cName] ?? '').replace(/\s+/g, ' ').trim();
+    for (const [j, d] of dates) { const v = r[j]; if (v == null || v === '') continue; const n = numV(v); out.push([d, code, names[code], n]); total += n; if (!from || d < from) from = d; if (!to || d > to) to = d; }
+  }
+  if (!out.length || !total) return null;
+  return { kind: 'DLY', file: fileName, rows: out, from, to, stores: Object.keys(names).length, names, total, skipped };
 }
 function basisVal(o, b) {
   if (!o) return 0;
@@ -1212,7 +1230,7 @@ const ICON = {
   settings: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>'
 };
 const NAV = [
-  { k: 'sales', label: 'Sales Performance', icon: 'area', items: [['report', 'Monitoring Sales', 'Achievement, UPT & basket size'], ['trend', 'Sales Trend', 'Jam, hari, UPT & basket harian'], ['promo', 'Kontribusi Promo', 'Porsi tiap promo terhadap sales'], ['omni', 'Monitoring OmniChannel', 'EA, Eigerindo Voucher, Tax Invoice, EASAP'], ['eac', 'Sales Member EAC', 'KPI penjualan ke member'], ['ra', 'RA Performance', 'Transaksi, UPT & basket per sales person'], ['pareto', 'Product Pareto', 'Kontribusi kategori & produk (80/20)']] },
+  { k: 'sales', label: 'Sales Performance', icon: 'area', items: [['report', 'Monitoring Sales', 'Achievement, UPT & basket size'], ['trend', 'Sales Trend', 'Jam, hari, UPT & basket harian'], ['promo', 'Kontribusi Promo', 'Porsi tiap promo terhadap sales'], ['omni', 'Monitoring OmniChannel', 'EA, Eigerindo Voucher, Tax Invoice, EASAP'], ['eac', 'Sales Member EAC', 'KPI penjualan ke member'], ['ra', 'RA Performance', 'Transaksi, UPT & basket per sales person'], ['pareto', 'Product Pareto', 'Kontribusi kategori & produk (80/20)'], ['growth', 'Growth vs Tahun Lalu', 'Harian, MTD & YTD dibanding tahun lalu']] },
   { k: 'inv', label: 'Inventory', icon: 'produk', items: [['produk', 'Produk', 'Penjualan & stok per artikel'], ['stok', 'Kesehatan Produk', 'SSR, dead stock, saran transfer'], ['promostock', 'Stok DCNP/SMDS', 'Stok barang diskon per MC Lv2–Lv4'], ['detention', 'Detention Stock', '% generic & varian terdisplay per toko']] },
   { k: 'lost', label: 'Lost Sales', icon: 'lost' },
   { k: 'admin', label: 'Kelola data', icon: 'admin', admin: 1 },
@@ -1240,7 +1258,7 @@ function renderNav() {
 function renderPeriod() {
   const box = $('#periodBox');
   const tsel = hasTypes() && App.page !== 'toko' ? `<label class="small muted" for="typeSel">Jenis toko</label><select id="typeSel" class="inp"><option value="">Semua toko</option>${['rg', 'bz', 'ot'].filter(t => storeCodes().some(c => sType(c) === t)).map(t => `<option value="${t}" ${App.ui.typeF === t ? 'selected' : ''}>${TYPE_LABEL[t]}</option>`).join('')}</select>` : '';
-  if (['report', 'promo', 'omni', 'eac', 'lost', 'detention'].includes(App.page)) { box.innerHTML = tsel; return; }
+  if (['report', 'promo', 'omni', 'eac', 'lost', 'detention', 'growth'].includes(App.page)) { box.innerHTML = tsel; return; }
   if (!App.lastDate || App.page === 'admin' || App.page === 'settings') { box.innerHTML = ''; return; }
   const L = App.lastDate, cm = L.slice(0, 7);
   const months = Object.keys(App.index.sales).sort().reverse().filter(m => m !== cm);
@@ -1282,7 +1300,7 @@ function render() {
     return;
   }
   if (!App.lastDate && !['admin', 'stok', 'report', 'settings', 'lost', 'detention'].includes(App.page)) { App.page = srLast() ? 'report' : 'stok'; }
-  const fn = { area: pageArea, report: pageReport, trend: pageTrend, promo: pagePromo, omni: pageOmni, eac: pageEac, ra: pageRA, pareto: pagePareto, lost: pageLost, promostock: pagePromoStock, detention: pageDetention, toko: pageStore, produk: pageProduct, stok: pageStock, admin: pageAdmin, settings: pageSettings }[App.page] || pageReport;
+  const fn = { area: pageArea, report: pageReport, trend: pageTrend, promo: pagePromo, omni: pageOmni, eac: pageEac, ra: pageRA, pareto: pagePareto, lost: pageLost, promostock: pagePromoStock, detention: pageDetention, growth: pageGrowth, toko: pageStore, produk: pageProduct, stok: pageStock, admin: pageAdmin, settings: pageSettings }[App.page] || pageReport;
   try { fn(view); if ((App.loadWarn || []).length) view.insertAdjacentHTML('afterbegin', `<div class="note" style="margin-bottom:14px">Sebagian data belum termuat (${esc(App.loadWarn.join(', '))}). Tekan <b>Muat ulang</b> di kanan atas untuk mencoba lagi.</div>`); } catch (e) { console.error(e); view.innerHTML = `<div class="empty-state"><h2>Halaman gagal ditampilkan</h2><p class="muted">${esc(e.message)}</p></div>`; }
 }
 
@@ -2271,6 +2289,92 @@ async function exportDetention() {
   (await getDownloads()).save({ filename: `Detention_Stock_Jateng01_${todayISO()}.xlsx`, data: new Blob([XLSX.write(wb, { bookType: 'xlsx', type: 'array' })]) });
 }
 
+/* ================= halaman: Growth vs Tahun Lalu ================= */
+async function loadDaily() { const C = await api('daily'); const M = new Map(), N = {}; for (const r of C.rows || []) { M.set(r[1] + '|' + r[0], r[3]); if (r[2]) N[r[1]] = r[2]; } App.daily = { map: M, names: N }; }
+/* sales tahun berjalan per toko per tanggal: dari ringkasan DSR (gross, semua item) atau, bila tidak ada, dari data sales harian ringkas */
+function tyVal(c, iso) {
+  const x = (App.index.sales[iso.slice(0, 7)] || {})[c], dd = +iso.slice(8);
+  if (x && (x.d || []).includes(dd)) { if (x.g) return x.g[dd] || 0; let t = 0, ok = false; for (const l of App.lines) if (l.s === c && l.d === iso) { t += l.g; ok = true; } if (ok) return t; }
+  const v = App.daily && App.daily.map.get(c + '|' + iso); return v == null ? null : v;
+}
+const lyDate = (iso, basis) => { if (basis === 'dow') return addDays(iso, -364); const y = +iso.slice(0, 4) - 1, md = iso.slice(5); return md === '02-29' ? y + '-02-28' : y + '-' + md; };
+const lyVal = (c, iso, basis) => { const v = App.daily && App.daily.map.get(c + '|' + lyDate(iso, basis)); return v == null ? null : v; };
+function pageGrowth(view) {
+  const U = App.ui;
+  if (!App.daily) { view.innerHTML = '<div class="loading"><span class="spin"></span>Mengambil data sales tahun lalu…</div>'; loadDaily().then(render).catch(e => { view.innerHTML = `<div class="empty-state"><h2>Gagal memuat data tahun lalu</h2><p class="muted">${esc(errMsg(e))}</p></div>`; }); return; }
+  if (!App.daily.map.size) { setHead('Growth vs Tahun Lalu', ''); view.innerHTML = `<div class="empty-state"><h2>Belum ada data sales tahun lalu</h2><p class="muted">${App.admin ? 'Upload file Report Daily Sales (format Site ID, Site Name, Branch, lalu kolom per tanggal) di Kelola data. Hanya toko Jateng 01 yang diambil.' : 'Admin belum mengunggah data pembanding tahun lalu.'}</p></div>`; return; }
+  const maxD = repLast() || todayISO(), D = U.gwDate && U.gwDate <= maxD ? U.gwDate : maxD; U.gwDate = D;
+  const basis = U.gwBasis || 'date', lfl = !!U.gwLfl;
+  const y = D.slice(0, 4), m = D.slice(0, 7), mFrom = m + '-01', yFrom = y + '-01-01';
+  const codes = new Set();
+  for (const k of App.daily.map.keys()) { const [c, d] = k.split('|'); if (d.slice(0, 4) >= String(+y - 1)) codes.add(c); }
+  for (const mm in App.index.sales) if (mm.startsWith(y)) for (const c in App.index.sales[mm]) codes.add(c);
+  const list = [...codes].filter(typeOk);
+  const nameOf = c => (App.stores[c] && (App.stores[c].alias || App.stores[c].name)) || App.daily.names[c] || c;
+  const range = (a, b) => { const o = []; for (let d = a; d <= b; d = addDays(d, 1)) o.push(d); return o; };
+  const sum = (c, ds, f) => { let t = 0, any = false; for (const d of ds) { const v = f(c, d); if (v != null) { t += v; any = true; } } return any ? t : null; };
+  const hasTY = d => list.some(c => tyVal(c, d) != null);
+  const missTY = range(yFrom, D).filter(d => !hasTY(d));
+  /* periode sebanding: default hanya tanggal yang sudah ada data tahun ini, supaya tanggal yang belum diupload tidak membuat growth minus */
+  const comp = U.gwComp !== false;
+  const pick = ds => comp ? ds.filter(hasTY) : ds;
+  const dY = pick(range(yFrom, D)), dM = pick(range(mFrom, D));
+  const rows = list.map(c => {
+    const r = { c, name: nameOf(c) };
+    for (const [k, ds] of [['d', [D]], ['m', dM], ['y', dY]]) { r[k + 'T'] = sum(c, ds, tyVal); r[k + 'L'] = sum(c, ds, (cc, d) => lyVal(cc, d, basis)); r[k + 'G'] = r[k + 'T'] != null && r[k + 'L'] ? r[k + 'T'] / r[k + 'L'] - 1 : null; }
+    r.isNew = !r.yL; r.closed = !r.yT && !!r.yL;
+    return r;
+  }).filter(r => r.yT || r.yL);
+  const use = lfl ? rows.filter(r => !r.isNew && !r.closed) : rows;
+  const tot = { c: '', name: 'TOTAL ' + (lfl ? '(like-for-like)' : 'JATENG 01') };
+  for (const k of ['d', 'm', 'y']) { tot[k + 'T'] = use.reduce((a, r) => a + (r[k + 'T'] || 0), 0); tot[k + 'L'] = use.reduce((a, r) => a + (r[k + 'L'] || 0), 0); tot[k + 'G'] = tot[k + 'L'] ? tot[k + 'T'] / tot[k + 'L'] - 1 : null; }
+  setHead('Growth vs Tahun Lalu', `Acuan ${fmtDate(D)} vs ${fmtDate(lyDate(D, basis))} · ${basis === 'dow' ? 'hari yang sama (364 hari sebelumnya)' : 'tanggal yang sama'} · gross semua item`);
+  const st = U.gwSort || { k: 'yT', dir: 'desc' };
+  const srt = use.slice().sort((a, b) => { const x = a[st.k], z = b[st.k]; const r = typeof x === 'string' ? String(x).localeCompare(String(z), 'id') : (x ?? -Infinity) - (z ?? -Infinity); return st.dir === 'asc' ? r : -r; });
+  const gc = g => g == null ? '<td class="r">–</td>' : `<td class="r ${g >= 0 ? 'dpos' : 'dneg'}">${g >= 0 ? '+' : ''}${fmtPct(g, 1)}</td>`;
+  const vc = v => `<td class="r">${v == null ? '–' : fN(v)}</td>`;
+  const cells = r => ['d', 'm', 'y'].map(k => `${vc(r[k + 'T'])}${vc(r[k + 'L'])}${gc(r[k + 'G'])}`).join('').replace(/<td class="r">/, '<td class="r sep">');
+  const sh = (k, l) => `<th class="s" data-gws="${k}">${l}${st.k === k ? (st.dir === 'asc' ? ' ▲' : ' ▼') : ''}</th>`;
+  const tile = (lbl, g, t, l) => `<div class="pt-tile" style="background:${g == null ? '#0F3192' : g >= 0 ? '#13806F' : '#C0392B'}"><span>${lbl}</span><b>${g == null ? '–' : (g >= 0 ? '+' : '') + fmtPct(g, 1)}</b><small style="color:#fff;opacity:.9">${fmtRpS(t)} vs ${fmtRpS(l)}</small></div>`;
+  view.innerHTML = `<div class="stack">
+    <div class="filters" style="margin:0"><label class="small muted" for="gwDate">Tanggal acuan</label><input type="date" id="gwDate" class="inp" value="${D}" max="${maxD}">
+      <div class="seg" role="group" aria-label="Basis pembanding"><button data-gwb="date" class="${basis === 'date' ? 'on' : ''}">Tanggal sama</button><button data-gwb="dow" class="${basis === 'dow' ? 'on' : ''}">Hari sama</button></div>
+      <label class="small" style="display:flex;gap:6px;align-items:center;font-weight:700"><input type="checkbox" id="gwLfl" ${lfl ? 'checked' : ''}> Like-for-like</label>
+      <label class="small" style="display:flex;gap:6px;align-items:center;font-weight:700" title="Hanya membandingkan tanggal yang sudah ada data tahun ini"><input type="checkbox" id="gwComp" ${comp ? 'checked' : ''}> Hanya tanggal yang ada datanya</label>
+      <div class="seg" role="group" aria-label="Format angka"><button data-rpf="1" class="${rpFull() ? 'on' : ''}">Penuh</button><button data-rpf="0" class="${rpFull() ? '' : 'on'}">Ringkas (jt)</button></div></div>
+    ${missTY.length ? `<div class="note">Sales tahun ini belum ada untuk ${missTY.length} hari di ${y} (mis. ${missTY.slice(0, 3).map(fmtDateS).join(', ')}${missTY.length > 3 ? ', …' : ''}). ${comp ? `Growth MTD & YTD sementara hanya membandingkan <b>${dY.length} tanggal yang sudah ada datanya</b> dengan tanggal yang sama tahun lalu.` : 'Tanggal yang belum ada datanya dihitung 0, sehingga growth bisa terlihat minus.'} Agar YTD utuh, upload Item DSR historis atau file sales harian ${y} dengan format yang sama seperti data tahun lalu.</div>` : ''}
+    <div class="pt-tiles" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr))">${tile('Growth harian · ' + fmtDateS(D), tot.dG, tot.dT, tot.dL)}${tile('Growth MTD · ' + MONL[+m.slice(5) - 1], tot.mG, tot.mT, tot.mL)}${tile('Growth YTD · ' + y, tot.yG, tot.yT, tot.yL)}</div>
+    <div class="grid g2">
+      <section class="card"><div class="card-h"><h3>Bulanan ${y} vs ${+y - 1}</h3><p class="small muted">bulan berjalan s/d ${fmtDateS(D)}</p></div><div class="chart-box"><canvas id="gwMon"></canvas></div></section>
+      <section class="card"><div class="card-h"><h3>Harian ${fmtMonth(m)}</h3><p class="small muted">tahun ini vs tahun lalu</p></div><div class="chart-box"><canvas id="gwDay"></canvas></div></section>
+    </div>
+    <div class="rp-wrap"><table class="rp" style="min-width:1050px">
+      <thead><tr><th rowspan="2" class="nmh s" data-gws="name">Toko</th><th colspan="3">Harian ${fmtDateS(D)}</th><th colspan="3">MTD 1–${+D.slice(8)} ${MON[+m.slice(5) - 1]}</th><th colspan="3">YTD 1 Jan – ${fmtDateS(D)}</th></tr>
+      <tr>${sh('dT', y)}${sh('dL', +y - 1)}${sh('dG', 'Growth')}${sh('mT', y)}${sh('mL', +y - 1)}${sh('mG', 'Growth')}${sh('yT', y)}${sh('yL', +y - 1)}${sh('yG', 'Growth')}</tr></thead>
+      <tbody>${srt.map(r => `<tr data-store="${esc(r.c)}" style="cursor:pointer"><td class="nm">${esc(r.c)} · ${esc(r.name)}${r.isNew ? '<small style="color:var(--info)">toko baru · belum ada pembanding</small>' : r.closed ? '<small>tidak ada penjualan tahun ini</small>' : ''}</td>${cells(r)}</tr>`).join('')}</tbody>
+      <tfoot><tr><td class="nm" style="background:#0B1B4A;color:#fff">${esc(tot.name)}</td>${cells(tot).replace(/ dpos| dneg/g, '')}</tr></tfoot></table></div>
+    <p class="small muted">Tahun ini = gross dari Item DSR (semua item, termasuk paper bag & voucher, supaya sebanding dengan data tahun lalu); bila DSR tanggal itu belum ada, dipakai data sales harian yang diupload. Tahun lalu = file sales harian (Report Daily Sales). Like-for-like hanya menghitung toko yang punya penjualan di kedua tahun. "Hari sama" membandingkan dengan hari yang sama 52 minggu lalu (Sabtu vs Sabtu).</p>
+  </div>`;
+  /* grafik bulanan */
+  const months = []; for (let i = 1; i <= +m.slice(5); i++) months.push(y + '-' + pad(i));
+  const monD = mm => pick(range(mm + '-01', mm === m ? D : mm + '-' + pad(dim(mm))));
+  const monT = months.map(mm => { const ds = monD(mm); return use.reduce((a, r) => a + (sum(r.c, ds, tyVal) || 0), 0); });
+  const monL = months.map(mm => { const ds = monD(mm); return use.reduce((a, r) => a + (sum(r.c, ds, (cc, d) => lyVal(cc, d, basis)) || 0), 0); });
+  if (typeof Chart !== 'undefined') {
+    const ink = css('--muted');
+    App.charts.push(new Chart($('#gwMon'), { type: 'bar', data: { labels: months.map(mm => MON[+mm.slice(5) - 1]), datasets: [
+      { label: y, data: monT, backgroundColor: css('--navy'), borderRadius: 3 }, { label: String(+y - 1), data: monL, backgroundColor: '#C8D0E0', borderRadius: 3 }] },
+      options: { maintainAspectRatio: false, plugins: { legend: { labels: { color: ink, boxWidth: 12 } }, tooltip: { callbacks: { label: c => c.dataset.label + ': ' + fmtRpS(c.parsed.y), afterBody: c => { const i = c[0].dataIndex; return monL[i] ? 'Growth: ' + fmtPct(monT[i] / monL[i] - 1, 1) : ''; } } } },
+        scales: { x: { ticks: { color: ink }, grid: { display: false } }, y: { ticks: { color: ink, callback: v => fmtRpS(v) }, grid: { color: css('--line') } } } } }));
+    const dd = range(mFrom, m + '-' + pad(dim(m)));
+    App.charts.push(new Chart($('#gwDay'), { type: 'line', data: { labels: dd.map(d => +d.slice(8)), datasets: [
+      { label: y, data: dd.map(d => d > D ? null : use.reduce((a, r) => a + (tyVal(r.c, d) || 0), 0)), borderColor: css('--navy'), backgroundColor: css('--navy'), tension: .2, pointRadius: 2 },
+      { label: String(+y - 1), data: dd.map(d => use.reduce((a, r) => a + (lyVal(r.c, d, basis) || 0), 0)), borderColor: '#9AA6C8', borderDash: [5, 4], pointRadius: 0, tension: .2 }] },
+      options: { maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { labels: { color: ink, boxWidth: 12 } }, tooltip: { callbacks: { label: c => c.dataset.label + ': ' + fmtRpS(c.parsed.y) } } },
+        scales: { x: { ticks: { color: ink }, grid: { display: false } }, y: { ticks: { color: ink, callback: v => fmtRpS(v) }, grid: { color: css('--line') } } } } }));
+  }
+}
+
 /* ================= halaman: per toko ================= */
 function pageStore(view) {
   const codes = storeCodes(); if (!App.ui.store || !codes.includes(App.ui.store)) App.ui.store = codes[0];
@@ -2519,14 +2623,14 @@ function pageAdmin(view) {
   renderPending(); renderCoverage(cm);
   $('#logT').innerHTML = tbl('log', { rows: App.log.slice().reverse(), limit: 15, empty: 'Belum ada upload.', cols: [
     { k: 'at', label: 'Waktu', h: r => esc(new Date(r.at).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })) },
-    { k: 'kind', label: 'Jenis', h: r => ({ DSR: 'Penjualan', INV: 'Stok', TGT: 'Target', OMT: 'Target Omni', EAC: 'Target EAC', LST: 'Lost Sales', WGT: 'Bobot harian', SR: 'Sales Report', DEL: 'Hapus' }[r.kind] || r.kind) }, { k: 'file', label: 'File', h: r => `<span class="small">${esc(r.file)}</span>` },
+    { k: 'kind', label: 'Jenis', h: r => ({ DSR: 'Penjualan', INV: 'Stok', TGT: 'Target', OMT: 'Target Omni', EAC: 'Target EAC', LST: 'Lost Sales', DLY: 'Sales harian', WGT: 'Bobot harian', SR: 'Sales Report', DEL: 'Hapus' }[r.kind] || r.kind) }, { k: 'file', label: 'File', h: r => `<span class="small">${esc(r.file)}</span>` },
     { k: 'stores', label: 'Toko', r: 1 }, { k: 'info', label: 'Isi', h: r => esc(r.info) + (r.removed ? ' <span class="badge b-DS">sudah dihapus</span>' : '') },
     { k: 'x', label: '', ns: 1, h: r => r.id && r.scope && !r.removed ? `<button class="btn sm danger" data-dellog="${esc(r.id)}">Hapus data file ini</button>` : '' }] });
 }
 /* hapus semua data yang dimasukkan oleh satu file (dikerjakan di spreadsheet) */
 async function deleteByLog(id) {
   const e = App.log.find(x => x.id === id); if (!e || !e.scope) return;
-  const what = { DSR: 'penjualan (Item DSR)', INV: 'stok', TGT: 'target', OMT: 'target OmniChannel', EAC: 'target Member EAC', LST: 'lost sales', WGT: 'bobot harian' }[e.kind] || 'data';
+  const what = { DSR: 'penjualan (Item DSR)', INV: 'stok', TGT: 'target', OMT: 'target OmniChannel', EAC: 'target Member EAC', LST: 'lost sales', DLY: 'sales harian ringkas', WGT: 'bobot harian' }[e.kind] || 'data';
   if (!confirm(`Hapus data ${what} dari file "${e.file}"?\n${e.info}\n\nCatatan: kalau toko & tanggal yang sama pernah diupload ulang dari file lain, data itu ikut terhapus. Tidak bisa dibatalkan.`)) return;
   try { toast('Menghapus data di spreadsheet…', 15000); await apiPost({ a: 'deleteLog', id }); await loadAll(); toast('Data dari file itu sudah dihapus'); render(); }
   catch (er) { console.error(er); toast('Gagal menghapus: ' + errMsg(er)); }
@@ -2544,6 +2648,7 @@ function renderPending() {
       const warn = p.days !== dim(p.month) ? ` <b style="color:var(--warn)">hanya ${p.days} dari ${dim(p.month)} hari</b>` : '';
       return `<div class="pend-i"><span class="k">Bobot harian</span><div><div class="f">${esc(p.file)}</div><div class="d">${fmtMonth(p.month)} · ${p.days} hari · total ${fmtPct(p.rawSum, 2)}${warn}</div></div><button class="btn sm" data-rmp="${i}">Hapus</button></div>`;
     }
+    if (p.kind === 'DLY') return `<div class="pend-i"><span class="k" style="background:var(--ok-bg);color:var(--ok)">Sales harian</span><div><div class="f">${esc(p.file)}</div><div class="d">${fmtDate(p.from)} – ${fmtDate(p.to)} · ${p.stores} toko area · total ${fmtRp(p.total)}${p.skipped ? ` · ${fmtN(p.skipped)} toko di luar area dilewati` : ''} · dipakai sebagai pembanding tahun lalu / pelengkap sales</div></div><button class="btn sm" data-rmp="${i}">Hapus</button></div>`;
     if (p.kind === 'LST') {
       const amt = p.rows.reduce((a, r) => a + (r[10] || 0), 0), st = new Set(p.rows.map(r => r[2])).size;
       return `<div class="pend-i"><span class="k err" style="background:var(--orange-tint);color:var(--orange-deep)">Lost Sales</span><div><div class="f">${esc(p.file)}</div><div class="d">${p.from === p.to ? fmtDate(p.from) : fmtDate(p.from) + ' – ' + fmtDate(p.to)} · ${fmtN(p.rows.length)} baris dari ${st} toko area · ${fmtRp(amt)}${p.skipped ? ` · ${fmtN(p.skipped)} baris dari ${p.otherStores} toko di luar area dilewati` : ''}</div></div><button class="btn sm" data-rmp="${i}">Hapus</button></div>`;
@@ -2685,6 +2790,13 @@ async function saveAll() {
       for (const m in R) for (const c in R[m]) rows.push([m, c, p.names[c] || '', R[m][c]]);
       if (rows.length) await withRetry(() => apiPost({ a: 'eacTarget', rows }));
       logs.push({ id: uid(), scope: { months: Object.keys(R), codes: Object.keys(p.names) }, at: now, kind: 'EAC', file: p.file, stores: p.rows, info: 'target Member EAC ' + Object.keys(R).sort().map(fmtMonth).join(', ') });
+    }
+    /* --- sales harian ringkas (data tahun lalu) --- */
+    for (const p of items.filter(p => p.kind === 'DLY')) {
+      say('Menyimpan sales harian ' + fmtDate(p.from) + ' – ' + fmtDate(p.to) + '…');
+      for (let i = 0; i < p.rows.length; i += 8000) { const part = p.rows.slice(i, i + 8000); await withRetry(() => apiPost({ a: 'daily', rows: part, src: p.file })); }
+      logs.push({ id: uid(), scope: { from: p.from, to: p.to, codes: Object.keys(p.names) }, at: now, kind: 'DLY', file: p.file, stores: p.stores, info: 'sales harian ' + fmtDate(p.from) + ' – ' + fmtDate(p.to) + ', ' + fmtRpS(p.total) });
+      App.daily = null;
     }
     /* --- lost sales --- */
     /* daftar toko area: yang sudah terdaftar + toko dari file lain di upload yang sama */
@@ -2885,6 +2997,8 @@ document.addEventListener('click', async e => {
   const oms = t.closest('[data-oms]'); if (oms) { const k = oms.dataset.oms; const s0 = App.ui.omSort || { k: 'totP', dir: 'desc' }; App.ui.omSort = s0.k === k ? { k, dir: s0.dir === 'asc' ? 'desc' : 'asc' } : { k, dir: k === 'name' ? 'asc' : 'desc' }; render(); return; }
   if (t.id === 'omXls') { exportOmni(); return; }
   if (t.id === 'eaXls') { exportEac(); return; }
+  const gws = t.closest('[data-gws]'); if (gws) { const k = gws.dataset.gws; const s0 = App.ui.gwSort || { k: 'yG', dir: 'asc' }; App.ui.gwSort = s0.k === k ? { k, dir: s0.dir === 'asc' ? 'desc' : 'asc' } : { k, dir: k === 'name' ? 'asc' : 'desc' }; render(); return; }
+  const gwb = t.closest('[data-gwb]'); if (gwb) { App.ui.gwBasis = gwb.dataset.gwb; render(); return; }
   if (t.id === 'raXls') { exportRA(); return; }
   if (t.id === 'lsXls') { exportLost(); return; }
   if (t.id === 'dtXls') { exportDetention(); return; }
@@ -2941,6 +3055,9 @@ document.addEventListener('change', async e => {
   if (t.id === 'lsM') { App.ui.lsM = t.value; render(); return; }
   if (t.id === 'lsStore') { App.ui.lsStore = t.value; App.ui.more = {}; render(); return; }
   if (t.id === 'ptStore') { App.ui.ptStore = t.value; App.ui.more = {}; render(); return; }
+  if (t.id === 'gwDate') { if (t.value) { App.ui.gwDate = t.value; render(); } return; }
+  if (t.id === 'gwLfl') { App.ui.gwLfl = t.checked; render(); return; }
+  if (t.id === 'gwComp') { App.ui.gwComp = t.checked; render(); return; }
   if (t.id === 'raStore') { App.ui.raStore = t.value; App.ui.more = {}; render(); return; }
   if (t.id === 'raMin') { App.ui.raMin = Math.max(0, +t.value || 0); render(); return; }
   if (t.id === 'eaDate') { if (t.value) { App.ui.eaDate = t.value; render(); } return; }

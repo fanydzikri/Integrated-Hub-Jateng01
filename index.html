@@ -851,12 +851,18 @@ const VLL = () => isNet() ? 'Net sales' : 'Gross sales';
 
 /* ================= server: Google Spreadsheet (Apps Script) ================= */
 const LS = { get: k => { try { return localStorage.getItem(k) || ''; } catch (e) { return ''; } }, set: (k, v) => { try { v ? localStorage.setItem(k, v) : localStorage.removeItem(k); } catch (e) { } } };
-async function api(a, params = {}) {
+async function api(a, params = {}, tries = 3) {
+  for (let i = 1; ; i++) {
+    try { return await api1(a, params); }
+    catch (e) { if (i >= tries || !['network', 'server', 'busy'].includes(e && e.code)) throw e; await sleep(1200 * i); }
+  }
+}
+async function api1(a, params) {
   const u = new URL(SHEET_API_URL); u.searchParams.set('a', a);
   for (const k in params) u.searchParams.set(k, params[k]);
   const key = App.adminPw || LS.get('dash_view'); if (key) u.searchParams.set('k', key);
   let r;
-  try { r = await fetch(u.toString(), { redirect: 'follow' }); } catch (e) { throw Object.assign(new Error('Tidak bisa terhubung ke spreadsheet. Cek internet atau URL Web App.'), { code: 'network' }); }
+  try { r = await fetch(u.toString(), { redirect: 'follow' }); } catch (e) { throw Object.assign(new Error('Server Google sedang sibuk atau koneksi terputus. Coba Muat ulang beberapa saat lagi.'), { code: 'network' }); }
   const j = await r.json().catch(() => ({ error: 'server', message: 'Jawaban server tidak terbaca. Pastikan Web App sudah di-deploy dengan akses "Anyone".' }));
   if (j && j.error) throw Object.assign(new Error(j.message || j.error), { code: j.error });
   return j;
@@ -889,9 +895,19 @@ async function loadAll() {
   App.log = M.log || []; App.books = M.books || []; App.cells = M.cells || 0;
   App.lines = []; App.loaded = new Set(); App.sku = {}; App.stock = {}; App.cache = {}; App.sr = {};
   computeLastDate();
+  App.loadWarn = [];
+  /* ringkasan detention & lost sales sudah ikut di meta (server versi 12); server lama: ambil terpisah */
+  if (Array.isArray(M.det)) { App.detMc = {}; App.detHist = M.det.map(r => ({ d: r[0], c: r[1], gW: r[2], gS: r[3], vW: r[4], vS: r[5], note: r[6] || '' })); }
+  if (Array.isArray(M.lost)) App.lost = M.lost.map(r => ({ d: r[0], t: r[1], s: r[2], cn: r[3], mc: r[4], sku: r[5], name: r[6], q: r[7] || 0, price: r[8] || 0, amt: r[9] || 0, reason: r[10], type: r[11], by: r[12] }));
   const months = Object.keys(App.index.sales).sort();
   const want = months.length ? months.filter(m => m >= addMonths(months[months.length - 1], -3)) : [];
-  await Promise.all([loadStock(), loadLost(), loadDetHist(), ...want.map(loadMonth)]);
+  const jobs = [['stok', loadStock], ...want.map(m => ['penjualan ' + fmtMonth(m), () => loadMonth(m)])];
+  if (!Array.isArray(M.lost)) jobs.push(['lost sales', loadLost]);
+  if (!Array.isArray(M.det)) jobs.push(['riwayat detention', loadDetHist]);
+  /* maksimal 2 permintaan bersamaan supaya server Google tidak kewalahan; yang gagal tidak menggagalkan seluruh halaman */
+  let next = 0;
+  const worker = async () => { while (next < jobs.length) { const [name, fn] = jobs[next++]; try { await fn(); } catch (e) { console.error(name, e); App.loadWarn.push(name); } } };
+  await Promise.all([worker(), worker()]);
 }
 function targetsFromDetail() {
   const t = {};
@@ -1264,7 +1280,7 @@ function render() {
   }
   if (!App.lastDate && !['admin', 'stok', 'report', 'settings', 'lost', 'detention'].includes(App.page)) { App.page = srLast() ? 'report' : 'stok'; }
   const fn = { area: pageArea, report: pageReport, trend: pageTrend, promo: pagePromo, omni: pageOmni, eac: pageEac, ra: pageRA, pareto: pagePareto, lost: pageLost, promostock: pagePromoStock, detention: pageDetention, toko: pageStore, produk: pageProduct, stok: pageStock, admin: pageAdmin, settings: pageSettings }[App.page] || pageReport;
-  try { fn(view); } catch (e) { console.error(e); view.innerHTML = `<div class="empty-state"><h2>Halaman gagal ditampilkan</h2><p class="muted">${esc(e.message)}</p></div>`; }
+  try { fn(view); if ((App.loadWarn || []).length) view.insertAdjacentHTML('afterbegin', `<div class="note" style="margin-bottom:14px">Sebagian data belum termuat (${esc(App.loadWarn.join(', '))}). Tekan <b>Muat ulang</b> di kanan atas untuk mencoba lagi.</div>`); } catch (e) { console.error(e); view.innerHTML = `<div class="empty-state"><h2>Halaman gagal ditampilkan</h2><p class="muted">${esc(e.message)}</p></div>`; }
 }
 
 /* ================= komponen ================= */

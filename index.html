@@ -2289,6 +2289,34 @@ async function exportDetention() {
   (await getDownloads()).save({ filename: `Detention_Stock_Jateng01_${todayISO()}.xlsx`, data: new Blob([XLSX.write(wb, { bookType: 'xlsx', type: 'array' })]) });
 }
 
+/* ================= growth satu toko (dipakai di halaman Per toko) ================= */
+function growthFor(c, D, basis, comp) {
+  const range = (a, b) => { const o = []; for (let d = a; d <= b; d = addDays(d, 1)) o.push(d); return o; };
+  const pick = ds => comp ? ds.filter(d => tyVal(c, d) != null) : ds;
+  const sum = (ds, f) => ds.reduce((a, d) => a + (f(d) || 0), 0);
+  const out = {}; const y = D.slice(0, 4);
+  for (const [k, ds] of [['d', [D]], ['m', pick(range(D.slice(0, 7) + '-01', D))], ['y', pick(range(y + '-01-01', D))]]) {
+    out[k + 'T'] = sum(ds, d => tyVal(c, d)); out[k + 'L'] = sum(ds, d => lyVal(c, d, basis)); out[k + 'G'] = out[k + 'L'] ? out[k + 'T'] / out[k + 'L'] - 1 : null; out[k + 'N'] = ds.length;
+  }
+  out.months = []; for (let i = 1; i <= +D.slice(5, 7); i++) { const mm = y + '-' + pad(i); const ds = pick(range(mm + '-01', mm === D.slice(0, 7) ? D : mm + '-' + pad(dim(mm)))); out.months.push({ mm, t: sum(ds, d => tyVal(c, d)), l: sum(ds, d => lyVal(c, d, basis)) }); }
+  return out;
+}
+function storeGrowth(c, D) {
+  const box = $('#sgBox'), sub = $('#sgSub'); if (!box) return;
+  if (!App.daily) { loadDaily().then(() => { if (App.page === 'toko' && App.ui.store === c) storeGrowth(c, D); }).catch(() => { if (sub) sub.textContent = 'data tahun lalu gagal dimuat'; }); return; }
+  if (!App.daily.map.size) { sub.textContent = 'belum ada data tahun lalu'; box.innerHTML = '<p class="small muted" style="margin:0">Upload file sales harian tahun lalu (Report Daily Sales) di Kelola data untuk melihat growth.</p>'; return; }
+  const basis = App.ui.gwBasis || 'date', comp = App.ui.gwComp !== false, g = growthFor(c, D, basis, comp), y = +D.slice(0, 4);
+  sub.textContent = `acuan ${fmtDate(D)} vs ${fmtDate(lyDate(D, basis))} · ${basis === 'dow' ? 'hari sama' : 'tanggal sama'}${comp ? ' · hanya tanggal yang ada datanya' : ''}`;
+  const tile = (lbl, k, note) => { const v = g[k + 'G']; return `<div class="pt-tile" style="background:${v == null ? '#5A6482' : v >= 0 ? '#13806F' : '#C0392B'}"><span>${lbl}</span><b>${v == null ? '–' : (v >= 0 ? '+' : '') + fmtPct(v, 1)}</b><small style="color:#fff;opacity:.9">${fmtRpS(g[k + 'T'])} vs ${fmtRpS(g[k + 'L'])}${note ? ' · ' + note : ''}</small></div>`; };
+  box.innerHTML = `<div class="pt-tiles" style="grid-template-columns:repeat(auto-fit,minmax(190px,1fr))">${tile('Hari · ' + fmtDateS(D), 'd')}${tile('Bulan · MTD ' + MON[+D.slice(5, 7) - 1], 'm', g.mN + ' hari')}${tile('Tahun · YTD ' + y, 'y', g.yN + ' hari')}</div>
+    ${g.yL ? '' : '<p class="small muted" style="margin:10px 0 0">Toko ini belum punya penjualan di tahun lalu (toko baru), jadi belum ada pembanding.</p>'}
+    <div class="chart-box" style="height:220px;margin-top:14px"><canvas id="sgChart"></canvas></div>
+    <p class="small muted" style="margin:8px 0 0">Gross semua item (termasuk paper bag & voucher) supaya sebanding dengan data tahun lalu. Pengaturan pembanding sama dengan menu <a href="#" data-go="growth" style="color:var(--navy);font-weight:700">Growth vs Tahun Lalu</a>.</p>`;
+  if (typeof Chart !== 'undefined') { const ink = css('--muted');
+    App.charts.push(new Chart($('#sgChart'), { type: 'bar', data: { labels: g.months.map(x => MON[+x.mm.slice(5) - 1]), datasets: [{ label: String(y), data: g.months.map(x => x.t), backgroundColor: css('--navy'), borderRadius: 3 }, { label: String(y - 1), data: g.months.map(x => x.l), backgroundColor: '#C8D0E0', borderRadius: 3 }] },
+      options: { maintainAspectRatio: false, plugins: { legend: { labels: { color: ink, boxWidth: 12 } }, tooltip: { callbacks: { label: c2 => c2.dataset.label + ': ' + fmtRpS(c2.parsed.y), afterBody: c2 => { const x = g.months[c2[0].dataIndex]; return x.l ? 'Growth: ' + fmtPct(x.t / x.l - 1, 1) : ''; } } } },
+        scales: { x: { ticks: { color: ink }, grid: { display: false } }, y: { ticks: { color: ink, callback: v => fmtRpS(v) }, grid: { color: css('--line') } } } } })); }
+}
 /* ================= halaman: Growth vs Tahun Lalu ================= */
 async function loadDaily() { const C = await api('daily'); const M = new Map(), N = {}; for (const r of C.rows || []) { M.set(r[1] + '|' + r[0], r[3]); if (r[2]) N[r[1]] = r[2]; } App.daily = { map: M, names: N }; }
 /* sales tahun berjalan per toko per tanggal: dari ringkasan DSR (gross, semua item) atau, bila tidak ada, dari data sales harian ringkas */
@@ -2405,6 +2433,7 @@ function pageStore(view) {
       <div class="kpi"><span>Transaksi</span><b>${fmtN(a.trx)}</b><small>${chipGrowth(p.trx ? a.trx / p.trx - 1 : null)}</small></div>
       <div class="kpi"><span>ATV / UPT</span><b>${a.atv ? fmtRpS(a.atv) : '–'}</b><small>${a.upt ? fmtX(a.upt, 2) + ' item per transaksi' : ''}</small></div>
     </div>
+    <section class="card"><div class="card-h"><h3>Growth vs tahun lalu</h3><p class="small muted" id="sgSub">memuat data tahun lalu…</p></div><div id="sgBox"></div></section>
     <div class="grid g2">
       <section class="card"><div class="card-h"><h3>Penjualan harian</h3></div><div class="chart-box"><canvas id="trend"></canvas></div></section>
       <section class="card"><div class="card-h"><h3>Kesehatan stok</h3><p class="small muted">${H && H.hasStock ? 'penjualan ' + H.days + ' hari data terakhir vs stok' : 'stok toko ini belum diupload'}</p></div><div id="hl"></div></section>
@@ -2416,6 +2445,7 @@ function pageStore(view) {
     </div>
   </div>`;
   trendChart($('#trend'), R, cur, prev, c);
+  storeGrowth(c, last && last < R.to ? last : R.to);
   if (H && H.hasStock) {
     const tot = HKEYS.reduce((s, k) => s + H.stock[k], 0) || 1;
     $('#hl').innerHTML = `<div class="bars">${HKEYS.map(k => `<div class="bar-r"><span>${badge(k)}</span><span class="t"><i style="width:${H.stock[k] / tot * 100}%;background:${hColor(k)}"></i></span><b>${fmtN(H.count[k])} art. <span class="muted small">${k === 'HB' ? '' : fmtN(H.stock[k]) + ' pcs'}</span></b></div>`).join('')}</div>

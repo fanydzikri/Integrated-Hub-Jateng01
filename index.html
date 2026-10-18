@@ -2867,7 +2867,7 @@ document.addEventListener('click', async e => {
   if (t.id === 'scopeBtn') { openScope(false); return; }
   const scb = t.closest('[data-scope]'); if (scb && t.closest('#scOv')) { setScope(''); return; }
   if (t.id === 'scGo') { const v = ($('#scSel') || {}).value; if (!v) { toast('Pilih toko dulu'); return; } setScope(v); return; }
-  if (t.id === 'scOv') { if (LS.get('dash_scope')) closeScope(); return; }
+  if (t.id === 'scOv') { if (!t.dataset.must) closeScope(); return; }
   if (t.id === 'lgCancel' || t.classList.contains('modal-ov')) { closeLogin(); return; }
   if (t.id === 'lgGo') { doLogin(); return; }
   if (t.id === 'saveBtn') { saveAll(); return; }
@@ -2941,14 +2941,14 @@ function openLogin() {
 function openScope(first) {
   closeScope();
   const codes = storeCodes();
-  const ov = document.createElement('div'); ov.className = 'modal-ov'; ov.id = 'scOv';
+  const ov = document.createElement('div'); ov.className = 'modal-ov'; ov.id = 'scOv'; if (first) ov.dataset.must = '1';
   ov.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-labelledby="scT" style="width:min(460px,100%)">
     <h2 id="scT">${first ? 'Selamat datang 👋' : 'Ganti tampilan'}</h2><p class="small muted" style="margin:0 0 14px">Mau melihat dashboard dari sisi mana?</p>
     <button class="btn" data-scope="" style="width:100%;text-align:left;padding:14px 16px;margin-bottom:10px;${!App.ui.scope ? 'border-color:var(--navy);background:var(--navy-tint)' : ''}"><b style="font-size:15px">🏢 Branch — semua toko</b><span class="small muted" style="display:block;font-weight:500">Untuk BM / AM: bandingkan seluruh toko Area Jateng 01</span></button>
     <div style="border:1px solid var(--line-strong);border-radius:8px;padding:14px 16px;${App.ui.scope ? 'border-color:var(--navy);background:var(--navy-tint)' : ''}">
       <b style="font-size:15px;color:var(--navy)">🏬 Toko saya</b><span class="small muted" style="display:block;margin-bottom:8px">Untuk store head: hanya data toko yang dipilih</span>
       <div style="display:flex;gap:8px;flex-wrap:wrap"><select id="scSel" class="inp" style="flex:1 1 200px"><option value="">Pilih toko…</option>${codes.map(c => `<option value="${esc(c)}" ${c === App.ui.scope ? 'selected' : ''}>${esc(c)} - ${esc(sName(c))}</option>`).join('')}</select><button class="btn primary" id="scGo">Lihat toko</button></div></div>
-    <p class="small muted" style="margin:12px 0 0">Pilihan ini diingat di perangkat ini. Bisa diganti kapan saja lewat tombol di kanan atas.</p></div>`;
+    <p class="small muted" style="margin:12px 0 0">Toko yang terakhir dipilih di perangkat ini sudah terisi otomatis. Tampilan bisa diganti kapan saja lewat tombol di kanan atas.</p></div>`;
   document.body.appendChild(ov);
 }
 function closeScope() { const o = $('#scOv'); if (o) o.remove(); }
@@ -2995,7 +2995,8 @@ async function boot() {
   const sv = LS.get('dash_scope');
   if (sv && sv.startsWith('store:')) { const c = sv.slice(6); if (App.stores[c] || storeCodes().includes(c)) { App.ui.scope = c; ['lsStore', 'raStore', 'ptStore', 'tdStore', 'prStore', 'psStore', 'dtStore', 'prodStore', 'stStore', 'trStore'].forEach(k => { App.ui[k] = c; }); App.ui.store = c; } }
   render();
-  if (!sv && storeCodes().length) openScope(true);
+  /* popup pilihan tampilan selalu muncul setiap halaman dibuka / direfresh (sekali per pemuatan halaman) */
+  if (!App.ui.scopeAsked && storeCodes().length) { App.ui.scopeAsked = true; openScope(true); }
   loadMaster();
 }
 async function init() {

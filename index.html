@@ -431,6 +431,28 @@ body.locked > *:not(#authWall):not(.toast):not(#toast){display:none!important}
 .tk-grid th.nm,.tk-grid td.nm{position:sticky;left:0;z-index:3;min-width:220px;max-width:260px;text-align:left;background:var(--surface)}.tk-grid th.nm{background:var(--navy)}
 .tk-grid td{border-bottom:1px solid var(--line);padding:4px;text-align:center}.tk-grid td.nm small{display:block;color:var(--muted)}
 .tk-cb{width:24px;height:24px;border-radius:6px;border:2px solid #C8D0E0;background:#fff;cursor:pointer;font-weight:900;color:#fff;padding:0}.tk-cb.on{background:var(--ok);border-color:var(--ok)}.tk-cb:disabled{cursor:default;opacity:.6}
+/* tombol & mode screenshot */
+.shot-btn{background:rgba(255,255,255,.14)!important;color:#fff!important;border-color:rgba(255,255,255,.35)!important;margin-left:6px}
+body.shot .credit,body.shot .brandbar,body.shot footer,body.shot .phead,body.shot .filters,body.shot details:not([open]),body.shot details[open]>summary,body.shot .row-act,body.shot .more,body.shot .hi-act,body.shot #hubImp,body.shot .seg,body.shot .dt-link,body.shot .shot-btn,body.shot .ck-grid~p{display:none!important}
+body.shot details[open].card{display:none!important}
+body.shot .rp-wrap,body.shot .tbl-wrap{max-height:none!important;overflow:visible!important}
+body.shot main.wrap{padding-top:18px;padding-bottom:30px}
+@media (min-width:900px){body.shot main.wrap{width:1240px;max-width:1240px;margin:0 auto}}
+body.shot .card{box-shadow:none}
+#shotHead{display:flex;justify-content:space-between;align-items:center;gap:16px;background:linear-gradient(120deg,#0B1B4A,#0F3192);color:#fff;border-radius:14px;padding:16px 20px;margin-bottom:16px;border-bottom:4px solid var(--orange)}
+#shotHead .sh-l{display:flex;align-items:center;gap:14px;min-width:0}#shotHead img{height:30px;background:#fff;border-radius:6px;padding:4px 8px}
+#shotHead b{display:block;font-size:22px;letter-spacing:-.01em}#shotHead span{display:block;font-size:12.5px;opacity:.85}
+#shotHead .sh-r{text-align:right;flex:none}#shotHead .sh-r b{font-size:14px}
+#shotBar{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:300;display:flex;gap:8px;align-items:center;background:#0B1B4A;color:#fff;border-radius:999px;padding:8px 10px 8px 16px;box-shadow:0 10px 30px rgba(0,0,0,.35);font-size:13px;font-weight:700;flex-wrap:wrap;justify-content:center;max-width:calc(100vw - 20px)}
+@media (max-width:640px){#shotHead{flex-direction:column;align-items:flex-start}#shotHead .sh-r{text-align:left}#shotHead b{font-size:18px}}
+.bc-v{font-weight:800;font-family:var(--font-mono)}.bc-v.ok{color:var(--ok)}.bc-v.mid{color:var(--orange-deep)}.bc-v.low{color:var(--bad)}
+.bc-rank{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
+.bc-r{border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:var(--surface)}.bc-r h4{margin:0 0 8px;font-size:13px;color:var(--navy)}
+.bc-hi,.bc-lo{display:flex;align-items:center;gap:6px;font-size:13px;padding:5px 8px;border-radius:8px;margin-top:4px}.bc-hi{background:var(--ok-bg)}.bc-lo{background:var(--bad-bg)}
+.bc-hi b,.bc-lo b{flex:1;min-width:0;line-height:1.25}.bc-hi span,.bc-lo span{font-family:var(--font-mono);font-weight:800}
+.bc-adv{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:10px}
+.bc-a{border-left:4px solid var(--navy);background:var(--surface);border-radius:10px;padding:10px 12px;border:1px solid var(--line)}.bc-a b{font-size:13.5px}.bc-a p{margin:6px 0 0;font-size:13px;line-height:1.5}
+.bc-a.low{border-left:4px solid var(--bad)}.bc-a.mid{border-left:4px solid var(--orange)}.bc-a.ok{border-left:4px solid var(--ok)}
 .ck-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}
 .ck-col h4{margin:0 0 8px;font-size:14px;color:var(--navy)}.ck-col h4 small{display:block;font-weight:500;color:var(--muted);font-size:11.5px}
 .ck-col ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
@@ -603,6 +625,7 @@ function detectSheet(rows, fileName) {
   for (let i = 0; i < Math.min(rows.length, 60); i++) {
     const h = (rows[i] || []).map(normH);
     if (h.includes('articlenumber') && h.some(x => x.includes('availability'))) return parseHO(rows, i, h, fileName);
+    if (h[0] === 'lokasi' && (rows[i + 1] || []).map(normH).includes('stockaccurate')) return parseBC(rows, i, fileName);
     if (h.includes('createdat') && h.includes('reason') && h.includes('locationcode')) return parseLost(rows, i, h, fileName);
     if ((h.includes('siteid') || h.includes('kodesite') || h.includes('sitecode')) && h.includes('branch') && !h.includes('offline')) { const r = parseDaily(rows, i, h, fileName); if (r) return r; }
     if (h.includes('locationcode') && h.includes('bruto')) throw new Error('Sales Report tidak dipakai lagi. Upload Item DSR saja.');
@@ -1041,7 +1064,7 @@ async function loadAll() {
   App.stores = M.stores || {};
   App.tgtDetail = M.targets || {}; App.tgtBasis = M.tgtBasis || 'total'; App.targets = targetsFromDetail();
   App.pendingUsers = M.pendingUsers || 0;
-  App.omni = M.omni || {}; App.eac = M.eac || {}; App.hoInfo = M.hoInfo || null; App.juknis = M.juknis || {}; App.aiReady = !!M.aiReady;
+  App.omni = M.omni || {}; App.eac = M.eac || {}; App.hoInfo = M.hoInfo || null; App.juknis = M.juknis || {}; App.bc = M.bc || []; App.aiReady = !!M.aiReady;
   App.log = M.log || []; App.books = M.books || []; App.cells = M.cells || 0;
   App.lines = []; App.loaded = new Set(); App.sku = {}; App.dsrSku = {}; App.stock = {}; App.cache = {}; App.sr = {};
   computeLastDate();
@@ -1369,7 +1392,7 @@ const ICON = {
 };
 const NAV = [
   { k: 'sales', label: 'Sales Performance', icon: 'area', items: [['report', 'Monitoring Sales', 'Achievement, UPT & basket size'], ['trend', 'Sales Trend', 'Jam, hari, UPT & basket harian'], ['promo', 'Kontribusi Promo', 'Porsi tiap promo terhadap sales'], ['omni', 'Monitoring OmniChannel', 'EA, Eigerindo Voucher, Tax Invoice, EASAP'], ['eac', 'Sales Member EAC', 'KPI penjualan ke member'], ['ra', 'RA Performance', 'Transaksi, UPT & basket per sales person'], ['pareto', 'Product Pareto', 'Kontribusi kategori & produk (80/20)'], ['growth', 'Growth vs Tahun Lalu', 'Harian, MTD & YTD dibanding tahun lalu']] },
-  { k: 'inv', label: 'Inventory', icon: 'produk', items: [['produk', 'Produk', 'Penjualan & stok per artikel'], ['transfer', 'Saran Transfer Stok', 'Pindahkan stok dari toko yang menumpuk ke toko yang butuh'], ['ro', 'Saran Repeat Order', 'Order ke gudang HO untuk stok yang menipis'], ['promostock', 'Stok DCNP/SMDS', 'Stok barang diskon per MC Lv2–Lv4'], ['detention', 'Detention Stock', '% generic & varian terdisplay per toko']] },
+  { k: 'inv', label: 'Inventory', icon: 'produk', items: [['produk', 'Produk', 'Penjualan & stok per artikel'], ['transfer', 'Saran Transfer Stok', 'Pindahkan stok dari toko yang menumpuk ke toko yang butuh'], ['ro', 'Saran Repeat Order', 'Order ke gudang HO untuk stok yang menipis'], ['promostock', 'Stok DCNP/SMDS', 'Stok barang diskon per MC Lv2–Lv4'], ['detention', 'Detention Stock', '% generic & varian terdisplay per toko'], ['bc', 'Blind Counting', 'Progres stock opname harian per toko']] },
   { k: 'lost', label: 'Lost Sales', icon: 'lost' },
   { k: 'pica', label: 'Analisa PICA', icon: 'pica' },
   { k: 'juknis', label: 'Promo', icon: 'tag' },
@@ -1400,7 +1423,7 @@ function renderPeriod() {
   const box = $('#periodBox');
   if (App.page === 'home' || isOps(App.page)) { box.innerHTML = ''; return; }
   const tsel = hasTypes() && App.page !== 'toko' && !scopeOn() ? `<label class="small muted" for="typeSel">Jenis toko</label><select id="typeSel" class="inp"><option value="">Semua toko</option>${['rg', 'bz', 'ot'].filter(t => storeCodes().some(c => sType(c) === t)).map(t => `<option value="${t}" ${App.ui.typeF === t ? 'selected' : ''}>${TYPE_LABEL[t]}</option>`).join('')}</select>` : '';
-  if (['report', 'promo', 'omni', 'eac', 'lost', 'detention', 'growth', 'stok', 'transfer', 'ro', 'pica', 'juknis'].includes(App.page)) { box.innerHTML = tsel; return; }
+  if (['report', 'promo', 'omni', 'eac', 'lost', 'detention', 'growth', 'stok', 'transfer', 'ro', 'pica', 'juknis', 'bc'].includes(App.page)) { box.innerHTML = tsel; return; }
   if (!App.lastDate || App.page === 'admin' || App.page === 'settings') { box.innerHTML = ''; return; }
   const L = App.lastDate, cm = L.slice(0, 7);
   const months = Object.keys(App.index.sales).sort().reverse().filter(m => m !== cm);
@@ -1444,7 +1467,7 @@ function setHead(t, sub) { if (scopeOn() && !String(t).includes(sName(App.ui.sco
 function render() {
   destroyCharts(); App.tables = {};
   if (App.booted) syncHash(false);
-  renderNav(); renderPeriod();
+  renderNav(); renderPeriod(); addShotBtn($('#periodBox'));
   const view = $('#view');
   if (!isOps(App.page) && App.page !== 'home' && !App.lastDate && App.page !== 'admin' && !Object.keys(App.index.stock).length && !srLast()) {
     setHead('Monitoring Penjualan Jateng 01', '');
@@ -1452,8 +1475,8 @@ function render() {
     return;
   }
   if (App.page === 'stok') App.page = 'transfer';
-  if (!isOps(App.page) && App.page !== 'home' && !App.lastDate && !['admin', 'report', 'settings', 'lost', 'detention', 'juknis'].includes(App.page)) { App.page = srLast() ? 'report' : 'detention'; }
-  const fn = { area: pageArea, report: pageReport, trend: pageTrend, promo: pagePromo, omni: pageOmni, eac: pageEac, ra: pageRA, pareto: pagePareto, lost: pageLost, promostock: pagePromoStock, detention: pageDetention, growth: pageGrowth, transfer: pageTransfer, ro: pageRO, pica: pagePica, juknis: pageJuknis, home: pageHome, ops_approval: pageApproval, ops_task: pageTask, ops_info: pageInfo, toko: pageStore, produk: pageProduct, stok: pageStock, admin: pageAdmin, settings: pageSettings }[App.page] || pageReport;
+  if (!isOps(App.page) && App.page !== 'home' && !App.lastDate && !['admin', 'report', 'settings', 'lost', 'detention', 'juknis', 'bc'].includes(App.page)) { App.page = srLast() ? 'report' : 'detention'; }
+  const fn = { area: pageArea, report: pageReport, trend: pageTrend, promo: pagePromo, omni: pageOmni, eac: pageEac, ra: pageRA, pareto: pagePareto, lost: pageLost, promostock: pagePromoStock, detention: pageDetention, growth: pageGrowth, transfer: pageTransfer, ro: pageRO, pica: pagePica, juknis: pageJuknis, home: pageHome, bc: pageBC, ops_approval: pageApproval, ops_task: pageTask, ops_info: pageInfo, toko: pageStore, produk: pageProduct, stok: pageStock, admin: pageAdmin, settings: pageSettings }[App.page] || pageReport;
   try { fn(view); lockScopedSelects(view); if (App.page === 'admin') renderUsers(); if ((App.loadWarn || []).length) view.insertAdjacentHTML('afterbegin', `<div class="note" style="margin-bottom:14px">Sebagian data belum termuat (${esc(App.loadWarn.join(', '))}). Tekan <b>Muat ulang</b> di kanan atas untuk mencoba lagi.</div>`); } catch (e) { console.error(e); view.innerHTML = `<div class="empty-state"><h2>Halaman gagal ditampilkan</h2><p class="muted">${esc(e.message)}</p></div>`; }
 }
 
@@ -3125,6 +3148,7 @@ function uploadChecklist() {
     { n: 'Item DSR Report', d: 'penjualan semua toko (kemarin)', last: dsrLast, s: st(dsrLast >= yest && !dsrMiss.length, dsrLast >= addDays(today, -2)), extra: dsrMiss.length ? `${dsrMiss.length} toko belum sampai ${fmtDateS(dsrLast)}` : '' },
     { n: 'Export by Bin (stok)', d: 'stok semua toko · Jumat: tandai juga Sabtu–Minggu', last: stLast, s: st(stLast >= yest && !stOld.length, ago(stLast) <= 3), extra: stOld.length ? `${stOld.length} toko stoknya > 2 hari` : '' },
     { n: 'Lost Sale Report', d: 'lost sales toko area', last: lostLast, s: st(lostLast >= yest, ago(lostLast) <= 3) },
+    { n: 'Blind counting (Total KPI)', d: 'progres stock opname', last: (App.bc || []).reduce((a, r) => r[0] > a ? r[0] : a, '') || null, s: st(((App.bc || []).reduce((a, r) => r[0] > a ? r[0] : a, '')) >= yest, ago((App.bc || []).reduce((a, r) => r[0] > a ? r[0] : a, '') || null) <= 3) },
     { n: 'Stok gudang HO', d: 'file Data Stock (pagi/siang)', last: hoLast, s: st(hoLast >= yest, ago(hoLast) <= 3), extra: App.hoInfo && App.hoInfo.label ? App.hoInfo.label : '' }
   ];
   /* mingguan */
@@ -3460,6 +3484,111 @@ async function exportHub(col) {
   (await getDownloads()).save({ filename: `${col === 'approval' ? 'Approval' : 'Task'}_Jateng01_${today}.xlsx`, data: new Blob([XLSX.write(wb, { bookType: 'xlsx', type: 'array' })]) });
 }
 
+/* ================= Blind Counting (stock opname) ================= */
+/* rumus sama dengan file Total KPI: SAR = 100 − |total − akurat| / total; total skor = SAR×50% + On time×10% + Bin×10% + MC4×30% */
+const BC_PAR = [['sar', 'Stock Accuracy Rate', .5], ['ot', 'On Time Sample Rate', .1], ['bin', 'Bin Accuracy', .1], ['mc', 'MC4 Completeness', .3]];
+function bcCalc(x) {
+  const r = v => Math.round(v * 100) / 100;
+  const sar = x.t ? r(100 - Math.abs(x.t - x.a) / x.t * 100) : 0, ot = x.ob ? r(x.o / x.ob * 100) : 0, bin = x.bt ? r(x.b / x.bt * 100) : 0, mc = x.mt ? r(x.md / x.mt * 100) : 0;
+  return { sar, ot, bin, mc, tot: r(sar * .5 + ot * .1 + bin * .1 + mc * .3), started: !!(x.t || x.ob || x.bt || x.md) };
+}
+function parseBC(rows, hi, fileName) {
+  const h = (rows[hi + 1] || []).map(normH), ci = k => h.indexOf(k);
+  const C = { a: ci('stockaccurate'), t: ci('totalstock'), o: ci('ontimesampling'), ob: ci('totalblindcounting'), b: ci('binaccurate'), bt: ci('totalbin'), md: ci('mcdone'), mt: ci('mctodo') };
+  if (Object.values(C).some(v => v < 0)) throw new Error('Kolom file Blind Counting tidak lengkap.');
+  const out = [];
+  for (let i = hi + 2; i < rows.length; i++) { const r = rows[i] || []; const loc = String(r[0] ?? '').trim(); const m = loc.match(/^(\d{3,6})\s*-\s*(.*)$/); if (!m) continue;
+    out.push([m[1], m[2].replace(/\s+/g, ' ').trim(), numV(r[C.a]), numV(r[C.t]), numV(r[C.o]), numV(r[C.ob]), numV(r[C.b]), numV(r[C.bt]), numV(r[C.md]), numV(r[C.mt])]); }
+  if (!out.length) throw new Error('Tidak ada baris toko di file Blind Counting.');
+  /* nama file Total_KPI_<epoch ms> → tanggal WIB */
+  let date = dateFromFilename(fileName); const ms = String(fileName).match(/(1[6-9]\d{11})/);
+  if (!date && ms) { const d = new Date(+ms[1] + 7 * 3600e3); date = d.toISOString().slice(0, 10); }
+  return { kind: 'BC', file: fileName, rows: out, date: date || todayISO(), dateFromName: !!date };
+}
+function bcData() {
+  const known = new Set(Object.keys(App.stores || {}));
+  const L = (App.bc || []).filter(r => !known.size || known.has(r[1])).filter(r => typeOk(r[1])).map(r => ({ d: r[0], c: r[1], a: r[2], t: r[3], o: r[4], ob: r[5], b: r[6], bt: r[7], md: r[8], mt: r[9] }));
+  return L;
+}
+const bcCls = v => v >= 95 ? 'ok' : v >= 85 ? 'mid' : 'low';
+function bcAdvice(k, x, K) {
+  if (k === 'sar') return `Selisih stok ${fmtN(Math.abs(x.t - x.a))} pcs dari ${fmtN(x.t)}. Recount artikel yang selisih, cek transaksi yang belum diposting (penerimaan, transfer, retur), dan buat BA selisih untuk item yang tidak ketemu.`;
+  if (k === 'ot') return `${fmtN(x.ob - x.o)} jadwal sampling tidak tepat waktu. Tetapkan PIC & jam blind counting harian (mis. pagi sebelum toko ramai) dan cek progresnya setiap closing.`;
+  if (k === 'bin') return `${fmtN(x.bt - x.b)} bin belum akurat. Rapikan barang ke bin sesuai sistem, lakukan move bin untuk barang yang pindah rak, dan pastikan label bin terpasang.`;
+  return `${fmtN(Math.max(0, x.mt - x.md))} MC Lv4 belum dihitung dari ${fmtN(x.mt)}. Bagi kategori yang tersisa ke tiap RA dengan target harian sampai seluruh MC4 selesai.`;
+}
+function pageBC(view) {
+  const U = App.ui, L = bcData();
+  setHead('Blind Counting', 'Progres stock opname harian per toko — Stock Accuracy, On Time Sample, Bin Accuracy & MC4 Completeness');
+  if (!L.length) { view.innerHTML = `<div class="empty-state"><h2>Belum ada data blind counting</h2><p class="muted">${App.admin ? 'Upload file Total KPI blind counting di Kelola data (setiap hari).' : 'Admin belum mengunggah data blind counting.'}</p></div>`; return; }
+  const dates = [...new Set(L.map(x => x.d))].sort(), D = U.bcDate && dates.includes(U.bcDate) ? U.bcDate : dates[dates.length - 1]; U.bcDate = D;
+  const cur = L.filter(x => x.d === D).map(x => Object.assign(x, bcCalc(x), { name: sName(x.c) }));
+  const act = cur.filter(x => x.started);
+  const sum = k => act.reduce((a, x) => a + (x[k] || 0), 0);
+  const A = { t: sum('t'), a: sum('a'), o: sum('o'), ob: sum('ob'), b: sum('b'), bt: sum('bt'), md: sum('md'), mt: cur.reduce((a, x) => a + x.mt, 0) };
+  A.t2 = act.reduce((a, x) => a + Math.abs(x.t - x.a), 0);
+  const area = { sar: A.t ? Math.round((100 - A.t2 / A.t * 100) * 100) / 100 : 0, ot: A.ob ? Math.round(A.o / A.ob * 10000) / 100 : 0, bin: A.bt ? Math.round(A.b / A.bt * 10000) / 100 : 0, mc: A.mt ? Math.round(A.md / A.mt * 10000) / 100 : 0 };
+  area.tot = Math.round((area.sar * .5 + area.ot * .1 + area.bin * .1 + area.mc * .3) * 100) / 100;
+  const prevD = dates[dates.indexOf(D) - 1];
+  /* trend harian area */
+  const byD = dates.map(d => { const xs = L.filter(x => x.d === d && (!U.bcStore || x.c === U.bcStore)).map(x => Object.assign({}, x, bcCalc(x))).filter(x => x.started); const s = k => xs.reduce((a, x) => a + x[k], 0);
+    const t = s('t'), dd = xs.reduce((a, x) => a + Math.abs(x.t - x.a), 0), mtAll = L.filter(x => x.d === d && (!U.bcStore || x.c === U.bcStore)).reduce((a, x) => a + x.mt, 0);
+    const v = { sar: t ? 100 - dd / t * 100 : null, ot: s('ob') ? s('o') / s('ob') * 100 : null, bin: s('bt') ? s('b') / s('bt') * 100 : null, mc: mtAll ? s('md') / mtAll * 100 : null }; v.tot = v.sar == null ? null : v.sar * .5 + (v.ot || 0) * .1 + (v.bin || 0) * .1 + (v.mc || 0) * .3; return v; });
+  const st = U.bcSort || { k: 'tot', dir: 'asc' };
+  const rows = cur.slice().sort((a, b) => { const x = a[st.k], y = b[st.k]; const r = typeof x === 'string' ? x.localeCompare(y) : (x ?? -1) - (y ?? -1); return st.dir === 'asc' ? r : -r; });
+  const best = k => act.slice().sort((a, b) => b[k] - a[k])[0], worst = k => act.slice().sort((a, b) => a[k] - b[k])[0];
+  const notStarted = cur.filter(x => !x.started);
+  const pc = v => `<td class="r"><span class="bc-v ${bcCls(v)}">${fmtX(v, 2)}%</span></td>`;
+  const sh = (k, l) => `<th class="s r" data-bcs="${k}">${l}${st.k === k ? (st.dir === 'asc' ? ' ▲' : ' ▼') : ''}</th>`;
+  view.innerHTML = `<div class="stack">
+    <div class="filters" style="margin:0"><label class="small muted" for="bcDate">Tanggal data</label><select id="bcDate" class="inp">${dates.slice().reverse().map(d => `<option value="${d}" ${d === D ? 'selected' : ''}>${fmtDate(d)}</option>`).join('')}</select>
+      <label class="small muted" for="bcStore">Grafik untuk</label><select id="bcStore" class="inp"><option value="">Seluruh area</option>${cur.map(x => `<option value="${esc(x.c)}" ${x.c === U.bcStore ? 'selected' : ''}>${esc(x.c)} - ${esc(x.name)}</option>`).join('')}</select></div>
+    <div class="pt-tiles" style="grid-template-columns:repeat(auto-fit,minmax(165px,1fr))">
+      <div class="pt-tile" style="background:#0B1B4A"><span>Total skor area</span><b>${fmtX(area.tot, 2)}%</b><small>SAR 50% · On time 10% · Bin 10% · MC4 30%</small></div>
+      ${BC_PAR.map(([k, l]) => { const pv = prevD ? (() => { const xs = L.filter(x => x.d === prevD).map(x => Object.assign({}, x, bcCalc(x))).filter(x => x.started); return null; })() : null; return `<div class="pt-tile" style="background:${area[k] >= 95 ? '#13806F' : area[k] >= 85 ? '#E46636' : '#C0392B'}"><span>${l}</span><b>${fmtX(area[k], 2)}%</b><small>${k === 'sar' ? fmtN(A.a) + ' / ' + fmtN(A.t) + ' pcs' : k === 'ot' ? fmtN(A.o) + ' / ' + fmtN(A.ob) + ' sampling' : k === 'bin' ? fmtN(A.b) + ' / ' + fmtN(A.bt) + ' bin' : fmtN(A.md) + ' / ' + fmtN(A.mt) + ' MC4'}</small></div>`; }).join('')}
+    </div>
+    <section class="card"><div class="card-h"><h3>Progres harian${U.bcStore ? ' · ' + esc(sName(U.bcStore)) : ' · seluruh area'}</h3><p class="small muted">${dates.length} hari data · ${fmtDateS(dates[0])} – ${fmtDateS(dates[dates.length - 1])}</p></div><div class="chart-box" style="height:290px"><canvas id="bcTrend"></canvas></div></section>
+    <section class="card"><div class="card-h"><h3>Tertinggi & terendah per parameter</h3><p class="small muted">${fmtDate(D)} · toko yang sudah mulai blind counting</p></div>
+      <div class="bc-rank">${[['tot', 'Total skor']].concat(BC_PAR.map(p => [p[0], p[1]])).map(([k, l]) => { const b = best(k), w = worst(k); return `<div class="bc-r"><h4>${l}</h4><div class="bc-hi">🏆 <b>${b ? esc(b.name) : '–'}</b><span>${b ? fmtX(b[k], 2) + '%' : ''}</span></div><div class="bc-lo">⚠️ <b>${w ? esc(w.name) : '–'}</b><span>${w ? fmtX(w[k], 2) + '%' : ''}</span></div></div>`; }).join('')}</div></section>
+    <section class="card"><div class="card-h"><h3>Saran tindakan</h3><p class="small muted">untuk toko terendah di tiap parameter</p></div>
+      <div class="bc-adv">${BC_PAR.map(([k, l]) => { const w = worst(k); if (!w || w[k] >= 99.5) return `<div class="bc-a ok"><b>${l}</b><p>Semua toko sudah di atas 99,5%. Pertahankan.</p></div>`; return `<div class="bc-a ${bcCls(w[k])}"><b>${l} · ${esc(w.name)} (${fmtX(w[k], 2)}%)</b><p>${bcAdvice(k, w)}</p>${act.filter(x => x !== w && x[k] < 85).length ? `<p class="small muted">Juga di bawah 85%: ${act.filter(x => x !== w && x[k] < 85).sort((a, b) => a[k] - b[k]).slice(0, 5).map(x => esc(x.name) + ' ' + fmtX(x[k], 1) + '%').join(', ')}</p>` : ''}</div>`; }).join('')}
+      ${notStarted.length ? `<div class="bc-a low"><b>Belum mulai blind counting</b><p>${notStarted.map(x => esc(x.name) + ' (' + esc(x.c) + ')').join(', ')} — pastikan jadwal & PIC sudah ditentukan.</p></div>` : ''}</div></section>
+    <section class="card"><div class="card-h"><h3>Detail per toko</h3><p class="small muted">hijau ≥ 95% · oranye 85–95% · merah &lt; 85%</p></div>
+      <div class="rp-wrap"><table class="tbl" style="min-width:880px"><thead><tr><th class="s" data-bcs="name">Toko</th>${sh('sar', 'Stock Accuracy')}${sh('ot', 'On Time Sample')}${sh('bin', 'Bin Accuracy')}${sh('mc', 'MC4 Complete')}${sh('tot', 'Total skor')}<th class="r">Selisih stok</th><th class="r">MC4 sisa</th></tr></thead><tbody>
+      ${rows.map(x => `<tr><td><span class="nm">${esc(x.name)}</span><span class="sub">${esc(x.c)}${x.started ? '' : ' · belum mulai'}</span></td>${pc(x.sar)}${pc(x.ot)}${pc(x.bin)}${pc(x.mc)}<td class="r"><b class="bc-v ${bcCls(x.tot)}">${fmtX(x.tot, 2)}%</b></td><td class="r">${fmtN(x.a - x.t)}</td><td class="r">${fmtN(Math.max(0, x.mt - x.md))}</td></tr>`).join('')}
+      </tbody></table></div></section>
+  </div>`;
+  if (typeof Chart !== 'undefined' && dates.length) {
+    const ink = css('--muted'), cols = { tot: '#0B1B4A', sar: css('--navy'), ot: css('--orange'), bin: '#13806F', mc: '#7A4FB5' };
+    App.charts.push(new Chart($('#bcTrend'), { type: 'line', data: { labels: dates.map(fmtDateS), datasets: [['tot', 'Total skor'], ...BC_PAR.map(p => [p[0], p[1]])].map(([k, l]) => ({ label: l, data: byD.map(v => v[k] == null ? null : +v[k].toFixed(2)), borderColor: cols[k], backgroundColor: cols[k], borderWidth: k === 'tot' ? 3 : 2, pointRadius: 3, tension: .2, spanGaps: true })) },
+      options: { maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { labels: { color: ink, boxWidth: 12 } }, tooltip: { callbacks: { label: c => c.dataset.label + ': ' + fmtX(c.parsed.y, 2) + '%' } } },
+        scales: { x: { ticks: { color: ink }, grid: { display: false } }, y: { suggestedMin: 50, max: 100, ticks: { color: ink, callback: v => v + '%' }, grid: { color: css('--line') } } } } }));
+  }
+}
+/* ================= Mode screenshot (untuk dikirim ke grup WA) ================= */
+function loadH2C() { if (window.html2canvas) return Promise.resolve(); return new Promise((res, rej) => { const sc = document.createElement('script'); sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js'; sc.onload = res; sc.onerror = () => rej(new Error('Komponen screenshot gagal dimuat')); document.head.appendChild(sc); }); }
+function addShotBtn(box) { if (!box || ['admin', 'settings', 'home'].includes(App.page) || document.body.classList.contains('shot') || box.querySelector('#shotBtn')) return; box.insertAdjacentHTML('beforeend', '<button class="btn sm shot-btn" id="shotBtn" title="Tampilan rapi untuk di-screenshot & dikirim ke grup WA">📸 Screenshot</button>'); }
+function shotOn() {
+  document.body.classList.add('shot');
+  let h = $('#shotHead'); if (!h) { h = document.createElement('div'); h.id = 'shotHead'; $('main.wrap').prepend(h); }
+  const now = new Date();
+  h.innerHTML = `<div class="sh-l"><img src="${esc(($('.brandbar img') || {}).src || '')}" alt=""><div><b>${esc($('#pageTitle').textContent)}</b><span>${esc($('#pageSub').textContent)}</span></div></div><div class="sh-r"><b>Integrated Hub Jateng 01</b><span>diambil ${now.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })} ${pad(now.getHours())}.${pad(now.getMinutes())}${App.user ? ' · ' + esc(App.user.name) : ''}</span></div>`;
+  let bar = $('#shotBar'); if (!bar) { bar = document.createElement('div'); bar.id = 'shotBar'; document.body.appendChild(bar); }
+  bar.innerHTML = `<span>📸 Mode screenshot</span><button class="btn sm primary" id="shotPng">⬇ Unduh gambar</button><button class="btn sm" id="shotCopy">📋 Salin gambar</button><button class="btn sm" id="shotOff">✕ Selesai</button>`;
+  App.charts.forEach(c => { try { c.resize(); } catch (e) { } });
+  window.scrollTo(0, 0);
+}
+function shotOff() { document.body.classList.remove('shot'); const h = $('#shotHead'); if (h) h.remove(); const b = $('#shotBar'); if (b) b.remove(); render(); }
+async function shotCapture(copy) {
+  try { toast('Membuat gambar…', 4000); await loadH2C();
+    const el = $('main.wrap'); const cv = await window.html2canvas(el, { scale: Math.min(2, window.devicePixelRatio || 1.5), useCORS: true, backgroundColor: getComputedStyle(document.body).backgroundColor || '#F4F6FB', logging: false, windowWidth: el.scrollWidth });
+    const blob = await new Promise(r => cv.toBlob(r, 'image/png'));
+    const name = ($('#pageTitle').textContent || 'Integrated Hub').replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '_') + '_' + todayISO() + '.png';
+    if (copy && navigator.clipboard && window.ClipboardItem) { await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]); toast('Gambar tersalin — tempel (Ctrl+V) di WhatsApp Web'); return; }
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000); toast('Gambar diunduh: ' + name);
+  } catch (e) { toast('Gagal membuat gambar: ' + (e.message || e) + '. Gunakan screenshot biasa (mode ini sudah rapi).', 5000); }
+}
+
 /* ================= halaman: per toko ================= */
 function pageStore(view) {
   const codes = storeCodes(); if (!App.ui.store || !codes.includes(App.ui.store)) App.ui.store = codes[0];
@@ -3739,7 +3868,7 @@ function pageAdmin(view) {
   renderPending(); renderCoverage(cm);
   $('#logT').innerHTML = tbl('log', { rows: App.log.slice().reverse(), limit: 15, empty: 'Belum ada upload.', cols: [
     { k: 'at', label: 'Waktu', h: r => esc(new Date(r.at).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })) },
-    { k: 'kind', label: 'Jenis', h: r => ({ DSR: 'Penjualan', INV: 'Stok', TGT: 'Target', OMT: 'Target Omni', EAC: 'Target EAC', LST: 'Lost Sales', DLY: 'Sales harian', HO: 'Stok gudang HO', JUK: 'Juknis promo', WGT: 'Bobot harian', SR: 'Sales Report', DEL: 'Hapus' }[r.kind] || r.kind) }, { k: 'file', label: 'File', h: r => `<span class="small">${esc(r.file)}</span>` },
+    { k: 'kind', label: 'Jenis', h: r => ({ DSR: 'Penjualan', INV: 'Stok', TGT: 'Target', OMT: 'Target Omni', EAC: 'Target EAC', LST: 'Lost Sales', DLY: 'Sales harian', HO: 'Stok gudang HO', JUK: 'Juknis promo', BC: 'Blind counting', WGT: 'Bobot harian', SR: 'Sales Report', DEL: 'Hapus' }[r.kind] || r.kind) }, { k: 'file', label: 'File', h: r => `<span class="small">${esc(r.file)}</span>` },
     { k: 'stores', label: 'Toko', r: 1 }, { k: 'info', label: 'Isi', h: r => esc(r.info) + (r.removed ? ' <span class="badge b-DS">sudah dihapus</span>' : '') },
     { k: 'x', label: '', ns: 1, h: r => r.id && r.scope && !r.removed ? `<button class="btn sm danger" data-dellog="${esc(r.id)}">Hapus data file ini</button>` : '' }] });
 }
@@ -3766,6 +3895,7 @@ function renderPending() {
     }
     if (p.kind === 'JUK') return `<div class="pend-i"><span class="k" style="background:#7A4FB5;color:#fff">Juknis promo</span><div><div class="f">${esc(p.file)}</div><div class="d">bulan <input type="month" class="inp sm" data-pmonth="${i}" value="${esc(p.month)}"> · ${p.data.promos.length} program terbaca${p.data.notes.length ? ' · ' + p.data.notes.length + ' memo update' : ''} · menggantikan juknis bulan yang sama</div>
       <details style="margin-top:6px"><summary class="small" style="cursor:pointer">Lihat hasil baca</summary><ul class="small" style="margin:6px 0 0;padding-left:18px">${p.data.promos.map(x => `<li><b>${esc(x.cat)}</b> · ${esc(x.title)} — ${esc(rangeTxt(x.ranges))}${x.exact ? '' : ' (periode khusus)'}</li>`).join('')}</ul></details></div><button class="btn sm" data-rmp="${i}">Hapus</button></div>`;
+    if (p.kind === 'BC') return `<div class="pend-i"><span class="k" style="background:#13806F;color:#fff">Blind counting</span><div><div class="f">${esc(p.file)}</div><div class="d">${p.rows.length} toko · tanggal data <input type="date" class="inp sm" data-pdate="${i}" value="${esc(p.date)}">${p.dateFromName ? '' : ' <b style="color:var(--warn)">cek tanggal</b>'} · menggantikan data tanggal yang sama</div></div><button class="btn sm" data-rmp="${i}">Hapus</button></div>`;
     if (p.kind === 'HO') return `<div class="pend-i"><span class="k" style="background:var(--navy);color:#fff">Stok gudang HO</span><div><div class="f">${esc(p.file)}</div><div class="d">${fmtN(p.rows.length)} SKU · ${fmtN(p.pcs)} pcs tersedia · tanggal data <input type="date" class="inp sm" data-pdate="${i}" value="${esc(p.date)}">${p.label ? ' (' + esc(p.label) + ')' : ''}${p.dateFromName ? '' : ' <b style="color:var(--warn)">cek tanggal</b>'} · menggantikan data gudang HO sebelumnya</div></div><button class="btn sm" data-rmp="${i}">Hapus</button></div>`;
     if (p.kind === 'DLY') return `<div class="pend-i"><span class="k" style="background:var(--ok-bg);color:var(--ok)">Sales harian</span><div><div class="f">${esc(p.file)}</div><div class="d">${fmtDate(p.from)} – ${fmtDate(p.to)} · ${p.stores} toko area · total ${fmtRp(p.total)}${p.skipped ? ` · ${fmtN(p.skipped)} toko di luar area dilewati` : ''} · dipakai sebagai pembanding tahun lalu / pelengkap sales</div></div><button class="btn sm" data-rmp="${i}">Hapus</button></div>`;
     if (p.kind === 'LST') {
@@ -3911,6 +4041,8 @@ async function saveAll() {
       if (rows.length) await withRetry(() => apiPost({ a: 'eacTarget', rows }));
       logs.push({ id: uid(), scope: { months: Object.keys(R), codes: Object.keys(p.names) }, at: now, kind: 'EAC', file: p.file, stores: p.rows, info: 'target Member EAC ' + Object.keys(R).sort().map(fmtMonth).join(', ') });
     }
+    /* --- blind counting --- */
+    for (const p of items.filter(p => p.kind === 'BC')) { say('Menyimpan blind counting…'); await withRetry(() => apiPost({ a: 'bc', date: p.date, rows: p.rows })); logs.push({ id: uid(), scope: { date: p.date }, at: now, kind: 'BC', file: p.file, stores: p.rows.length, info: 'blind counting ' + fmtDate(p.date) }); }
     /* --- juknis promo --- */
     for (const p of items.filter(p => p.kind === 'JUK')) {
       say('Menyimpan juknis promo…');
@@ -4105,7 +4237,7 @@ function settingsChange(t) {
 /* ================= navigasi & event ================= */
 /* ---------- alamat link per menu (#/nama-menu) ---------- */
 const SLUG = { report: 'monitoring-sales', trend: 'sales-trend', promo: 'kontribusi-promo', omni: 'omnichannel', eac: 'sales-member-eac', ra: 'ra-performance', pareto: 'product-pareto', growth: 'growth', toko: 'per-toko',
-  produk: 'produk', transfer: 'saran-transfer', ro: 'saran-repeat-order', promostock: 'stok-dcnp-smds', detention: 'detention-stock', lost: 'lost-sales', pica: 'analisa-pica', juknis: 'promo', admin: 'kelola-data', settings: 'pengaturan', home: 'home', ops_approval: 'ops/approval', ops_task: 'ops/task', ops_info: 'ops/informasi' };
+  produk: 'produk', transfer: 'saran-transfer', ro: 'saran-repeat-order', promostock: 'stok-dcnp-smds', detention: 'detention-stock', lost: 'lost-sales', pica: 'analisa-pica', juknis: 'promo', admin: 'kelola-data', settings: 'pengaturan', home: 'home', bc: 'blind-counting', ops_approval: 'ops/approval', ops_task: 'ops/task', ops_info: 'ops/informasi' };
 const PAGE_OF = Object.fromEntries(Object.entries(SLUG).map(([k, v]) => [v, k]));
 function hashFor() { const sl = SLUG[App.page] || 'monitoring-sales'; return '#/' + sl + (App.page === 'toko' && App.ui.store ? '/' + App.ui.store : ''); }
 function applyHash() {
@@ -4142,6 +4274,11 @@ document.addEventListener('click', async e => {
   if (t.id === 'tfXls') { exportTransfer(); return; }
   if (t.id === 'roXls') { exportRO(); return; }
   if (t.id === 'pcAIBtn') { picaAsk(false); return; }
+  const bcs = t.closest('[data-bcs]'); if (bcs) { const k = bcs.dataset.bcs, s0 = App.ui.bcSort || { k: 'tot', dir: 'asc' }; App.ui.bcSort = s0.k === k ? { k, dir: s0.dir === 'asc' ? 'desc' : 'asc' } : { k, dir: k === 'name' ? 'asc' : 'asc' }; render(); return; }
+  if (t.id === 'shotBtn') { shotOn(); return; }
+  if (t.id === 'shotOff') { shotOff(); return; }
+  if (t.id === 'shotPng') { shotCapture(false); return; }
+  if (t.id === 'shotCopy') { shotCapture(true); return; }
   const hb = t.closest('[data-hub]'); if (hb) { enterHub(hb.dataset.hub); return; }
   const U0 = App.ui;
   const apt = t.closest('[data-aptab]'); if (apt) { U0.apTab = apt.dataset.aptab; U0.apMore = 0; render(); return; }
@@ -4253,6 +4390,8 @@ document.addEventListener('change', async e => {
   if (t.id === 'lsM') { App.ui.lsM = t.value; render(); return; }
   if (t.id === 'lsStore') { App.ui.lsStore = t.value; App.ui.more = {}; render(); return; }
   if (t.id === 'ptStore') { App.ui.ptStore = t.value; App.ui.more = {}; render(); return; }
+  if (t.id === 'bcDate') { App.ui.bcDate = t.value; render(); return; }
+  if (t.id === 'bcStore') { App.ui.bcStore = t.value; render(); return; }
   if (t.id === 'apStore') { App.ui.apStore = t.value; render(); return; }
   if (t.id === 'tkMon') { App.ui.tkMon = t.value; render(); return; }
   if (t.id === 'tkAll') { const b = $('#tkStores'); if (b) b.style.display = t.checked ? 'none' : ''; return; }

@@ -436,6 +436,9 @@ body.locked > *:not(#authWall):not(.toast):not(#toast){display:none!important}
 body.shot .credit,body.shot .brandbar,body.shot footer,body.shot .phead,body.shot .filters,body.shot details:not([open]),body.shot details[open]>summary,body.shot .row-act,body.shot .more,body.shot .hi-act,body.shot #hubImp,body.shot .seg,body.shot .dt-link,body.shot .shot-btn,body.shot .ck-grid~p{display:none!important}
 body.shot details[open].card{display:none!important}
 body.shot .rp-wrap,body.shot .tbl-wrap{max-height:none!important;overflow:visible!important}
+body.shot{overflow-x:visible}
+body.shot table th,body.shot table td{position:static!important}
+body.shot .rp-wrap>table,body.shot .tbl-wrap>table{width:max-content;min-width:100%}
 body.shot main.wrap{padding-top:18px;padding-bottom:30px}
 @media (min-width:900px){body.shot main.wrap{width:1240px;max-width:1240px;margin:0 auto}}
 body.shot .card{box-shadow:none}
@@ -508,6 +511,7 @@ table.rp{border-collapse:separate;border-spacing:0;font-size:12px;width:100%;min
 .rp td{padding:4px 6px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums;white-space:nowrap}
 .rp td.r{text-align:right;font-family:var(--font-mono);font-size:11.5px;font-weight:600}
 .rp td.kpi2{color:var(--navy);background:var(--navy-tint)}
+.rp tfoot td.dneg{color:#FFB4A6!important;background:transparent!important}.rp tfoot td.dpos{color:#7FE0AE!important;background:transparent!important}
 .rp td.site{text-align:center;color:var(--muted);font-family:var(--font-mono);font-size:11px}
 .rp td.nm{font-weight:700;position:sticky;left:0;background:var(--surface);z-index:1;min-width:170px;max-width:220px;white-space:normal;line-height:1.25;font-size:12px}
 .rp th.nmh{position:sticky;left:0;z-index:3}
@@ -3589,13 +3593,23 @@ function shotOn() {
   h.innerHTML = `<div class="sh-l"><img src="${esc(($('.brandbar img') || {}).src || '')}" alt=""><div><b>${esc($('#pageTitle').textContent)}</b><span>${esc($('#pageSub').textContent)}</span></div></div><div class="sh-r"><b>Integrated Hub Jateng 01</b><span>diambil ${now.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })} ${pad(now.getHours())}.${pad(now.getMinutes())}${App.user ? ' · ' + esc(App.user.name) : ''}</span></div>`;
   let bar = $('#shotBar'); if (!bar) { bar = document.createElement('div'); bar.id = 'shotBar'; document.body.appendChild(bar); }
   bar.innerHTML = `<span>📸 Mode screenshot</span><button class="btn sm primary" id="shotPng">⬇ Unduh gambar</button><button class="btn sm" id="shotCopy">📋 Salin gambar</button><button class="btn sm" id="shotOff">✕ Selesai</button>`;
-  App.charts.forEach(c => { try { c.resize(); } catch (e) { } });
+  shotFit();
   window.scrollTo(0, 0);
 }
-function shotOff() { document.body.classList.remove('shot'); const h = $('#shotHead'); if (h) h.remove(); const b = $('#shotBar'); if (b) b.remove(); render(); }
+/* lebarkan halaman mengikuti tabel terlebar supaya tidak ada kolom yang terpotong */
+function shotFit() {
+  const main = $('main.wrap'); if (!main) return;
+  main.style.width = ''; main.style.maxWidth = '';
+  $$('.rp-wrap,.tbl-wrap').forEach(w => { w.scrollTop = 0; w.scrollLeft = 0; });
+  const pad = 48, need = Math.max(0, ...$$('#view table, #view .jk-tl, #view .tk-grid').map(t => t.scrollWidth));
+  if (window.innerWidth >= 900) { const w = Math.max(1240, need + pad); main.style.width = w + 'px'; main.style.maxWidth = w + 'px'; }
+  App.charts.forEach(c => { try { c.resize(); } catch (e) { } });
+}
+function shotOff() { const m = $('main.wrap'); if (m) { m.style.width = ''; m.style.maxWidth = ''; } document.body.classList.remove('shot'); const h = $('#shotHead'); if (h) h.remove(); const b = $('#shotBar'); if (b) b.remove(); render(); }
 async function shotCapture(copy) {
   try { toast('Membuat gambar…', 4000); await loadH2C();
-    const el = $('main.wrap'); const cv = await window.html2canvas(el, { scale: Math.min(2, window.devicePixelRatio || 1.5), useCORS: true, backgroundColor: getComputedStyle(document.body).backgroundColor || '#F4F6FB', logging: false, windowWidth: el.scrollWidth });
+    shotFit(); const el = $('main.wrap'); const W = Math.max(el.scrollWidth, el.offsetWidth);
+    const cv = await window.html2canvas(el, { scale: Math.min(2, window.devicePixelRatio || 1.5), useCORS: true, backgroundColor: getComputedStyle(document.body).backgroundColor || '#F4F6FB', logging: false, width: W, windowWidth: W + 80, scrollX: 0, scrollY: 0 });
     const blob = await new Promise(r => cv.toBlob(r, 'image/png'));
     const name = ($('#pageTitle').textContent || 'Integrated Hub').replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '_') + '_' + todayISO() + '.png';
     if (copy && navigator.clipboard && window.ClipboardItem) { await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]); toast('Gambar tersalin — tempel (Ctrl+V) di WhatsApp Web'); return; }

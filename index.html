@@ -406,6 +406,12 @@ table.tbl{width:100%;border-collapse:collapse;font-size:13.5px}
 .jk-ex-h{display:flex;align-items:center;gap:8px}.jk-ex-h .n{width:24px;height:24px;border-radius:50%;background:var(--jc);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;flex:none}.jk-ex-h b{flex:1;color:var(--jc)}
 .jk-ex p{margin:6px 0 0;font-size:13px}.jk-ex-r{display:flex;justify-content:space-between;gap:8px;background:var(--bg);border-radius:7px;padding:6px 8px;margin-top:6px;font-size:13px}.jk-ex-r b{color:var(--ok);white-space:nowrap}
 .jk-ex.no .jk-ex-r b{color:var(--muted)}
+.ck-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}
+.ck-col h4{margin:0 0 8px;font-size:14px;color:var(--navy)}.ck-col h4 small{display:block;font-weight:500;color:var(--muted);font-size:11.5px}
+.ck-col ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.ck{display:flex;gap:8px;align-items:flex-start;border:1px solid var(--line);border-radius:10px;padding:8px 10px;background:var(--surface)}
+.ck .ic{flex:none;font-size:15px;line-height:1.3}.ck div{display:flex;flex-direction:column;gap:1px;min-width:0}.ck b{font-size:13px}
+.ck.bad{border-color:#F3C3BD;background:var(--bad-bg)}.ck.warn{border-color:#F6D3BE;background:var(--orange-tint)}.ck.ok{border-color:#BFE3D6}
 .pd{margin-top:6px}
 .pd-hero{position:relative;background:#fff;border:1px solid var(--line);border-radius:16px;overflow:hidden;aspect-ratio:1/1;width:100%;max-width:min(560px,62vh);margin:0 auto;display:flex;align-items:center;justify-content:center}
 .pd-thumbs{justify-content:flex-start}
@@ -3069,6 +3075,50 @@ function openJuknis(key) {
     <p class="small muted" style="margin-top:14px">Sumber: ${esc(J.file || '')}</p></div>`);
 }
 
+/* ================= checklist upload (Kelola data) ================= */
+function uploadChecklist() {
+  const today = todayISO(), yest = addDays(today, -1), ago = d => d ? dayDiff(d, today) : null;
+  const st = (ok, warn) => ok ? 'ok' : warn ? 'warn' : 'bad';
+  const ageTxt = d => { const a = ago(d); return d ? (a <= 0 ? 'hari ini' : a === 1 ? 'kemarin' : a + ' hari lalu') + ' · ' + fmtDateS(d) : 'belum pernah'; };
+  const codes = storeCodes().filter(c => sType(c) !== 'bz');
+  /* harian */
+  const dsrLast = App.lastDate, dsrMiss = dsrLast ? codes.filter(c => (lastDateOf(c) || '') < dsrLast) : [];
+  const stDates = Object.values(App.stock || {}).map(x => x.date).filter(Boolean), stLast = stDates.length ? stDates.reduce((a, d) => d > a ? d : a) : null, stOld = codes.filter(c => !App.stock[c] || ago(App.stock[c].date) > 2);
+  const lostLast = (App.lost || []).reduce((a, x) => x.d > a ? x.d : a, '') || null, hoLast = App.hoInfo && App.hoInfo.date;
+  const daily = [
+    { n: 'Item DSR Report', d: 'penjualan semua toko (kemarin)', last: dsrLast, s: st(dsrLast >= yest && !dsrMiss.length, dsrLast >= addDays(today, -2)), extra: dsrMiss.length ? `${dsrMiss.length} toko belum sampai ${fmtDateS(dsrLast)}` : '' },
+    { n: 'Export by Bin (stok)', d: 'stok semua toko · Jumat: tandai juga Sabtu–Minggu', last: stLast, s: st(stLast >= yest && !stOld.length, ago(stLast) <= 3), extra: stOld.length ? `${stOld.length} toko stoknya > 2 hari` : '' },
+    { n: 'Lost Sale Report', d: 'lost sales toko area', last: lostLast, s: st(lostLast >= yest, ago(lostLast) <= 3) },
+    { n: 'Stok gudang HO', d: 'file Data Stock (pagi/siang)', last: hoLast, s: st(hoLast >= yest, ago(hoLast) <= 3), extra: App.hoInfo && App.hoInfo.label ? App.hoInfo.label : '' }
+  ];
+  /* mingguan */
+  const gaps7 = (() => { let n = 0; for (let d = addDays(today, -7); d < today; d = addDays(d, 1)) { const M = App.index.sales[d.slice(0, 7)] || {}; n += codes.filter(c => !((M[c] || {}).d || []).includes(+d.slice(8))).length; } return n; })();
+  const weekly = [
+    { n: 'Cek kelengkapan DSR 7 hari terakhir', d: 'grid "Kelengkapan data" di bawah', s: gaps7 ? 'warn' : 'ok', extra: gaps7 ? gaps7 + ' toko-hari belum ada data' : 'lengkap' },
+    { n: 'Perbarui cache', d: 'hanya bila ada koreksi manual di spreadsheet', s: 'info' }
+  ];
+  /* bulanan */
+  const m = today.slice(0, 7), nm = addMonths(m, 1), late = +today.slice(8) >= 20, tm = late ? nm : m;
+  const has = o => !!(o && Object.keys(o).length);
+  const lbl = late ? fmtMonth(nm) : fmtMonth(m);
+  const mon = [
+    { n: 'Target sales', d: 'sheet Target Sales di template', s: st(has(App.targets[tm]), has(App.targets[m])), extra: lbl + (has(App.targets[tm]) ? ' sudah ada' : ' belum ada') },
+    { n: 'Bobot harian', d: 'sheet Bobot Harian di template', s: st(!!wOf(tm), !!wOf(m)), extra: lbl + (wOf(tm) ? ' sudah ada' : ' belum ada') },
+    { n: 'Target OmniChannel', d: 'sheet Target OmniChannel di template', s: st(has(App.omni[tm]), has(App.omni[m])), extra: lbl + (has(App.omni[tm]) ? ' sudah ada' : ' belum ada') },
+    { n: 'Target Sales Member EAC', d: 'sheet Target EAC (bisa sekaligus Jan–Des)', s: st(has(App.eac[tm]), has(App.eac[m])), extra: lbl + (has(App.eac[tm]) ? ' sudah ada' : ' belum ada') },
+    { n: 'Juknis promo (PDF)', d: 'termasuk versi update di tengah bulan', s: st(!!(App.juknis || {})[tm], !!(App.juknis || {})[m]), extra: lbl + ((App.juknis || {})[tm] ? ' sudah ada' : ' belum ada') },
+    { n: 'Master artikel, foto & list promo', d: 'diupdate di admin Katalog Produk (otomatis ikut)', s: App.mst.status === 'ok' && App.mst.master ? 'info' : 'warn', extra: App.mst.master ? 'master ' + (App.mst.master.generated || '') : 'cek Katalog' }
+  ];
+  const yearly = [{ n: 'Sales harian tahun lalu', d: 'Report Daily Sales (sekali setahun, untuk Growth)', s: 'info' }];
+  const icon = { ok: '✅', warn: '⚠️', bad: '❌', info: 'ℹ️' };
+  const item = x => `<li class="ck ${x.s}"><span class="ic">${icon[x.s]}</span><div><b>${esc(x.n)}</b><span class="small muted">${esc(x.d)}</span>${x.last !== undefined ? `<span class="small">Terakhir: ${ageTxt(x.last)}</span>` : ''}${x.extra ? `<span class="small">${esc(x.extra)}</span>` : ''}</div></li>`;
+  const col = (t, sub, arr) => `<div class="ck-col"><h4>${t}<small>${sub}</small></h4><ul>${arr.map(item).join('')}</ul></div>`;
+  const todo = [...daily, ...mon].filter(x => x.s === 'bad' || x.s === 'warn').length;
+  return `<section class="card"><div class="card-h"><h3>Checklist upload</h3><p class="small muted">${todo ? `<b style="color:var(--bad)">${todo} item perlu diperhatikan</b>` : '<b style="color:var(--ok)">Semua data terbaru ✓</b>'}</p></div>
+    <div class="ck-grid">${col('Harian', 'setiap pagi', daily)}${col('Mingguan', 'cek ringan', weekly)}${col('Bulanan', late ? 'mulai tgl 20: siapkan ' + fmtMonth(nm) : 'awal bulan / bila ada perubahan', mon)}${col('Tahunan', 'sekali setahun', yearly)}</div>
+    <p class="small muted" style="margin:10px 0 0">Tip: target, bobot, OmniChannel & EAC cukup lewat <b>Download template</b> di bawah, diisi, lalu diupload sekali. Semua file bisa diupload bersamaan.</p></section>`;
+}
+
 /* ================= halaman: per toko ================= */
 function pageStore(view) {
   const codes = storeCodes(); if (!App.ui.store || !codes.includes(App.ui.store)) App.ui.store = codes[0];
@@ -3300,6 +3350,7 @@ function pageAdmin(view) {
   const codes = storeCodes().filter(c => sType(c) !== 'bz' || monthTarget(c, tm) || (App.index.sales[tm] || {})[c] || (App.tgtDetail[tm] || {})[c]);
   const allCodes = storeCodes();
   view.innerHTML = `<div class="stack">${permNote}
+    ${uploadChecklist()}
     <section class="card"><div class="card-h"><h3>Upload data</h3><p class="small muted">Item DSR Report, Lost Sale Report, Export by Bin (stok), dan file target. Semua tersimpan di spreadsheet master.</p></div>
       <label class="drop" id="drop"><input type="file" id="fileIn" multiple accept=".xlsx,.xls,.csv,.pdf"><b>Pilih file</b><span class="small muted">atau seret file ke sini. Toko dikenali otomatis dari kolom Location.</span></label>
       <div class="pend" id="pend"></div>

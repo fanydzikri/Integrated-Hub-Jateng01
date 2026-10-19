@@ -383,6 +383,34 @@ table.tbl{width:100%;border-collapse:collapse;font-size:13.5px}
 .ai-box{background:linear-gradient(180deg,#F5F7FD,#fff);border:1px solid var(--line-strong);border-radius:12px;padding:16px 18px}
 .ai-box h2,.ai-box h3{font-size:15px;color:var(--navy);margin:12px 0 6px}.ai-box h2:first-child,.ai-box h3:first-child{margin-top:0}
 .ai-box ul{margin:0 0 6px;padding-left:18px}.ai-box li{margin-bottom:3px;font-size:13.5px;line-height:1.5}.ai-box p{font-size:13.5px;line-height:1.55;margin:0 0 6px}
+.pd{margin-top:6px}
+.pd-hero{position:relative;background:#fff;border:1px solid var(--line);border-radius:16px;overflow:hidden;aspect-ratio:1/1;width:100%;max-width:min(560px,62vh);margin:0 auto;display:flex;align-items:center;justify-content:center}
+.pd-thumbs{justify-content:flex-start}
+.pd-main{width:100%;height:100%;object-fit:contain;display:block}
+.pd-noimg{display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:13px}
+.pd-nav{position:absolute;top:50%;transform:translateY(-50%);width:44px;height:44px;border-radius:50%;border:1px solid var(--line);background:rgba(255,255,255,.92);color:var(--navy);font-size:24px;font-weight:700;cursor:pointer;box-shadow:0 2px 8px rgba(11,27,74,.12)}
+.pd-nav.l{left:12px}.pd-nav.r{right:12px}
+.pd-count{position:absolute;bottom:10px;right:12px;background:rgba(11,27,74,.7);color:#fff;font-size:11px;font-weight:700;border-radius:999px;padding:3px 9px}
+.pd-thumbs,.pd-colors{display:flex;gap:8px;overflow-x:auto;padding:10px 0 4px}
+.pd-th,.pd-col{flex:none;width:76px;height:76px;padding:0;border:2px solid var(--line);border-radius:12px;background:#fff;overflow:hidden;cursor:pointer}
+.pd-th img,.pd-col img{width:100%;height:100%;object-fit:cover;display:block}
+.pd-th.on,.pd-col.on{border-color:var(--orange);box-shadow:0 0 0 2px rgba(228,102,54,.18)}
+.pd-col span{display:flex;align-items:center;justify-content:center;height:100%;font-weight:800;color:var(--navy);font-size:13px}
+.pd-crumb{margin:14px 0 2px;color:var(--muted);font-size:14px}
+.pd-name{margin:0;font-size:24px;font-weight:800;color:var(--ink);letter-spacing:-.01em;line-height:1.2;text-transform:uppercase}
+.pd-price{display:flex;align-items:center;gap:10px;margin-top:12px}
+.pd-price b{font-size:28px;font-weight:800;color:var(--navy);letter-spacing:-.02em}
+.pd-disc{background:var(--orange);color:#fff;font-weight:800;font-size:14px;border-radius:7px;padding:3px 9px}
+.pd-old{margin:2px 0 0;font-size:14px}.pd-old s{color:var(--muted)}.pd-old span{color:var(--ok);font-weight:700;margin-left:6px}
+.pd-lbl{margin:16px 0 0;font-size:14px;color:var(--muted)}.pd-lbl b{color:var(--ink)}
+.pd-sizes{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.pd-sz{min-width:58px;border:1.5px solid var(--navy);border-radius:10px;padding:6px 10px;text-align:center;line-height:1.15}
+.pd-sz b{display:block;font-size:14px;color:var(--navy)}.pd-sz small{font-size:11px;color:var(--muted)}
+.pd-sz.off{border-color:var(--line);opacity:.55}.pd-sz.off b{color:var(--muted)}
+.pd-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:14px}
+.pd-stats div{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.pd-stats span{display:block;font-size:11.5px;color:var(--muted);font-weight:600}.pd-stats b{font-size:17px;color:var(--navy)}
+@media (max-width:640px){.pd-name{font-size:20px}.pd-price b{font-size:24px}.pd-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.pd-th,.pd-col{width:64px;height:64px}}
 .ra-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
 .ra-tile{background:#0F3192;color:#fff;border-radius:10px;padding:12px 16px;text-align:center}
 .ra-tile span{display:block;font-size:12px;font-weight:600;color:#C9D3F0}
@@ -2969,30 +2997,60 @@ function pageProduct(view) {
     ]
   });
 }
-function openProduct(art, store) {
-  const R = periodRange(); const inf = artInfo(art); const H = health();
-  const cur = linesIn(R.from, R.to).filter(l => artOf(l.sku) === art);
-  const per = storeCodes().map(c => { const ls = cur.filter(l => l.s === c); const h = H.stores[c] && H.stores[c].items.get(art); return { c, name: sName(c), q: ls.reduce((s, l) => s + l.q, 0), n: ls.reduce((s, l) => s + VAL(l), 0), stock: h ? h.stock : (stockByArt(c).get(art) || { t: 0 }).t, rate: h ? h.rate : 0, k: h ? h.k : null }; }).filter(r => r.q || r.stock);
-  // varian (sku)
-  const vm = new Map();
-  for (const l of cur) { if (store && l.s !== store) continue; const x = vm.get(l.sku) || { sku: l.sku, q: 0, n: 0, stock: 0 }; x.q += l.q; x.n += VAL(l); vm.set(l.sku, x); }
-  for (const c of (store ? [store] : storeCodes())) { const S = App.stock[c]; if (!S) continue; for (const sku in S.items) if (artOf(sku) === art) { const x = vm.get(sku) || { sku, q: 0, n: 0, stock: 0 }; x.stock += S.items[sku][0]; vm.set(sku, x); } }
-  const vars = [...vm.values()].sort((a, b) => b.q - a.q || b.stock - a.stock);
-  const mc = mainColor(art, store), gal = photosOf(art, mc).slice(0, 8);
-  const colorThumbs = (artMaster(art) || { colors: [] }).colors.map(c => { const u = photosOf(art, c)[0]; return u ? `<figure style="margin:0;text-align:center">${imgTag(sizedImg(u, 200), '', c)}<figcaption class="small muted">${esc(c)}</figcaption></figure>` : ''; }).join('');
-  openDrawer(`<p class="muted small">${esc(inf.c2 ? inf.c2 + ' › ' : '')}${esc(inf.c3)} › ${esc(inf.c4)} · kode ${esc(art)}${inf.gd ? ' · ' + esc(inf.gd) : ''}</p><h2>${esc(inf.name)}</h2>
-    ${inf.price ? `<p style="margin:2px 0 0;font-weight:800;color:var(--orange-deep)">${fmtRp(inf.price)}</p>` : ''}
-    ${gal.length ? `<div class="gal">${gal.map(u => imgTag(sizedImg(u, 340), '', inf.name)).join('')}</div>` : (App.mst.status === 'loading' ? '<p class="small muted">Memuat foto…</p>' : '')}
-    ${colorThumbs ? `<p class="small muted" style="margin:6px 0 0">Warna tersedia di master:</p><div class="gal" style="margin-top:4px">${colorThumbs}</div>` : ''}
-    <p class="muted small">${esc(R.label)}</p>
-    <h3 style="font-family:var(--font-head);margin:18px 0 8px">Per toko</h3>
+/* ---------- detail produk (gaya katalog) ---------- */
+const COLOR_ID = { BLK: 'Hitam', WHT: 'Putih', NVY: 'Navy', BLU: 'Biru', GRY: 'Abu-abu', DGR: 'Abu tua', LGR: 'Abu muda', OLI: 'Olive', RED: 'Merah', GRN: 'Hijau', BRW: 'Cokelat', BRN: 'Cokelat', KHK: 'Khaki', MRN: 'Maroon', MAR: 'Maroon', ORG: 'Oranye', ORN: 'Oranye', YLW: 'Kuning', PNK: 'Pink', PRP: 'Ungu', TSK: 'Tosca', CRM: 'Krem', BGE: 'Beige', SLV: 'Silver', GLD: 'Emas', CML: 'Camel', MST: 'Mustard', TRQ: 'Turquoise', CHC: 'Cokelat tua', ARM: 'Army', MOS: 'Moss', SND: 'Sand', TAN: 'Tan', BOL: 'Biru olive', DBL: 'Biru tua', LBL: 'Biru muda' };
+const colorLabel = c => COLOR_ID[c] ? COLOR_ID[c] + ' (' + c + ')' : c || '–';
+const GENDER_ID = { 'Male': 'Pria', 'Female': 'Wanita', 'Adult Unisex': 'Unisex', 'Kids Unisex': 'Anak', 'Unisex': 'Unisex' };
+const SIZE_ORDER = ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', '2XL', 'XXXL', '3XL', '4XL', '5XL', 'ALL', 'FS', 'F'];
+const sizeSort = (a, b) => { const ia = SIZE_ORDER.indexOf(a), ib = SIZE_ORDER.indexOf(b); if (ia >= 0 || ib >= 0) return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib); const na = parseFloat(a), nb = parseFloat(b); return !isNaN(na) && !isNaN(nb) ? na - nb : String(a).localeCompare(String(b)); };
+const sizeOfSku = sku => { const k = App.mst.sku && App.mst.sku.get(sku), it = k && mItem(k); if (it && it.a && it.a[sku]) return String(it.a[sku]); const p = String((App.sku[sku] || [])[0] || '').split(','); return p.length >= 3 ? p[p.length - 1].trim() : ''; };
+function openProduct(art, store, color, idx, allColors) {
+  const R = periodRange(), inf = artInfo(art), H = health();
+  const M = artMaster(art), colors = [...new Set([...(M ? M.colors : []), ...Object.keys((App.mst.photo && App.mst.photo.items && App.mst.photo.items[art] || {}).c || {})])];
+  /* warna yang ada di stok/penjualan tapi tidak di master */
+  const skuAll = new Set(); for (const c of storeCodes()) { const S = App.stock[c]; if (S) for (const sku in S.items) if (artOf(sku) === art) skuAll.add(sku); }
+  const cur = linesIn(R.from, R.to).filter(l => artOf(l.sku) === art); cur.forEach(l => skuAll.add(l.sku));
+  for (const sku of skuAll) { const c = colorOfSku(sku); if (c && !colors.includes(c)) colors.push(c); }
+  const col = color && colors.includes(color) ? color : (mainColor(art, store) || colors[0] || '');
+  const imgs = photosOf(art, col); const i = Math.max(0, Math.min(imgs.length - 1, idx || 0));
+  const st = { art, store, col, i, all: !!allColors }; App.ui.pd = st;
+  const inCol = sku => !col || colorOfSku(sku) === col;
+  /* harga & promo (dari list promo Katalog) */
+  const price = (M && M.p) || inf.price || 0;
+  let disc = 0; if (App.mst.promo && App.mst.promo.items) { const it = App.mst.promo.items[art + '.' + col]; if (it) disc = it.d || 0; else for (const sku of skuAll) { const p = App.mst.psku && App.mst.psku.get(sku); if (p && inCol(sku)) { disc = p.d; break; } } }
+  const net = disc ? Math.round(price * (1 - disc / 100) / 100) * 100 : price;
+  /* ukuran untuk warna terpilih + stok area */
+  const sizes = new Map(); const key = art + '.' + col, mi = mItem(key);
+  if (mi && mi.a) for (const sku in mi.a) sizes.set(String(mi.a[sku]), { sku, stock: 0 });
+  for (const c of storeCodes()) { const S = App.stock[c]; if (!S) continue; for (const sku in S.items) if (artOf(sku) === art && inCol(sku)) { const sz = sizeOfSku(sku) || sku.slice(-3); const x = sizes.get(sz) || { sku, stock: 0 }; x.stock += Math.max(0, S.items[sku][0]); sizes.set(sz, x); } }
+  const szList = [...sizes.entries()].sort((a, b) => sizeSort(a[0], b[0]));
+  /* per toko */
+  const per = storeCodes().filter(typeOk).map(c => { const ls = cur.filter(l => l.s === c && (st.all || inCol(l.sku))); const S = App.stock[c]; let stock = 0; if (S) for (const sku in S.items) if (artOf(sku) === art && (st.all || inCol(sku))) stock += S.items[sku][0];
+    const h = H.stores[c] && H.stores[c].items.get(art); return { c, name: sName(c), q: ls.reduce((s, l) => s + l.q, 0), n: ls.reduce((s, l) => s + VAL(l), 0), stock, rate: h ? h.rate : 0 }; }).filter(r => r.q || r.stock);
+  const tq = per.reduce((a, r) => a + r.q, 0), tn = per.reduce((a, r) => a + r.n, 0), ts = per.reduce((a, r) => a + Math.max(0, r.stock), 0), tr = per.reduce((a, r) => a + r.rate, 0);
+  const vm = new Map(); for (const l of cur) { if (store && l.s !== store) continue; if (!st.all && !inCol(l.sku)) continue; const x = vm.get(l.sku) || { sku: l.sku, q: 0, n: 0, stock: 0 }; x.q += l.q; x.n += VAL(l); vm.set(l.sku, x); }
+  for (const c of (store ? [store] : storeCodes())) { const S = App.stock[c]; if (!S) continue; for (const sku in S.items) if (artOf(sku) === art && (st.all || inCol(sku))) { const x = vm.get(sku) || { sku, q: 0, n: 0, stock: 0 }; x.stock += S.items[sku][0]; vm.set(sku, x); } }
+  const vars = [...vm.values()].sort((a, b) => sizeSort(sizeOfSku(a.sku), sizeOfSku(b.sku)));
+  const crumbs = [GENDER_ID[inf.gd] || inf.gd, inf.c3 && inf.c3[0] + inf.c3.slice(1).toLowerCase(), inf.c4 && inf.c4[0] + inf.c4.slice(1).toLowerCase(), inf.c2 && inf.c2[0] + inf.c2.slice(1).toLowerCase()].filter(Boolean).join(' · ');
+  openDrawer(`<div class="pd">
+    <div class="pd-hero">${imgs.length ? imgTag(sizedImg(imgs[i], 720), 'pd-main', inf.name) : `<div class="pd-main pd-noimg">${App.mst.status === 'loading' ? 'Memuat foto…' : 'Foto belum tersedia'}</div>`}
+      ${imgs.length > 1 ? `<button class="pd-nav l" data-pdi="${(i - 1 + imgs.length) % imgs.length}" aria-label="Foto sebelumnya">‹</button><button class="pd-nav r" data-pdi="${(i + 1) % imgs.length}" aria-label="Foto berikutnya">›</button><span class="pd-count">${i + 1} / ${imgs.length}</span>` : ''}</div>
+    ${imgs.length > 1 ? `<div class="pd-thumbs">${imgs.map((u, k) => `<button class="pd-th ${k === i ? 'on' : ''}" data-pdi="${k}" aria-label="Foto ${k + 1}">${imgTag(sizedImg(u, 200), '', '')}</button>`).join('')}</div>` : ''}
+    <p class="pd-crumb">${esc(crumbs)}</p>
+    <h2 class="pd-name">${esc(inf.name)}</h2>
+    ${price ? `<div class="pd-price"><b>${fmtRp(net)}</b>${disc ? `<span class="pd-disc">-${disc}%</span>` : ''}</div>${disc ? `<p class="pd-old"><s>${fmtRp(price)}</s> <span>Hemat ${fmtRp(price - net)}</span></p>` : ''}` : ''}
+    ${colors.length ? `<p class="pd-lbl">Warna: <b>${esc(colorLabel(col))}</b></p><div class="pd-colors">${colors.map(c => { const u = photosOf(art, c)[0]; return `<button class="pd-col ${c === col ? 'on' : ''}" data-pdc="${esc(c)}" title="${esc(colorLabel(c))}">${u ? imgTag(sizedImg(u, 200), '', c) : `<span>${esc(c)}</span>`}</button>`; }).join('')}</div>` : ''}
+    ${szList.length ? `<p class="pd-lbl">Ukuran & stok area <span class="muted">(warna ${esc(col)})</span></p><div class="pd-sizes">${szList.map(([sz, x]) => `<span class="pd-sz ${x.stock > 0 ? '' : 'off'}"><b>${esc(sz)}</b><small>${fmtN(x.stock)}</small></span>`).join('')}</div>` : ''}
+    <p class="small muted" style="margin:10px 0 0">Kode artikel ${esc(art)}${inf.gd ? ' · ' + esc(inf.gd) : ''} · ${esc(R.label)}</p>
+    <div class="pd-stats"><div><span>Terjual</span><b>${fmtN(tq)}</b></div><div><span>${VL()}</span><b>${fmtRpS(tn)}</b></div><div><span>Stok area</span><b>${fmtN(ts)}</b></div><div><span>Jual/bln</span><b>${fmtX(tr, 1)}</b></div></div>
+    <div class="card-h" style="margin:18px 0 8px"><h3 style="margin:0">Per toko</h3><div class="seg" role="group"><button data-pdall="0" class="${st.all ? '' : 'on'}">Warna ini</button><button data-pdall="1" class="${st.all ? 'on' : ''}">Semua warna</button></div></div>
     <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Toko</th><th class="r">Qty</th><th class="r">${VL()}</th><th class="r">Stok</th><th class="r">Jual/bln</th></tr></thead><tbody>
-    ${per.sort((a, b) => b.q - a.q || b.stock - a.stock).map(r => `<tr><td><span class="nm">${esc(r.name)}</span><span class="sub">${esc(r.c)}</span></td><td class="r">${fmtN(r.q)}</td><td class="r">${fmtRpS(r.n)}</td><td class="r">${fmtN(r.stock)}</td><td class="r">${fmtX(r.rate)}</td></tr>`).join('') || '<tr><td colspan="5" class="empty">Tidak ada penjualan atau stok.</td></tr>'}
+    ${per.sort((a, b) => b.q - a.q || b.stock - a.stock).map(r => `<tr${r.c === store ? ' style="background:var(--navy-tint)"' : ''}><td><span class="nm">${esc(r.name)}</span><span class="sub">${esc(r.c)}</span></td><td class="r">${fmtN(r.q)}</td><td class="r">${fmtRpS(r.n)}</td><td class="r"><b>${fmtN(r.stock)}</b></td><td class="r">${fmtX(r.rate)}</td></tr>`).join('') || '<tr><td colspan="5" class="empty">Belum ada penjualan atau stok untuk warna ini.</td></tr>'}
     </tbody></table></div>
-    <h3 style="font-family:var(--font-head);margin:18px 0 8px">Varian ${store ? 'di ' + esc(sName(store)) : 'se-area'}</h3>
+    <h3 style="margin:18px 0 8px">Varian ${store ? 'di ' + esc(sName(store)) : 'se-area'}</h3>
     <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Varian</th><th class="r">Qty</th><th class="r">${VL()}</th><th class="r">Stok</th></tr></thead><tbody>
-    ${vars.map(v => `<tr><td>${esc(varName((App.sku[v.sku] || [])[0]) || v.sku)}<span class="sub">${esc(v.sku)}</span></td><td class="r">${fmtN(v.q)}</td><td class="r">${fmtRpS(v.n)}</td><td class="r">${fmtN(v.stock)}</td></tr>`).join('') || '<tr><td colspan="4" class="empty">Tidak ada varian.</td></tr>'}
-    </tbody></table></div>`);
+    ${vars.map(v => `<tr><td>${esc(varName((App.sku[v.sku] || [])[0]) || colorOfSku(v.sku) + ', ' + sizeOfSku(v.sku))}<span class="sub">${esc(v.sku)}</span></td><td class="r">${fmtN(v.q)}</td><td class="r">${fmtRpS(v.n)}</td><td class="r">${fmtN(v.stock)}</td></tr>`).join('') || '<tr><td colspan="4" class="empty">Tidak ada varian.</td></tr>'}
+    </tbody></table></div></div>`);
 }
 
 /* ================= halaman: kesehatan stok ================= */
@@ -3522,6 +3580,9 @@ document.addEventListener('click', async e => {
   const rpv = t.closest('[data-rpv]'); if (rpv) { App.ui.rpVal = rpv.dataset.rpv; render(); return; }
   if (t.id === 'rpXls') { exportReport(); return; }
   const tb = t.closest('[data-sttab]'); if (tb) { App.ui.stTab = tb.dataset.sttab; render(); return; }
+  const pdi = t.closest('[data-pdi]'); if (pdi && App.ui.pd) { const P = App.ui.pd; openProduct(P.art, P.store, P.col, +pdi.dataset.pdi, P.all); return; }
+  const pdc = t.closest('[data-pdc]'); if (pdc && App.ui.pd) { const P = App.ui.pd; openProduct(P.art, P.store, pdc.dataset.pdc, 0, P.all); return; }
+  const pda = t.closest('[data-pdall]'); if (pda && App.ui.pd) { const P = App.ui.pd; const y = $('.drawer') ? $('.drawer').scrollTop : 0; openProduct(P.art, P.store, P.col, P.i, pda.dataset.pdall === '1'); if ($('.drawer')) $('.drawer').scrollTop = y; return; }
   const pxr = t.closest('[data-pxrm]'); if (pxr) { e.preventDefault(); const [i, d] = pxr.dataset.pxrm.split('|'); const p = App.pending[+i]; if (p) { p.extra = (p.extra || []).filter(x => x !== d); renderPending(); } return; }
   const pxg = t.closest('[data-pxgap]'); if (pxg) { const p = App.pending[+pxg.dataset.pxgap]; if (p) { const codes = Object.keys(p.stores); const add = new Set(p.extra || []);
       for (const c of codes) { const last = (App.detHist || []).filter(r => r.c === c && r.d < p.date).reduce((a, r) => r.d > a ? r.d : a, ''); if (!last) continue; for (let d = addDays(last, 1); d < p.date; d = addDays(d, 1)) add.add(d); }
@@ -3603,7 +3664,7 @@ document.addEventListener('change', async e => {
   if (t.dataset && t.dataset.pxadd !== undefined) { const p = App.pending[+t.dataset.pxadd]; if (p && t.value && t.value !== p.date) { p.extra = [...new Set([...(p.extra || []), t.value])].sort(); renderPending(); } return; }
   if (t.dataset && t.dataset.pdate !== undefined) { const p = App.pending[+t.dataset.pdate]; if (p && t.value) { p.date = t.value; p.dateFromName = true; } return; }
 });
-document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeDrawer(); closeLogin(); if (App.ui.navOpen) { App.ui.navOpen = null; renderNav(); } } });
+document.addEventListener('keydown', e => { if ((e.key === 'ArrowRight' || e.key === 'ArrowLeft') && $('#ov') && App.ui.pd && $('.pd-nav')) { const P = App.ui.pd, n = photosOf(P.art, P.col).length; if (n > 1) openProduct(P.art, P.store, P.col, (P.i + (e.key === 'ArrowRight' ? 1 : -1) + n) % n, P.all); return; } if (e.key === 'Escape') { closeDrawer(); closeLogin(); if (App.ui.navOpen) { App.ui.navOpen = null; renderNav(); } } });
 window.addEventListener('scroll', () => { const b = document.getElementById('brandbar'); if (b) b.classList.toggle('scrolled', window.scrollY > 8); }, { passive: true });
 document.addEventListener('dragover', e => { const d = e.target.closest && e.target.closest('#drop'); if (d) { e.preventDefault(); d.classList.add('over'); } });
 document.addEventListener('dragleave', e => { const d = e.target.closest && e.target.closest('#drop'); if (d) d.classList.remove('over'); });

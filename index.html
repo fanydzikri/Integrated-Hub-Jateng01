@@ -1408,6 +1408,7 @@ function lockScopedSelects(view) {
 function setHead(t, sub) { if (scopeOn() && !String(t).includes(sName(App.ui.scope))) t += ' · ' + sName(App.ui.scope); $('#pageTitle').textContent = t; $('#pageSub').textContent = sub || ''; }
 function render() {
   destroyCharts(); App.tables = {};
+  if (App.booted) syncHash(false);
   renderNav(); renderPeriod();
   const view = $('#view');
   if (!App.lastDate && App.page !== 'admin' && !Object.keys(App.index.stock).length && !srLast()) {
@@ -3761,7 +3762,21 @@ function settingsChange(t) {
 }
 
 /* ================= navigasi & event ================= */
-function go(page) { App.page = page; App.ui.navOpen = null; const f = $('#navFloat'); if (f) f.remove(); closeDrawer(); render(); window.scrollTo(0, 0); }
+/* ---------- alamat link per menu (#/nama-menu) ---------- */
+const SLUG = { report: 'monitoring-sales', trend: 'sales-trend', promo: 'kontribusi-promo', omni: 'omnichannel', eac: 'sales-member-eac', ra: 'ra-performance', pareto: 'product-pareto', growth: 'growth', toko: 'per-toko',
+  produk: 'produk', transfer: 'saran-transfer', ro: 'saran-repeat-order', promostock: 'stok-dcnp-smds', detention: 'detention-stock', lost: 'lost-sales', pica: 'analisa-pica', juknis: 'promo', admin: 'kelola-data', settings: 'pengaturan' };
+const PAGE_OF = Object.fromEntries(Object.entries(SLUG).map(([k, v]) => [v, k]));
+function hashFor() { const sl = SLUG[App.page] || 'monitoring-sales'; return '#/' + sl + (App.page === 'toko' && App.ui.store ? '/' + App.ui.store : ''); }
+function applyHash() {
+  const parts = decodeURIComponent(location.hash || '').replace(/^#\/?/, '').split('/').filter(Boolean);
+  const pg = PAGE_OF[(parts[0] || '').toLowerCase()]; if (!pg) return false;
+  App.page = pg; if (pg === 'toko' && parts[1]) App.ui.store = parts[1];
+  return true;
+}
+function syncHash(push) { const h = hashFor(); if (location.hash === h) return; try { history[push ? 'pushState' : 'replaceState'](null, '', h); } catch (e) { location.hash = h; } }
+window.addEventListener('popstate', () => { if (applyHash()) { App.ui.navOpen = null; closeDrawer(); render(); } });
+window.addEventListener('hashchange', () => { const before = App.page; if (applyHash() && (App.page !== before || App.page === 'toko')) render(); });
+function go(page) { App.page = page; App.ui.navOpen = null; const f = $('#navFloat'); if (f) f.remove(); closeDrawer(); syncHash(true); render(); window.scrollTo(0, 0); }
 window.addEventListener('resize', () => { if (App.ui.navOpen) renderNav(); });
 document.addEventListener('click', async e => {
   const t = e.target;
@@ -3977,6 +3992,7 @@ async function boot() {
   loadMaster();
 }
 async function init() {
+  applyHash(); App.booted = true;
   renderNav();
   if (typeof Chart !== 'undefined') { Chart.defaults.font.family = '"Plus Jakarta Sans", system-ui, sans-serif'; }
   if (!/^https:\/\/script\.google(usercontent)?\.com\//.test(SHEET_API_URL)) { $('#view').innerHTML = '<div class="empty-state"><h2>Spreadsheet belum disambungkan</h2><p class="muted">Isi SHEET_API_URL di bagian atas file index.html dengan URL Web App Apps Script.</p></div>'; return; }

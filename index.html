@@ -383,6 +383,29 @@ table.tbl{width:100%;border-collapse:collapse;font-size:13.5px}
 .ai-box{background:linear-gradient(180deg,#F5F7FD,#fff);border:1px solid var(--line-strong);border-radius:12px;padding:16px 18px}
 .ai-box h2,.ai-box h3{font-size:15px;color:var(--navy);margin:12px 0 6px}.ai-box h2:first-child,.ai-box h3:first-child{margin-top:0}
 .ai-box ul{margin:0 0 6px;padding-left:18px}.ai-box li{margin-bottom:3px;font-size:13.5px;line-height:1.5}.ai-box p{font-size:13.5px;line-height:1.55;margin:0 0 6px}
+.jk-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
+.jk-card{all:unset;box-sizing:border-box;cursor:pointer;display:flex;flex-direction:column;gap:5px;background:var(--surface);border:1px solid var(--line);border-left:5px solid var(--jc);border-radius:12px;padding:12px 14px;transition:box-shadow .15s}
+.jk-card:hover{box-shadow:0 6px 18px rgba(11,27,74,.12)}
+.jk-card b{font-size:15px;color:var(--ink);line-height:1.25}
+.jk-cat{align-self:flex-start;font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:#fff;background:var(--jc);border-radius:5px;padding:2px 7px}
+.jk-meta{font-size:12.5px;color:var(--muted);line-height:1.35}
+.jk-b{align-self:flex-start;font-size:11.5px;font-weight:700;border-radius:999px;padding:3px 9px;background:var(--navy-tint);color:var(--navy)}
+.jk-b.ok{background:var(--ok-bg);color:var(--ok)}.jk-b.or{background:var(--orange-tint);color:var(--orange-deep)}.jk-b.red{background:var(--bad-bg);color:var(--bad)}
+.jk-tl{border-collapse:separate;border-spacing:0;font-size:11px;width:100%}
+.jk-tl th{font-weight:700;color:var(--muted);padding:4px 0;min-width:18px;text-align:center;position:sticky;top:0;background:var(--surface)}
+.jk-tl th.nm,.jk-tl td.nm{text-align:left;min-width:200px;max-width:240px;padding:4px 8px;position:sticky;left:0;background:var(--surface);z-index:1;font-size:12px;font-weight:600}
+.jk-tl td{height:24px;padding:2px 0;border-bottom:1px solid var(--line)}
+.jk-tl td i{display:block;height:12px;border-radius:3px}
+.jk-tl .we{background:var(--orange-tint)}.jk-tl .td{background:#FFE2D3}
+.jk-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px}
+.jk-note{border-left:5px solid var(--orange)}
+.jk-d h3{font-size:14.5px;color:var(--navy);margin:16px 0 8px}
+.jk-syarat{width:100%;border-collapse:collapse;font-size:13.5px}.jk-syarat th{text-align:left;width:130px;color:var(--muted);font-weight:600;padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:top}.jk-syarat td{padding:7px 8px;border-bottom:1px solid var(--line)}
+.jk-tips{margin-top:12px;background:var(--navy-tint);border-radius:10px;padding:10px 12px;font-size:13.5px}
+.jk-ex{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:8px;background:var(--surface)}
+.jk-ex-h{display:flex;align-items:center;gap:8px}.jk-ex-h .n{width:24px;height:24px;border-radius:50%;background:var(--jc);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;flex:none}.jk-ex-h b{flex:1;color:var(--jc)}
+.jk-ex p{margin:6px 0 0;font-size:13px}.jk-ex-r{display:flex;justify-content:space-between;gap:8px;background:var(--bg);border-radius:7px;padding:6px 8px;margin-top:6px;font-size:13px}.jk-ex-r b{color:var(--ok);white-space:nowrap}
+.jk-ex.no .jk-ex-r b{color:var(--muted)}
 .pd{margin-top:6px}
 .pd-hero{position:relative;background:#fff;border:1px solid var(--line);border-radius:16px;overflow:hidden;aspect-ratio:1/1;width:100%;max-width:min(560px,62vh);margin:0 auto;display:flex;align-items:center;justify-content:center}
 .pd-thumbs{justify-content:flex-start}
@@ -983,7 +1006,7 @@ async function loadAll() {
   App.index = M.index || {}; App.index.sales = App.index.sales || {}; App.index.stock = App.index.stock || {};
   App.stores = M.stores || {};
   App.tgtDetail = M.targets || {}; App.tgtBasis = M.tgtBasis || 'total'; App.targets = targetsFromDetail();
-  App.omni = M.omni || {}; App.eac = M.eac || {}; App.hoInfo = M.hoInfo || null; App.aiReady = !!M.aiReady;
+  App.omni = M.omni || {}; App.eac = M.eac || {}; App.hoInfo = M.hoInfo || null; App.juknis = M.juknis || {}; App.aiReady = !!M.aiReady;
   App.log = M.log || []; App.books = M.books || []; App.cells = M.cells || 0;
   App.lines = []; App.loaded = new Set(); App.sku = {}; App.dsrSku = {}; App.stock = {}; App.cache = {}; App.sr = {};
   computeLastDate();
@@ -1300,6 +1323,7 @@ const ICON = {
   produk: '<path d="M4 8l8-4 8 4-8 4zM4 8v8l8 4 8-4V8M12 12v8"/>',
   stok: '<path d="M12 21s-7-4.5-7-10.5A4.5 4.5 0 0 1 12 7a4.5 4.5 0 0 1 7 3.5C19 16.5 12 21 12 21z"/>',
   admin: '<path d="M12 3v12m0-12l-4 4m4-4l4 4M4 17v3h16v-3"/>',
+  tag: '<path d="M20.6 13.4l-7.2 7.2a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.5"/>',
   pica: '<path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2V17h5v-1.1c0-.8.4-1.5 1-2A6 6 0 0 0 12 3z"/>',
   lost: '<path d="M12 9v4m0 4h.01M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/>',
   settings: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>'
@@ -1309,6 +1333,7 @@ const NAV = [
   { k: 'inv', label: 'Inventory', icon: 'produk', items: [['produk', 'Produk', 'Penjualan & stok per artikel'], ['transfer', 'Saran Transfer Stok', 'Pindahkan stok dari toko yang menumpuk ke toko yang butuh'], ['ro', 'Saran Repeat Order', 'Order ke gudang HO untuk stok yang menipis'], ['promostock', 'Stok DCNP/SMDS', 'Stok barang diskon per MC Lv2–Lv4'], ['detention', 'Detention Stock', '% generic & varian terdisplay per toko']] },
   { k: 'lost', label: 'Lost Sales', icon: 'lost' },
   { k: 'pica', label: 'Analisa PICA', icon: 'pica' },
+  { k: 'juknis', label: 'Promo', icon: 'tag' },
   { k: 'admin', label: 'Kelola data', icon: 'admin', admin: 1 },
   { k: 'settings', label: 'Pengaturan', icon: 'settings', admin: 1 }
 ];
@@ -1334,7 +1359,7 @@ function renderNav() {
 function renderPeriod() {
   const box = $('#periodBox');
   const tsel = hasTypes() && App.page !== 'toko' && !scopeOn() ? `<label class="small muted" for="typeSel">Jenis toko</label><select id="typeSel" class="inp"><option value="">Semua toko</option>${['rg', 'bz', 'ot'].filter(t => storeCodes().some(c => sType(c) === t)).map(t => `<option value="${t}" ${App.ui.typeF === t ? 'selected' : ''}>${TYPE_LABEL[t]}</option>`).join('')}</select>` : '';
-  if (['report', 'promo', 'omni', 'eac', 'lost', 'detention', 'growth', 'stok', 'transfer', 'ro', 'pica'].includes(App.page)) { box.innerHTML = tsel; return; }
+  if (['report', 'promo', 'omni', 'eac', 'lost', 'detention', 'growth', 'stok', 'transfer', 'ro', 'pica', 'juknis'].includes(App.page)) { box.innerHTML = tsel; return; }
   if (!App.lastDate || App.page === 'admin' || App.page === 'settings') { box.innerHTML = ''; return; }
   const L = App.lastDate, cm = L.slice(0, 7);
   const months = Object.keys(App.index.sales).sort().reverse().filter(m => m !== cm);
@@ -1385,8 +1410,8 @@ function render() {
     return;
   }
   if (App.page === 'stok') App.page = 'transfer';
-  if (!App.lastDate && !['admin', 'report', 'settings', 'lost', 'detention'].includes(App.page)) { App.page = srLast() ? 'report' : 'detention'; }
-  const fn = { area: pageArea, report: pageReport, trend: pageTrend, promo: pagePromo, omni: pageOmni, eac: pageEac, ra: pageRA, pareto: pagePareto, lost: pageLost, promostock: pagePromoStock, detention: pageDetention, growth: pageGrowth, transfer: pageTransfer, ro: pageRO, pica: pagePica, toko: pageStore, produk: pageProduct, stok: pageStock, admin: pageAdmin, settings: pageSettings }[App.page] || pageReport;
+  if (!App.lastDate && !['admin', 'report', 'settings', 'lost', 'detention', 'juknis'].includes(App.page)) { App.page = srLast() ? 'report' : 'detention'; }
+  const fn = { area: pageArea, report: pageReport, trend: pageTrend, promo: pagePromo, omni: pageOmni, eac: pageEac, ra: pageRA, pareto: pagePareto, lost: pageLost, promostock: pagePromoStock, detention: pageDetention, growth: pageGrowth, transfer: pageTransfer, ro: pageRO, pica: pagePica, juknis: pageJuknis, toko: pageStore, produk: pageProduct, stok: pageStock, admin: pageAdmin, settings: pageSettings }[App.page] || pageReport;
   try { fn(view); lockScopedSelects(view); if ((App.loadWarn || []).length) view.insertAdjacentHTML('afterbegin', `<div class="note" style="margin-bottom:14px">Sebagian data belum termuat (${esc(App.loadWarn.join(', '))}). Tekan <b>Muat ulang</b> di kanan atas untuk mencoba lagi.</div>`); } catch (e) { console.error(e); view.innerHTML = `<div class="empty-state"><h2>Halaman gagal ditampilkan</h2><p class="muted">${esc(e.message)}</p></div>`; }
 }
 
@@ -2899,6 +2924,152 @@ async function picaAsk(force) {
   } catch (e) { box.innerHTML = `<div class="note">AI belum bisa dipakai: ${esc(errMsg(e))}</div>`; }
 }
 
+/* ================= Juknis promo (PDF) ================= */
+const PDFJS_URL = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js', PDFJS_WORKER = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+function loadPdfJs() {
+  if (window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
+  return new Promise((res, rej) => { const sc = document.createElement('script'); sc.src = PDFJS_URL; sc.onload = () => { window.pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_WORKER; res(window.pdfjsLib); }; sc.onerror = () => rej(new Error('Pembaca PDF gagal dimuat. Cek koneksi internet.')); document.head.appendChild(sc); });
+}
+const BLN = { jan: 1, januari: 1, feb: 2, februari: 2, mar: 3, maret: 3, apr: 4, april: 4, mei: 5, may: 5, jun: 6, juni: 6, jul: 7, juli: 7, agu: 8, agt: 8, ags: 8, agustus: 8, aug: 8, sep: 9, sept: 9, september: 9, okt: 10, oktober: 10, oct: 10, nov: 11, november: 11, des: 12, desember: 12, dec: 12 };
+/* "1 - 31 OKTOBER 2026", "16–18, 23–25 & 30–31 OKT 2026", "s.d. 8 OKTOBER 2026", "3 hari sesuai tanggal HUT Kota (Okt)" */
+function parsePeriode(txt, defMonth) {
+  const t = String(txt || '').toLowerCase().replace(/[–—]/g, '-');
+  let mo = null, yr = null; const mm = t.match(/\b(januari|februari|maret|april|mei|juni|juli|agustus|september|oktober|november|desember|jan|feb|mar|apr|jun|jul|agu|agt|ags|aug|sep|sept|okt|oct|nov|des|dec)\b\.?\s*(20\d{2})?/);
+  if (mm) { mo = BLN[mm[1]]; yr = mm[2] ? +mm[2] : null; }
+  const dm = defMonth || todayISO().slice(0, 7); if (!mo) mo = +dm.slice(5); if (!yr) yr = +dm.slice(0, 4);
+  const m = yr + '-' + pad(mo), last = dim(m), ranges = [];
+  const sd = t.match(/s\.?\s*d\.?\s*(\d{1,2})/); if (sd) return { ranges: [[m + '-01', m + '-' + pad(Math.min(last, +sd[1]))]], month: m, exact: true };
+  const head = t.split(/\b(januari|februari|maret|april|mei|juni|juli|agustus|september|oktober|november|desember|jan|feb|mar|apr|jun|jul|agu|agt|ags|aug|sep|sept|okt|oct|nov|des|dec)\b/)[0];
+  for (const g of head.split(/,|&|\bdan\b/)) { const r = g.match(/(\d{1,2})\s*-\s*(\d{1,2})/); if (r) { ranges.push([m + '-' + pad(+r[1]), m + '-' + pad(Math.min(last, +r[2]))]); continue; } const one = g.match(/^\s*(\d{1,2})\s*$/); if (one && +one[1] <= last) ranges.push([m + '-' + pad(+one[1]), m + '-' + pad(+one[1])]); }
+  if (!ranges.length) return { ranges: [[m + '-01', m + '-' + pad(last)]], month: m, exact: false };
+  return { ranges, month: m, exact: true };
+}
+async function parseJuknisPdf(buf, fileName) {
+  const lib = await loadPdfJs();
+  const pdf = await lib.getDocument({ data: new Uint8Array(buf) }).promise;
+  const pages = [];
+  for (let p = 1; p <= pdf.numPages; p++) {
+    const pg = await pdf.getPage(p), vp = pg.getViewport({ scale: 1 }), tc = await pg.getTextContent();
+    const items = tc.items.filter(i => i.str.trim()).map(i => ({ s: i.str.replace(/\s+/g, ' '), x: i.transform[4] / vp.width * 720, y: (vp.height - i.transform[5]) / vp.height * 405, h: i.height / vp.height * 405 }));
+    pages.push(items);
+  }
+  /* gabungkan potongan teks per baris (per kolom) */
+  const lines = (items, x0, x1) => { const L = []; for (const it of items.filter(i => i.x >= x0 && i.x < x1).sort((a, b) => a.y - b.y || a.x - b.x)) { const l = L.find(l => Math.abs(l.y - it.y) <= 3); if (l) l.parts.push(it); else L.push({ y: it.y, parts: [it] }); }
+    return L.map(l => ({ y: l.y, x: Math.min(...l.parts.map(p => p.x)), t: l.parts.sort((a, b) => a.x - b.x).map(p => p.s).join(' ').replace(/\s+/g, ' ').replace(/\s+([,.)])/g, '$1').trim() })).sort((a, b) => a.y - b.y); };
+  let cat = 'Lainnya', period = '', title = '';
+  const promos = [], notes = [];
+  for (const items of pages) {
+    const all = lines(items, 0, 721), txt = all.map(l => l.t).join('\n');
+    const big = items.filter(i => i.h >= 20).map(i => i.s.trim()).join(' ');
+    if (!title && /petunjuk teknis/i.test(txt)) { const pm = txt.match(/periode\s*:?\s*([^\n]+)/i); if (pm) period = pm[1].trim(); title = 'Juknis Program Promo'; continue; }
+    if (/^promo\b/i.test(big) && !/syarat/i.test(txt)) { const c = big.replace(/^promo\s*/i, '').trim(); if (c) cat = /regul/i.test(c) ? 'Reguler' : /event/i.test(c) ? 'Event' : /bank/i.test(c) ? 'Banking' : /bazaar/i.test(c) ? 'Bazaar' : c; continue; }
+    if (/SYARAT\s*&\s*KETENTUAN/i.test(txt) && /CONTOH PENERAPAN/i.test(txt)) {
+      const head = items.filter(i => i.y < 50 && i.x < 500 && i.h >= 11).sort((a, b) => a.x - b.x).map(i => i.s).join(' ').replace(/\s+/g, ' ').trim();
+      const L = lines(items, 0, 365).filter(l => l.y > 60 && l.y < 392), Rr = lines(items, 365, 721).filter(l => l.y > 60 && l.y < 392);
+      const f = {}; for (const l of L) { const m = l.t.match(/^(Periode|Min\.?\s*Transaksi|Maks\.?\s*Transaksi|Berlaku di|Produk)\s*:\s*(.*)$/i); if (m) f[m[1].toLowerCase().replace(/[^a-z]/g, '')] = m[2].trim(); }
+      const kY = (L.find(l => /^KETENTUAN:?$/i.test(l.t)) || {}).y, tY = (L.find(l => /^TIPS KASIR/i.test(l.t)) || {}).y;
+      const ket = kY != null ? L.filter(l => l.y > kY && (tY == null || l.y < tY - 2)).map(l => l.t) : [];
+      const tips = tY != null ? L.filter(l => l.y >= tY - 2).map(l => l.t).join(' ').replace(/^TIPS KASIR:?\s*/i, '') : '';
+      /* contoh penerapan */
+      const ex = []; let cur = null;
+      for (const l of Rr) { const cm = l.t.match(/^\d?\s*Contoh\s*(\d)\s*[—-]\s*(.*)$/i) || l.t.match(/^Contoh\s*(\d)\s*[—-]\s*(.*)$/i);
+        if (cm) { cur = { n: +cm[1], judul: cm[2].trim(), lines: [] }; ex.push(cur); continue; }
+        if (!cur || /^\d$/.test(l.t) || /^CONTOH PENERAPAN/i.test(l.t)) continue; cur.lines.push(l.t); }
+      const contoh = ex.map(e => { const pe = e.lines.findIndex(t => /^Pesan:/i.test(t)); const body = pe >= 0 ? e.lines.slice(0, pe) : e.lines, pesan = pe >= 0 ? e.lines.slice(pe).join(' ').replace(/^Pesan:\s*/i, '') : '';
+        const item = body[0] || '', res = body.slice(1).join(' '), bm = res.match(/(Bayar\s+Rp\s*[\d.]+|\d+\s*[×x]\s*Rp\s*[\d.]+|Harga normal|Bunga normal)\s*$/i);
+        const hasil = bm ? res.slice(0, bm.index).trim() : res, bayar = bm ? bm[1] : '';
+        return { n: e.n, judul: e.judul, item, hasil, bayar, pesan, ok: e.n < 3 && !/tidak|ditolak|<|harga normal|bunga normal|^bukan/i.test(hasil) }; });
+      const per = f.periode || period, P = parsePeriode(per, null);
+      const berlaku = f.berlakudi || '';
+      promos.push({ id: 'p' + promos.length, cat, title: head, periode: per, ranges: P.ranges, exact: P.exact, minTrx: f.mintransaksi || '', maxTrx: f.makstransaksi || '', berlaku, produk: f.produk || '', ket, tips, contoh,
+        site: /bazaar|factory|42 site/i.test(berlaku) ? 'bazaar' : /selected|terpilih|31 toko/i.test(berlaku) ? 'selected' : 'reguler' });
+      continue;
+    }
+    if (/UPDATE\s+PROMO|MEMO/i.test(txt) && !/RINGKASAN|KALENDER|TIMELINE/i.test(txt.split('\n')[0] + ' ' + (all[1] || {}).t)) {
+      /* memo: kotak kiri & kanan dibaca terpisah, tabel perubahan dibaca per baris */
+      const tblY = (all.find(l => /^Item\b/i.test(l.t)) || {}).y || 999;
+      const top = [...lines(items, 0, 365).filter(l => l.y > 50 && l.y < tblY - 4), ...lines(items, 365, 721).filter(l => l.y > 50 && l.y < tblY - 4)].map(l => l.t);
+      const rows = all.filter(l => l.y >= tblY - 1 && l.y < 392).map(l => l.t);
+      notes.push({ title: (all.find(l => l.y < 50 && l.x < 400) || all[0] || {}).t || 'Update', text: top, table: rows });
+    }
+  }
+  if (!promos.length) throw new Error('Tidak menemukan halaman promo (Syarat & Ketentuan) di PDF ini.');
+  const month = (parsePeriode(period, null).month) || promos[0].ranges[0][0].slice(0, 7);
+  /* cocokkan pembatalan dari memo update */
+  const cancelled = notes.flatMap(n => n.text).join(' ').match(/([A-Za-z][A-Za-z0-9 %.,]+?)\s+\d{1,2}\s*[–-]\s*\d{1,2}\s*\w{3}\s+DIBATALKAN/i);
+  return { kind: 'JUK', file: fileName, month, data: { title: title || 'Juknis Promo', period, file: fileName, promos, notes, cancelled: cancelled ? cancelled[1].trim() : '', at: todayISO() } };
+}
+/* ---------- halaman Promo ---------- */
+const JCAT = { Reguler: '#1E40AF', Event: '#0F766E', Banking: '#1E1B6B', Bazaar: '#E4570F', Lainnya: '#5A6482' };
+function juknisAll() { const J = App.juknis || {}; const out = []; for (const m in J) for (const p of (J[m].promos || [])) out.push(Object.assign({ month: m, src: J[m] }, p)); return out; }
+function promoState(p, D) {
+  const rs = p.ranges || []; const on = rs.some(([a, b]) => D >= a && D <= b);
+  const next = rs.filter(([a]) => a > D).sort((x, y) => x[0] < y[0] ? -1 : 1)[0], end = rs.filter(([a, b]) => D >= a && D <= b).map(r => r[1])[0];
+  const lastEnd = rs.reduce((a, r) => r[1] > a ? r[1] : a, '');
+  return { on, next: next ? next[0] : null, end: end || null, past: !on && !next && lastEnd < D, daysLeft: end ? dayDiff(D, end) : null, daysTo: next ? dayDiff(D, next[0]) : null };
+}
+const rangeTxt = rs => (rs || []).map(([a, b]) => a === b ? fmtDateS(a) : (a.slice(0, 7) === b.slice(0, 7) ? +a.slice(8) + '–' + fmtDateS(b) : fmtDateS(a) + ' – ' + fmtDateS(b))).join(', ');
+function promoCard(p, S) {
+  const col = JCAT[p.cat] || JCAT.Lainnya;
+  const badge = S.on ? (S.daysLeft === 0 ? '<span class="jk-b red">Hari terakhir</span>' : S.daysLeft <= 3 ? `<span class="jk-b red">Berakhir ${S.daysLeft} hari lagi</span>` : `<span class="jk-b ok">Berjalan · s/d ${fmtDateS(S.end)}</span>`)
+    : S.next ? (S.daysTo === 1 ? '<span class="jk-b or">Mulai besok</span>' : `<span class="jk-b or">Mulai ${S.daysTo} hari lagi · ${fmtDateS(S.next)}</span>`) : '<span class="jk-b">Selesai</span>';
+  return `<button class="jk-card" data-jk="${esc(p.month + '|' + p.id)}" style="--jc:${col}"><span class="jk-cat">${esc(p.cat)}</span><b>${esc(p.title)}</b>${badge}
+    <span class="jk-meta">📅 ${esc(rangeTxt(p.ranges))}${p.exact ? '' : ' (lihat ketentuan)'}</span>
+    ${p.minTrx && !/tidak ada/i.test(p.minTrx) ? `<span class="jk-meta">🧾 Min. ${esc(p.minTrx)}</span>` : ''}<span class="jk-meta">🏬 ${esc(p.berlaku || '–')}</span>${p.produk ? `<span class="jk-meta">🏷️ ${esc(p.produk)}</span>` : ''}</button>`;
+}
+function pageJuknis(view) {
+  const U = App.ui, all = juknisAll(), today = todayISO();
+  const D = U.jkDate || today;
+  setHead('Promo', 'Reminder promo yang sedang & akan berjalan dari juknis promo');
+  if (!all.length) { view.innerHTML = `<div class="empty-state"><h2>Belum ada juknis promo</h2><p class="muted">${App.admin ? 'Upload file PDF juknis promo di Kelola data. Dashboard membaca setiap slide promo secara otomatis.' : 'Admin belum mengunggah juknis promo.'}</p></div>`; return; }
+  const sc = scopeOn() ? App.ui.scope : '', bz = sc && sType(sc) === 'bz';
+  const cat = U.jkCat || '';
+  const fit = p => (!cat || p.cat === cat) && (!sc || (bz ? p.site !== 'reguler' || p.cat === 'Banking' : p.site !== 'bazaar'));
+  const list = all.filter(fit).map(p => ({ p, S: promoState(p, D) }));
+  const on = list.filter(x => x.S.on).sort((a, b) => (a.S.daysLeft ?? 99) - (b.S.daysLeft ?? 99));
+  const soon = list.filter(x => !x.S.on && x.S.next).sort((a, b) => a.S.daysTo - b.S.daysTo);
+  const past = list.filter(x => x.S.past);
+  const cats = [...new Set(all.map(p => p.cat))];
+  const months = Object.keys(App.juknis || {}).sort();
+  const m = U.jkMonth && months.includes(U.jkMonth) ? U.jkMonth : (months.includes(D.slice(0, 7)) ? D.slice(0, 7) : months[months.length - 1]);
+  const J = App.juknis[m] || {}, mDays = dim(m);
+  const tl = (J.promos || []).filter(fit);
+  const dayCol = d => { const iso = m + '-' + pad(d), w = dowOf(iso); return w === 0 || w === 6; };
+  const ending = on.filter(x => x.S.daysLeft != null && x.S.daysLeft <= 3).length, tomorrow = soon.filter(x => x.S.daysTo === 1).length;
+  view.innerHTML = `<div class="stack">
+    <div class="filters" style="margin:0"><label class="small muted" for="jkDate">Tanggal</label><input type="date" id="jkDate" class="inp" value="${D}">
+      <div class="seg" role="group" aria-label="Kategori"><button data-jkc="" class="${!cat ? 'on' : ''}">Semua</button>${cats.map(c => `<button data-jkc="${esc(c)}" class="${cat === c ? 'on' : ''}">${esc(c)}</button>`).join('')}</div>
+      ${sc ? `<span class="small muted">Menampilkan promo yang berlaku untuk toko ${bz ? 'bazaar' : 'reguler'} (${esc(sName(sc))})</span>` : ''}</div>
+    <div class="pt-tiles" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr))">
+      <div class="pt-tile" style="background:#13806F"><span>Berjalan ${D === today ? 'hari ini' : fmtDateS(D)}</span><b>${on.length} promo</b><small>${ending ? ending + ' berakhir ≤ 3 hari' : '&nbsp;'}</small></div>
+      <div class="pt-tile" style="background:#E46636"><span>Akan berjalan</span><b>${soon.length} promo</b><small>${tomorrow ? tomorrow + ' mulai besok' : soon[0] ? 'berikutnya ' + fmtDateS(soon[0].S.next) : '&nbsp;'}</small></div>
+      <div class="pt-tile" style="background:#0B1B4A"><span>Juknis</span><b style="font-size:17px">${esc(J.title || 'Juknis Promo')}</b><small>${esc(J.period || fmtMonth(m))} · ${(J.promos || []).length} program</small></div>
+    </div>
+    ${(J.notes || []).length ? `<section class="card jk-note"><div class="card-h"><h3>📢 ${esc(J.notes[0].title)}</h3></div>${J.notes.map(n => `<ul class="pc-list">${n.text.map(t => `<li>${esc(t)}</li>`).join('')}</ul>${(n.table || []).length ? `<div class="tbl-wrap" style="margin-top:8px;max-height:none"><table class="tbl"><tbody>${n.table.map((t, k) => `<tr${k === 0 ? ' style="font-weight:700;background:var(--navy-tint)"' : ''}><td style="white-space:normal">${esc(t).replace(/DIBATALKAN/g, '<b style="color:var(--bad)">DIBATALKAN</b>')}</td></tr>`).join('')}</tbody></table></div>` : ''}`).join('')}</section>` : ''}
+    <section class="card"><div class="card-h"><h3>🟢 Sedang berjalan</h3><p class="small muted">${fmtDate(D)}</p></div>${on.length ? `<div class="jk-grid">${on.map(x => promoCard(x.p, x.S)).join('')}</div>` : '<p class="muted small">Tidak ada promo yang berjalan di tanggal ini.</p>'}</section>
+    <section class="card"><div class="card-h"><h3>🟠 Akan berjalan</h3><p class="small muted">siapkan display & stok lebih awal</p></div>${soon.length ? `<div class="jk-grid">${soon.map(x => promoCard(x.p, x.S)).join('')}</div>` : '<p class="muted small">Belum ada promo berikutnya di juknis yang diupload.</p>'}</section>
+    <section class="card"><div class="card-h"><h3>Timeline ${esc(fmtMonth(m))}</h3>${months.length > 1 ? `<select id="jkMonth" class="inp sm">${months.map(x => `<option value="${x}" ${x === m ? 'selected' : ''}>${fmtMonth(x)}</option>`).join('')}</select>` : ''}</div>
+      <div class="rp-wrap" style="max-height:none"><table class="jk-tl"><thead><tr><th class="nm">Promo</th>${Array.from({ length: mDays }, (_, i) => `<th class="${dayCol(i + 1) ? 'we' : ''}${m + '-' + pad(i + 1) === D ? ' td' : ''}">${i + 1}</th>`).join('')}</tr></thead><tbody>
+      ${tl.map(p => `<tr data-jk="${esc(m + '|' + p.id)}" style="cursor:pointer"><td class="nm"><span class="jk-dot" style="background:${JCAT[p.cat] || JCAT.Lainnya}"></span>${esc(p.title)}</td>${Array.from({ length: mDays }, (_, i) => { const iso = m + '-' + pad(i + 1), inR = (p.ranges || []).some(([a, b]) => iso >= a && iso <= b); return `<td class="${dayCol(i + 1) ? 'we' : ''}${iso === D ? ' td' : ''}">${inR ? `<i style="background:${JCAT[p.cat] || JCAT.Lainnya};opacity:${p.exact ? 1 : .35}"></i>` : ''}</td>`; }).join('')}</tr>`).join('')}
+      </tbody></table></div><p class="small muted" style="margin:8px 0 0">Kolom oranye = hari ini / tanggal terpilih; bar pudar = periode menyesuaikan ketentuan (mis. HUT kota per toko).</p></section>
+    ${past.length ? `<details class="card"><summary style="cursor:pointer;font-weight:700">Sudah berakhir (${past.length})</summary><div class="jk-grid" style="margin-top:10px">${past.map(x => promoCard(x.p, x.S)).join('')}</div></details>` : ''}
+    <p class="small muted">Sumber: ${esc(J.file || 'juknis promo')} (dibaca otomatis). Selalu cocokkan dengan juknis & list artikel resmi.</p>
+  </div>`;
+}
+function openJuknis(key) {
+  const [m, id] = key.split('|'); const J = (App.juknis || {})[m] || {}, p = (J.promos || []).find(x => x.id === id); if (!p) return;
+  const S = promoState(p, App.ui.jkDate || todayISO()), col = JCAT[p.cat] || JCAT.Lainnya;
+  const row = (k, v) => v ? `<tr><th>${k}</th><td>${esc(v)}</td></tr>` : '';
+  openDrawer(`<div class="jk-d" style="--jc:${col}"><span class="jk-cat">${esc(p.cat)}</span><h2 style="margin:6px 0 4px">${esc(p.title)}</h2>
+    <p style="margin:0 0 12px">${S.on ? `<span class="jk-b ok">Sedang berjalan · s/d ${fmtDate(S.end)}</span>` : S.next ? `<span class="jk-b or">Mulai ${fmtDate(S.next)}</span>` : '<span class="jk-b">Sudah berakhir</span>'}</p>
+    <h3>Syarat & ketentuan</h3><table class="jk-syarat"><tbody>${row('Periode', p.periode)}${row('Min. transaksi', p.minTrx)}${row('Maks. transaksi', p.maxTrx)}${row('Berlaku di', p.berlaku)}${row('Produk', p.produk)}</tbody></table>
+    ${p.ket.length ? `<h3>Ketentuan</h3><ul class="pc-list">${p.ket.map(t => `<li>${esc(t)}</li>`).join('')}</ul>` : ''}
+    ${p.tips ? `<div class="jk-tips">💡 <b>Tips kasir:</b> ${esc(p.tips)}</div>` : ''}
+    ${p.contoh.length ? `<h3>Contoh penerapan</h3>${p.contoh.map(c => `<div class="jk-ex ${c.ok ? 'ok' : 'no'}"><div class="jk-ex-h"><span class="n">${c.n}</span><b>${esc(c.judul)}</b><span class="ic">${c.ok ? '✅' : '❌'}</span></div>
+      <p>🛒 ${esc(c.item)}</p><div class="jk-ex-r"><span>${esc(c.hasil)}</span>${c.bayar ? `<b>${esc(c.bayar)}</b>` : ''}</div>${c.pesan ? `<p class="small" style="font-style:italic;color:var(--muted)">💬 ${esc(c.pesan)}</p>` : ''}</div>`).join('')}` : ''}
+    <p class="small muted" style="margin-top:14px">Sumber: ${esc(J.file || '')}</p></div>`);
+}
+
 /* ================= halaman: per toko ================= */
 function pageStore(view) {
   const codes = storeCodes(); if (!App.ui.store || !codes.includes(App.ui.store)) App.ui.store = codes[0];
@@ -3131,7 +3302,7 @@ function pageAdmin(view) {
   const allCodes = storeCodes();
   view.innerHTML = `<div class="stack">${permNote}
     <section class="card"><div class="card-h"><h3>Upload data</h3><p class="small muted">Item DSR Report, Lost Sale Report, Export by Bin (stok), dan file target. Semua tersimpan di spreadsheet master.</p></div>
-      <label class="drop" id="drop"><input type="file" id="fileIn" multiple accept=".xlsx,.xls,.csv"><b>Pilih file</b><span class="small muted">atau seret file ke sini. Toko dikenali otomatis dari kolom Location.</span></label>
+      <label class="drop" id="drop"><input type="file" id="fileIn" multiple accept=".xlsx,.xls,.csv,.pdf"><b>Pilih file</b><span class="small muted">atau seret file ke sini. Toko dikenali otomatis dari kolom Location.</span></label>
       <div class="pend" id="pend"></div>
       <div class="note" style="margin-top:12px;display:flex;flex-wrap:wrap;gap:10px;align-items:center"><span><b>Template target bulanan</b> — satu file berisi sheet Target Sales, Target OmniChannel, Bobot Harian, dan Target EAC (Jan–Des), sudah terisi daftar toko & tanggal. Isi angkanya, lalu upload sekali.</span>
         <input type="month" id="tplM" class="inp sm" value="${esc(addMonths((App.lastDate || todayISO()).slice(0, 7), (+(App.lastDate || todayISO()).slice(8)) >= 20 ? 1 : 0))}"><button class="btn sm primary" id="tplBtn">Download template</button></div>
@@ -3176,7 +3347,7 @@ function pageAdmin(view) {
   renderPending(); renderCoverage(cm);
   $('#logT').innerHTML = tbl('log', { rows: App.log.slice().reverse(), limit: 15, empty: 'Belum ada upload.', cols: [
     { k: 'at', label: 'Waktu', h: r => esc(new Date(r.at).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })) },
-    { k: 'kind', label: 'Jenis', h: r => ({ DSR: 'Penjualan', INV: 'Stok', TGT: 'Target', OMT: 'Target Omni', EAC: 'Target EAC', LST: 'Lost Sales', DLY: 'Sales harian', HO: 'Stok gudang HO', WGT: 'Bobot harian', SR: 'Sales Report', DEL: 'Hapus' }[r.kind] || r.kind) }, { k: 'file', label: 'File', h: r => `<span class="small">${esc(r.file)}</span>` },
+    { k: 'kind', label: 'Jenis', h: r => ({ DSR: 'Penjualan', INV: 'Stok', TGT: 'Target', OMT: 'Target Omni', EAC: 'Target EAC', LST: 'Lost Sales', DLY: 'Sales harian', HO: 'Stok gudang HO', JUK: 'Juknis promo', WGT: 'Bobot harian', SR: 'Sales Report', DEL: 'Hapus' }[r.kind] || r.kind) }, { k: 'file', label: 'File', h: r => `<span class="small">${esc(r.file)}</span>` },
     { k: 'stores', label: 'Toko', r: 1 }, { k: 'info', label: 'Isi', h: r => esc(r.info) + (r.removed ? ' <span class="badge b-DS">sudah dihapus</span>' : '') },
     { k: 'x', label: '', ns: 1, h: r => r.id && r.scope && !r.removed ? `<button class="btn sm danger" data-dellog="${esc(r.id)}">Hapus data file ini</button>` : '' }] });
 }
@@ -3201,6 +3372,8 @@ function renderPending() {
       const warn = p.days !== dim(p.month) ? ` <b style="color:var(--warn)">hanya ${p.days} dari ${dim(p.month)} hari</b>` : '';
       return `<div class="pend-i"><span class="k">Bobot harian</span><div><div class="f">${esc(p.file)}</div><div class="d">${fmtMonth(p.month)} · ${p.days} hari · total ${fmtPct(p.rawSum, 2)}${warn}</div></div><button class="btn sm" data-rmp="${i}">Hapus</button></div>`;
     }
+    if (p.kind === 'JUK') return `<div class="pend-i"><span class="k" style="background:#7A4FB5;color:#fff">Juknis promo</span><div><div class="f">${esc(p.file)}</div><div class="d">bulan <input type="month" class="inp sm" data-pmonth="${i}" value="${esc(p.month)}"> · ${p.data.promos.length} program terbaca${p.data.notes.length ? ' · ' + p.data.notes.length + ' memo update' : ''} · menggantikan juknis bulan yang sama</div>
+      <details style="margin-top:6px"><summary class="small" style="cursor:pointer">Lihat hasil baca</summary><ul class="small" style="margin:6px 0 0;padding-left:18px">${p.data.promos.map(x => `<li><b>${esc(x.cat)}</b> · ${esc(x.title)} — ${esc(rangeTxt(x.ranges))}${x.exact ? '' : ' (periode khusus)'}</li>`).join('')}</ul></details></div><button class="btn sm" data-rmp="${i}">Hapus</button></div>`;
     if (p.kind === 'HO') return `<div class="pend-i"><span class="k" style="background:var(--navy);color:#fff">Stok gudang HO</span><div><div class="f">${esc(p.file)}</div><div class="d">${fmtN(p.rows.length)} SKU · ${fmtN(p.pcs)} pcs tersedia · tanggal data <input type="date" class="inp sm" data-pdate="${i}" value="${esc(p.date)}">${p.label ? ' (' + esc(p.label) + ')' : ''}${p.dateFromName ? '' : ' <b style="color:var(--warn)">cek tanggal</b>'} · menggantikan data gudang HO sebelumnya</div></div><button class="btn sm" data-rmp="${i}">Hapus</button></div>`;
     if (p.kind === 'DLY') return `<div class="pend-i"><span class="k" style="background:var(--ok-bg);color:var(--ok)">Sales harian</span><div><div class="f">${esc(p.file)}</div><div class="d">${fmtDate(p.from)} – ${fmtDate(p.to)} · ${p.stores} toko area · total ${fmtRp(p.total)}${p.skipped ? ` · ${fmtN(p.skipped)} toko di luar area dilewati` : ''} · dipakai sebagai pembanding tahun lalu / pelengkap sales</div></div><button class="btn sm" data-rmp="${i}">Hapus</button></div>`;
     if (p.kind === 'LST') {
@@ -3253,6 +3426,7 @@ async function addFiles(files) {
   for (const f of files) {
     try {
       const buf = await f.arrayBuffer();
+      if (/\.pdf$/i.test(f.name)) { $('#saveMsg').textContent = 'Membaca juknis PDF…'; App.pending.push(await parseJuknisPdf(buf, f.name)); renderPending(); continue; }
       for (const p of parseWorkbookAll(buf, f.name)) {
         if ((p.kind === 'OMT' || p.kind === 'TGT') && p.needMonth && !p.month) p.month = (App.lastDate || todayISO()).slice(0, 7);
         App.pending.push(p);
@@ -3344,6 +3518,12 @@ async function saveAll() {
       for (const m in R) for (const c in R[m]) rows.push([m, c, p.names[c] || '', R[m][c]]);
       if (rows.length) await withRetry(() => apiPost({ a: 'eacTarget', rows }));
       logs.push({ id: uid(), scope: { months: Object.keys(R), codes: Object.keys(p.names) }, at: now, kind: 'EAC', file: p.file, stores: p.rows, info: 'target Member EAC ' + Object.keys(R).sort().map(fmtMonth).join(', ') });
+    }
+    /* --- juknis promo --- */
+    for (const p of items.filter(p => p.kind === 'JUK')) {
+      say('Menyimpan juknis promo…');
+      await withRetry(() => apiPost({ a: 'juknis', month: p.month, data: p.data }));
+      logs.push({ at: now, kind: 'JUK', file: p.file, stores: '–', info: 'juknis promo ' + fmtMonth(p.month) + ', ' + p.data.promos.length + ' program' });
     }
     /* --- stok gudang HO (snapshot terbaru) --- */
     for (const p of items.filter(p => p.kind === 'HO')) {
@@ -3554,6 +3734,8 @@ document.addEventListener('click', async e => {
   if (t.id === 'tfXls') { exportTransfer(); return; }
   if (t.id === 'roXls') { exportRO(); return; }
   if (t.id === 'pcAIBtn') { picaAsk(false); return; }
+  const jk = t.closest('[data-jk]'); if (jk) { openJuknis(jk.dataset.jk); return; }
+  const jkc = t.closest('[data-jkc]'); if (jkc) { App.ui.jkCat = jkc.dataset.jkc; render(); return; }
   const pcv = t.closest('[data-pcv]'); if (pcv) { App.ui.pcView = pcv.dataset.pcv; render(); return; }
   const pcm = t.closest('[data-pcm]'); if (pcm) { App.ui.pcMode = pcm.dataset.pcm; render(); return; }
   const pcg = t.closest('[data-pcgo]'); if (pcg) { App.ui.pcView = 'store'; App.ui.pcStore = pcg.dataset.pcgo; render(); window.scrollTo(0, 0); return; }
@@ -3627,6 +3809,8 @@ document.addEventListener('change', async e => {
   if (t.id === 'lsM') { App.ui.lsM = t.value; render(); return; }
   if (t.id === 'lsStore') { App.ui.lsStore = t.value; App.ui.more = {}; render(); return; }
   if (t.id === 'ptStore') { App.ui.ptStore = t.value; App.ui.more = {}; render(); return; }
+  if (t.id === 'jkDate') { App.ui.jkDate = t.value || null; render(); return; }
+  if (t.id === 'jkMonth') { App.ui.jkMonth = t.value; render(); return; }
   if (t.id === 'pcDate') { if (t.value) { App.ui.pcDate = t.value; render(); } return; }
   if (t.id === 'pcStore') { App.ui.pcStore = t.value; render(); return; }
   if (t.id === 'pcAll') { App.ui.pcAll = t.checked; render(); return; }

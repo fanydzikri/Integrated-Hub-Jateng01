@@ -406,6 +406,11 @@ table.tbl{width:100%;border-collapse:collapse;font-size:13.5px}
 .jk-ex-h{display:flex;align-items:center;gap:8px}.jk-ex-h .n{width:24px;height:24px;border-radius:50%;background:var(--jc);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;flex:none}.jk-ex-h b{flex:1;color:var(--jc)}
 .jk-ex p{margin:6px 0 0;font-size:13px}.jk-ex-r{display:flex;justify-content:space-between;gap:8px;background:var(--bg);border-radius:7px;padding:6px 8px;margin-top:6px;font-size:13px}.jk-ex-r b{color:var(--ok);white-space:nowrap}
 .jk-ex.no .jk-ex-r b{color:var(--muted)}
+body.locked > *:not(#authWall):not(.toast):not(#toast){display:none!important}
+#authWall{position:fixed;inset:0;z-index:200;overflow:auto;display:flex;align-items:flex-start;justify-content:center;padding:6vh 16px 24px;background:linear-gradient(160deg,#0B1B4A 0%,#0F3192 55%,#1B47C2 100%)}
+.auth-card{width:min(420px,100%);background:#fff;border-radius:18px;padding:24px 22px;box-shadow:0 24px 60px rgba(0,0,0,.35);border-top:5px solid var(--orange)}
+.auth-brand{display:flex;align-items:center;gap:12px}.auth-brand img{height:30px}.auth-brand b{display:block;color:var(--navy);font-size:16px}.auth-brand span{font-size:12px;color:var(--muted)}
+.fl{display:block;font-size:13px;font-weight:700;color:var(--ink);margin-bottom:10px}.fl .inp{display:block;width:100%;margin-top:5px;box-sizing:border-box}
 .ck-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}
 .ck-col h4{margin:0 0 8px;font-size:14px;color:var(--navy)}.ck-col h4 small{display:block;font-weight:500;color:var(--muted);font-size:11.5px}
 .ck-col ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
@@ -989,6 +994,9 @@ async function api1(a, params) {
   return j;
 }
 async function apiPost(body, pw) {
+  try { return await apiPost1(body, pw); } catch (e) { if (e && e.code === 'auth' && App.user && !['login', 'register'].includes(body.a)) sessionExpired(); throw e; }
+}
+async function apiPost1(body, pw) {
   let r;
   try { r = await fetch(SHEET_API_URL, { method: 'POST', redirect: 'follow', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(Object.assign({}, body, { pw: pw || App.adminPw })) }); }
   catch (e) { throw Object.assign(new Error('Tidak bisa terhubung ke spreadsheet. Cek internet.'), { code: 'network' }); }
@@ -1012,6 +1020,7 @@ async function loadAll() {
   App.index = M.index || {}; App.index.sales = App.index.sales || {}; App.index.stock = App.index.stock || {};
   App.stores = M.stores || {};
   App.tgtDetail = M.targets || {}; App.tgtBasis = M.tgtBasis || 'total'; App.targets = targetsFromDetail();
+  App.pendingUsers = M.pendingUsers || 0;
   App.omni = M.omni || {}; App.eac = M.eac || {}; App.hoInfo = M.hoInfo || null; App.juknis = M.juknis || {}; App.aiReady = !!M.aiReady;
   App.log = M.log || []; App.books = M.books || []; App.cells = M.cells || 0;
   App.lines = []; App.loaded = new Set(); App.sku = {}; App.dsrSku = {}; App.stock = {}; App.cache = {}; App.sr = {};
@@ -1360,7 +1369,7 @@ function renderNav() {
   }
   const L = App.lastDate;
   const RL = repLast();
-  $('#sideFoot').innerHTML = `<button id="scopeBtn" class="sc" title="Ganti mode tampilan">${App.ui.scope ? '🏬 <span class="scn">' + esc(sName(App.ui.scope)) + '</span><span class="scc">' + esc(App.ui.scope) + '</span>' : '🏢 Branch'} ▾</button><span class="dinfo">${App.ui.scope ? '' : storeCodes().length + ' site · '}data s/d ${RL ? fmtDate(RL) : '–'}</span><button id="reloadBtn" title="Muat ulang data" aria-label="Muat ulang">⟳<span class="t"> Muat ulang</span></button>${App.admin ? `<button id="logoutBtn" class="og" title="Keluar dari admin">Keluar</button>` : `<button id="loginBtn" class="og" title="Masuk admin">Admin</button>`}`;
+  $('#sideFoot').innerHTML = (App.ui.scopeLocked ? `<span class="small" style="font-weight:700;color:var(--navy)">🏬 ${esc(App.ui.scope)}</span>` : '') + `<button id="scopeBtn" class="sc" ${App.ui.scopeLocked ? 'hidden ' : ''}title="Ganti mode tampilan">${App.ui.scope ? '🏬 <span class="scn">' + esc(sName(App.ui.scope)) + '</span><span class="scc">' + esc(App.ui.scope) + '</span>' : '🏢 Branch'} ▾</button><span class="dinfo">${App.ui.scope ? '' : storeCodes().length + ' site · '}data s/d ${RL ? fmtDate(RL) : '–'}</span><button id="reloadBtn" title="Muat ulang data" aria-label="Muat ulang">⟳<span class="t"> Muat ulang</span></button>${App.admin && App.pendingUsers ? `<button id="bellBtn" class="og" title="${App.pendingUsers} pendaftaran akun menunggu persetujuan" style="background:#C0392B">🔔 ${App.pendingUsers}</button>` : ''}<button id="logoutBtn" class="og" title="${esc(App.user ? App.user.name + ' (' + App.user.u + ')' : '')} — keluar">Keluar</button>`;
 }
 function renderPeriod() {
   const box = $('#periodBox');
@@ -1419,7 +1428,7 @@ function render() {
   if (App.page === 'stok') App.page = 'transfer';
   if (!App.lastDate && !['admin', 'report', 'settings', 'lost', 'detention', 'juknis'].includes(App.page)) { App.page = srLast() ? 'report' : 'detention'; }
   const fn = { area: pageArea, report: pageReport, trend: pageTrend, promo: pagePromo, omni: pageOmni, eac: pageEac, ra: pageRA, pareto: pagePareto, lost: pageLost, promostock: pagePromoStock, detention: pageDetention, growth: pageGrowth, transfer: pageTransfer, ro: pageRO, pica: pagePica, juknis: pageJuknis, toko: pageStore, produk: pageProduct, stok: pageStock, admin: pageAdmin, settings: pageSettings }[App.page] || pageReport;
-  try { fn(view); lockScopedSelects(view); if ((App.loadWarn || []).length) view.insertAdjacentHTML('afterbegin', `<div class="note" style="margin-bottom:14px">Sebagian data belum termuat (${esc(App.loadWarn.join(', '))}). Tekan <b>Muat ulang</b> di kanan atas untuk mencoba lagi.</div>`); } catch (e) { console.error(e); view.innerHTML = `<div class="empty-state"><h2>Halaman gagal ditampilkan</h2><p class="muted">${esc(e.message)}</p></div>`; }
+  try { fn(view); lockScopedSelects(view); if (App.page === 'admin') renderUsers(); if ((App.loadWarn || []).length) view.insertAdjacentHTML('afterbegin', `<div class="note" style="margin-bottom:14px">Sebagian data belum termuat (${esc(App.loadWarn.join(', '))}). Tekan <b>Muat ulang</b> di kanan atas untuk mencoba lagi.</div>`); } catch (e) { console.error(e); view.innerHTML = `<div class="empty-state"><h2>Halaman gagal ditampilkan</h2><p class="muted">${esc(e.message)}</p></div>`; }
 }
 
 /* ================= komponen ================= */
@@ -3120,6 +3129,80 @@ function uploadChecklist() {
     <p class="small muted" style="margin:10px 0 0">Tip: target, bobot, OmniChannel & EAC cukup lewat <b>Download template</b> di bawah, diisi, lalu diupload sekali. Semua file bisa diupload bersamaan.</p></section>`;
 }
 
+/* ================= login akun (wajib setiap membuka / refresh link) ================= */
+function showAuth(mode, msg) {
+  mode = mode || 'login'; document.body.classList.add('locked'); closeScope();
+  let w = $('#authWall'); if (!w) { w = document.createElement('div'); w.id = 'authWall'; document.body.appendChild(w); }
+  const jobs = ['Store Head', 'Asst. Store Head', 'Retail Assistant', 'Kasir', 'Branch Manager', 'Area Manager', 'Admin / Staff', 'Lainnya'];
+  w.innerHTML = `<div class="auth-card">
+    <div class="auth-brand"><img src="${esc(($('.brandbar img') || {}).src || '')}" alt="Eigerindo" onerror="this.style.display='none'"><div><b>Monitoring Penjualan</b><span>Area Jateng 01, Regional 3</span></div></div>
+    <div class="seg" role="tablist" style="width:100%;margin:14px 0 16px"><button data-auth="login" class="${mode === 'login' ? 'on' : ''}" style="flex:1">Masuk</button><button data-auth="reg" class="${mode === 'reg' ? 'on' : ''}" style="flex:1">Daftar akun</button></div>
+    ${msg ? `<div class="note" style="margin-bottom:12px">${msg}</div>` : ''}
+    ${mode === 'login' ? `<form id="authLogin" autocomplete="on" onsubmit="return false">
+      <label class="fl">Username<input class="inp" id="auU" name="username" autocomplete="username" placeholder="Username" required></label>
+      <label class="fl">Password<input class="inp" id="auP" name="password" type="password" autocomplete="current-password" required></label>
+      <button class="btn primary" id="auGo" style="width:100%;margin-top:6px">Masuk</button>
+      <p class="small muted" style="margin:12px 0 0;text-align:center">Belum punya akun? <a href="#" data-auth="reg" style="color:var(--navy);font-weight:700">Daftar di sini</a></p></form>`
+    : `<form id="authReg" autocomplete="on" onsubmit="return false">
+      <label class="fl">Username <small class="muted">(disarankan NIK-Nama, tanpa spasi)</small><input class="inp" id="arU" autocomplete="username" placeholder="mis. 123456-Budi" required></label>
+      <label class="fl">Nama lengkap<input class="inp" id="arN" autocomplete="name" required></label>
+      <div style="display:flex;gap:10px;flex-wrap:wrap"><label class="fl" style="flex:1 1 160px">Jabatan<select class="inp" id="arJ">${jobs.map(j => `<option>${j}</option>`).join('')}</select></label>
+      <label class="fl" style="flex:1 1 120px">Kode toko <small class="muted">(bila di toko)</small><input class="inp" id="arS" inputmode="numeric" placeholder="mis. 2038"></label></div>
+      <label class="fl">Password <small class="muted">(min. 6 karakter)</small><input class="inp" id="arP" type="password" autocomplete="new-password" required></label>
+      <label class="fl">Ulangi password<input class="inp" id="arP2" type="password" autocomplete="new-password" required></label>
+      <button class="btn primary" id="arGo" style="width:100%;margin-top:6px">Kirim pendaftaran</button>
+      <p class="small muted" style="margin:12px 0 0;text-align:center">Akun aktif setelah disetujui admin.</p></form>`}
+    <p class="small muted" style="margin:18px 0 0;text-align:center">Dashboard ini dibuat oleh <b>Fany Dzikri Hakim</b></p></div>`;
+  setTimeout(() => { const f = $(mode === 'login' ? '#auU' : '#arU'); if (f) f.focus(); }, 50);
+}
+function hideAuth() { const w = $('#authWall'); if (w) w.remove(); document.body.classList.remove('locked'); }
+async function doAuthLogin() {
+  const u = ($('#auU') || {}).value || '', p = ($('#auP') || {}).value || '', btn = $('#auGo');
+  if (!u.trim() || !p) { toast('Isi username dan password'); return; }
+  if (btn) { btn.disabled = true; btn.textContent = 'Memeriksa…'; }
+  try {
+    const r = await apiPost({ a: 'login', u: u.trim(), p });
+    App.token = r.token; App.adminPw = r.token; App.user = r.user; App.admin = r.user.role === 'admin';
+    if (r.user.role === 'toko' && r.user.store) { App.ui.scope = r.user.store; App.ui.scopeLocked = true; App.ui.scopeAsked = true; ['lsStore', 'raStore', 'ptStore', 'tdStore', 'prStore', 'psStore', 'dtStore', 'prodStore', 'stStore', 'trStore', 'tfStore', 'roStore', 'pcStore'].forEach(k => { App.ui[k] = r.user.store; }); App.ui.store = r.user.store; }
+    hideAuth(); await boot();
+  } catch (e) {
+    if (btn) { btn.disabled = false; btn.textContent = 'Masuk'; }
+    showAuth('login', e.code === 'pending' ? '⏳ ' + esc(e.message) : '❌ ' + esc(e.code === 'auth' ? e.message : errMsg(e)));
+    const f = $('#auU'); if (f) f.value = u;
+  }
+}
+async function doAuthReg() {
+  const v = id => (($('#' + id) || {}).value || '').trim(), btn = $('#arGo');
+  const u = v('arU'), n = v('arN'), j = v('arJ'), s = v('arS'), p = ($('#arP') || {}).value || '', p2 = ($('#arP2') || {}).value || '';
+  if (!u || !n || !p) { toast('Lengkapi username, nama, dan password'); return; }
+  if (p !== p2) { toast('Ulangi password tidak sama'); return; }
+  if (btn) { btn.disabled = true; btn.textContent = 'Mengirim…'; }
+  try { await apiPost({ a: 'register', u, p, name: n, job: j, store: s }); showAuth('login', `✅ Pendaftaran <b>${esc(u)}</b> terkirim. Kamu bisa login setelah admin menyetujui akunmu.`); const f = $('#auU'); if (f) f.value = u; }
+  catch (e) { if (btn) { btn.disabled = false; btn.textContent = 'Kirim pendaftaran'; } toast(e.message || errMsg(e)); }
+}
+function sessionExpired(msg) { App.token = ''; App.adminPw = ''; App.admin = false; App.user = null; showAuth('login', msg || 'Sesi berakhir. Silakan login lagi.'); }
+async function doLogout() { try { await apiPost({ a: 'logout' }); } catch (e) { } App.token = ''; App.adminPw = ''; App.admin = false; App.user = null; App.ui.scopeLocked = false; App.ui.scope = ''; App.ui.scopeAsked = false; showAuth('login', 'Kamu sudah keluar.'); }
+/* kelola akun (admin) */
+async function renderUsers() {
+  const box = $('#usersBox'); if (!box || !App.admin) return;
+  box.innerHTML = '<div class="loading" style="padding:12px"><span class="spin"></span>Memuat akun…</div>';
+  let L = []; try { L = (await api('users')).users || []; } catch (e) { box.innerHTML = `<p class="small" style="color:var(--bad)">${esc(errMsg(e))}</p>`; return; }
+  App.pendingUsers = L.filter(x => x.status === 'pending').length; renderNav();
+  const tab = App.ui.usTab || (App.pendingUsers ? 'pending' : 'approved');
+  const shown = L.filter(x => tab === 'all' ? true : x.status === tab);
+  const roleTxt = x => x.role === 'admin' ? 'Admin' : x.role === 'toko' ? 'Toko ' + (x.store || '?') : 'Semua toko';
+  const stTxt = { pending: '⏳ Menunggu', approved: '✅ Aktif', rejected: '❌ Ditolak', disabled: '⛔ Nonaktif' };
+  box.innerHTML = `<div class="seg" role="group" style="margin-bottom:10px">${[['pending', 'Menunggu (' + L.filter(x => x.status === 'pending').length + ')'], ['approved', 'Aktif (' + L.filter(x => x.status === 'approved').length + ')'], ['all', 'Semua (' + L.length + ')']].map(([k, l]) => `<button data-ustab="${k}" class="${tab === k ? 'on' : ''}">${l}</button>`).join('')}</div>
+    <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Akun</th><th>Jabatan / toko</th><th>Status</th><th>Akses</th><th>Aksi</th></tr></thead><tbody>
+    ${shown.map(x => `<tr><td><span class="nm">${esc(x.u)}</span><span class="sub">${esc(x.name)} · daftar ${x.created ? fmtDateS(x.created.slice(0, 10)) : '–'}${x.last ? ' · login ' + fmtDateS(x.last.slice(0, 10)) : ''}</span></td>
+      <td class="small">${esc(x.job || '–')}${x.store ? ' · ' + esc(x.store) + ' ' + esc(sName(x.store) !== x.store ? sName(x.store) : '') : ''}</td><td class="small">${stTxt[x.status] || esc(x.status)}</td>
+      <td><select class="inp sm" data-usrole="${esc(x.u)}"><option value="viewer" ${x.role !== 'toko' ? 'selected' : ''}>Semua toko</option><option value="toko" ${x.role === 'toko' ? 'selected' : ''}>Hanya toko…</option></select>
+        <input class="inp sm" style="width:72px;${x.role === 'toko' ? '' : 'display:none'}" data-usstore="${esc(x.u)}" value="${esc(x.store)}" placeholder="kode"></td>
+      <td style="white-space:nowrap">${x.status !== 'approved' ? `<button class="btn sm primary" data-usok="${esc(x.u)}">Setujui</button> ` : `<button class="btn sm" data-ussave="${esc(x.u)}">Simpan</button> `}${x.status === 'pending' ? `<button class="btn sm danger" data-usno="${esc(x.u)}">Tolak</button> ` : x.status === 'approved' ? `<button class="btn sm" data-usoff="${esc(x.u)}">Nonaktifkan</button> ` : ''}<button class="btn sm" data-uspw="${esc(x.u)}" title="Reset password">🔑</button> <button class="btn sm danger" data-usdel="${esc(x.u)}" title="Hapus akun">🗑</button></td></tr>`).join('') || '<tr><td colspan="5" class="empty">Tidak ada akun di daftar ini.</td></tr>'}
+    </tbody></table></div><p class="small muted" style="margin:8px 0 0">"Hanya toko…" mengunci akun ke satu toko (cocok untuk store head). Akun admin utama (${esc(App.user ? App.user.u : '')}) tidak tampil di sini.</p>`;
+}
+async function userAction(u, body, okMsg) { try { await apiPost(Object.assign({ a: 'userSet', u }, body)); toast(okMsg); renderUsers(); } catch (e) { toast('Gagal: ' + errMsg(e)); } }
+
 /* ================= halaman: per toko ================= */
 function pageStore(view) {
   const codes = storeCodes(); if (!App.ui.store || !codes.includes(App.ui.store)) App.ui.store = codes[0];
@@ -3340,7 +3423,7 @@ function pageStock(view) {
 
 /* ================= halaman: kelola data (admin) ================= */
 function pageAdmin(view) {
-  if (!App.admin) { App.page = 'report'; openLogin(); return render(); }
+  if (!App.admin) { App.page = 'report'; toast('Menu ini khusus admin'); return render(); }
   setHead('Kelola data', 'Upload sekali di sini, semua yang membuka link langsung melihat data terbaru');
   const permNote = '';
   const months = Object.keys(App.index.sales).sort().reverse();
@@ -3352,6 +3435,7 @@ function pageAdmin(view) {
   const allCodes = storeCodes();
   view.innerHTML = `<div class="stack">${permNote}
     ${uploadChecklist()}
+    <section class="card"><div class="card-h"><h3>Akun pengguna</h3><p class="small muted">${App.pendingUsers ? `<b style="color:var(--bad)">${App.pendingUsers} pendaftaran menunggu persetujuan</b>` : 'setujui pendaftaran & atur akses'}</p></div><div id="usersBox"></div></section>
     <section class="card"><div class="card-h"><h3>Upload data</h3><p class="small muted">Item DSR Report, Lost Sale Report, Export by Bin (stok), dan file target. Semua tersimpan di spreadsheet master.</p></div>
       <label class="drop" id="drop"><input type="file" id="fileIn" multiple accept=".xlsx,.xls,.csv,.pdf"><b>Pilih file</b><span class="small muted">atau seret file ke sini. Toko dikenali otomatis dari kolom Location.</span></label>
       <div class="pend" id="pend"></div>
@@ -3688,7 +3772,7 @@ async function rebuildCache() {
 
 /* ================= halaman: pengaturan (admin) ================= */
 function pageSettings(view) {
-  if (!App.admin) { App.page = 'report'; openLogin(); return render(); }
+  if (!App.admin) { App.page = 'report'; toast('Menu ini khusus admin'); return render(); }
   const S = SET(), H = health(), U = App.ui;
   setHead('Pengaturan', 'Berlaku untuk semua yang membuka dashboard.');
   const codes = storeCodes().filter(c => App.stock[c]);
@@ -3836,8 +3920,20 @@ document.addEventListener('click', async e => {
       p.extra = [...add].sort(); if (!p.extra.length) toast('Tidak ada hari kosong sebelum tanggal ini (atau belum ada riwayat).'); renderPending(); } return; }
   const pxw = t.closest('[data-pxwe]'); if (pxw) { const p = App.pending[+pxw.dataset.pxwe]; if (p) { const add = new Set(p.extra || []); for (let k = 1; k <= 7; k++) { const d = addDays(p.date, k), w = dowOf(d); if (w === 6 || w === 0) add.add(d); if (w === 0) break; } p.extra = [...add].sort(); renderPending(); } return; }
   const rp = t.closest('[data-rmp]'); if (rp) { App.pending.splice(+rp.dataset.rmp, 1); renderPending(); return; }
-  if (t.id === 'admLink' || t.id === 'loginBtn') { e.preventDefault(); if (App.admin) go('admin'); else openLogin(); return; }
-  if (t.id === 'logoutBtn') { App.adminPw = ''; App.admin = false; LS.set('dash_admin', ''); toast('Kamu sudah keluar'); App.page = 'report'; render(); return; }
+  if (t.id === 'admLink' || t.id === 'loginBtn') { e.preventDefault(); if (App.admin) go('admin'); else toast('Menu ini khusus admin'); return; }
+  if (t.id === 'logoutBtn') { doLogout(); return; }
+  if (t.id === 'bellBtn') { App.ui.usTab = 'pending'; go('admin'); setTimeout(() => { const u = $('#usersBox'); if (u) u.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 400); return; }
+  const au = t.closest('[data-auth]'); if (au) { e.preventDefault(); showAuth(au.dataset.auth); return; }
+  if (t.id === 'auGo') { doAuthLogin(); return; }
+  if (t.id === 'arGo') { doAuthReg(); return; }
+  const ust = t.closest('[data-ustab]'); if (ust) { App.ui.usTab = ust.dataset.ustab; renderUsers(); return; }
+  const usr = x => { const r = $(`[data-usrole="${CSS.escape(x)}"]`), st = $(`[data-usstore="${CSS.escape(x)}"]`); return { role: r ? r.value : 'viewer', store: r && r.value === 'toko' ? (st ? st.value.trim() : '') : '' }; };
+  const uok = t.closest('[data-usok]'); if (uok) { const x = uok.dataset.usok, R = usr(x); if (R.role === 'toko' && !R.store) { toast('Isi kode toko untuk akses "Hanya toko"'); return; } userAction(x, Object.assign({ status: 'approved' }, R), 'Akun ' + x + ' disetujui'); return; }
+  const usv = t.closest('[data-ussave]'); if (usv) { const x = usv.dataset.ussave, R = usr(x); if (R.role === 'toko' && !R.store) { toast('Isi kode toko'); return; } userAction(x, R, 'Akses ' + x + ' disimpan'); return; }
+  const uno = t.closest('[data-usno]'); if (uno) { userAction(uno.dataset.usno, { status: 'rejected' }, 'Pendaftaran ditolak'); return; }
+  const uoff = t.closest('[data-usoff]'); if (uoff) { if (confirm('Nonaktifkan akun ' + uoff.dataset.usoff + '?')) userAction(uoff.dataset.usoff, { status: 'disabled' }, 'Akun dinonaktifkan'); return; }
+  const upw = t.closest('[data-uspw]'); if (upw) { const np = prompt('Password baru untuk ' + upw.dataset.uspw + ' (min. 6 karakter):'); if (np) userAction(upw.dataset.uspw, { newPw: np }, 'Password direset — beritahu pemilik akun'); return; }
+  const udel = t.closest('[data-usdel]'); if (udel) { if (confirm('Hapus akun ' + udel.dataset.usdel + ' permanen?')) userAction(udel.dataset.usdel, { del: 1 }, 'Akun dihapus'); return; }
   if (t.id === 'rebuildBtn') { rebuildCache(); return; }
   if (t.id === 'addStore') { const c = ($('#newCode').value || '').trim(), n = ($('#newName').value || '').trim(); if (!/^[0-9A-Za-z]{3,8}$/.test(c)) { toast('Isi kode site yang valid'); return; } if (App.stores[c]) { toast('Kode ' + c + ' sudah ada di daftar'); return; } try { await apiPost({ a: 'storeAdd', code: c, name: n }); await loadAll(); toast('Toko ' + c + ' ditambahkan'); render(); } catch (er) { toast('Gagal: ' + errMsg(er)); } return; }
   const rms = t.closest('[data-rmstore]'); if (rms) { const c = rms.dataset.rmstore; if (!confirm(`Hapus ${c} - ${sName(c)} dari daftar toko area? Data penjualannya tidak ikut terhapus.`)) return; try { await apiPost({ a: 'storeRemove', code: c }); await loadAll(); toast('Dihapus dari daftar'); render(); } catch (er) { toast('Gagal: ' + errMsg(er)); } return; }
@@ -3978,17 +4074,17 @@ async function boot() {
   try { await loadAll(); }
   catch (e) {
     console.error(e); renderNav();
-    if (e && e.code === 'auth') { const had = !!LS.get('dash_view'); LS.set('dash_view', ''); showLoginWall(had); return; }
+    if (e && e.code === 'auth') { sessionExpired(); return; }
     $('#view').innerHTML = `<div class="empty-state"><h2>Gagal memuat data</h2><p class="muted">${esc(errMsg(e))}</p><button class="btn" id="reloadBtn">Coba lagi</button></div>`;
     return;
   }
   if ((App.page === 'admin' || App.page === 'settings') && !App.admin) App.page = 'report';
   if (!App.lastDate && App.admin && !Object.keys(App.index.stock).length) App.page = 'admin';
   const sv = LS.get('dash_scope');
-  if (sv && sv.startsWith('store:')) { const c = sv.slice(6); if (App.stores[c] || storeCodes().includes(c)) { App.ui.scope = c; ['lsStore', 'raStore', 'ptStore', 'tdStore', 'prStore', 'psStore', 'dtStore', 'prodStore', 'stStore', 'trStore'].forEach(k => { App.ui[k] = c; }); App.ui.store = c; } }
+  if (!App.ui.scopeLocked && sv && sv.startsWith('store:')) { const c = sv.slice(6); if (App.stores[c] || storeCodes().includes(c)) { App.ui.scope = c; ['lsStore', 'raStore', 'ptStore', 'tdStore', 'prStore', 'psStore', 'dtStore', 'prodStore', 'stStore', 'trStore'].forEach(k => { App.ui[k] = c; }); App.ui.store = c; } }
   render();
   /* popup pilihan tampilan selalu muncul setiap halaman dibuka / direfresh (sekali per pemuatan halaman) */
-  if (!App.ui.scopeAsked && storeCodes().length) { App.ui.scopeAsked = true; openScope(true); }
+  if (!App.ui.scopeAsked && !App.ui.scopeLocked && storeCodes().length) { App.ui.scopeAsked = true; openScope(true); }
   loadMaster();
 }
 async function init() {
@@ -3996,11 +4092,11 @@ async function init() {
   renderNav();
   if (typeof Chart !== 'undefined') { Chart.defaults.font.family = '"Plus Jakarta Sans", system-ui, sans-serif'; }
   if (!/^https:\/\/script\.google(usercontent)?\.com\//.test(SHEET_API_URL)) { $('#view').innerHTML = '<div class="empty-state"><h2>Spreadsheet belum disambungkan</h2><p class="muted">Isi SHEET_API_URL di bagian atas file index.html dengan URL Web App Apps Script.</p></div>'; return; }
-  const saved = LS.get('dash_admin');
-  if (saved) { try { await apiPost({ a: 'check' }, saved); App.adminPw = saved; App.admin = true; } catch (e) { if (e.code === 'auth') LS.set('dash_admin', ''); } }
-  await boot();
+  LS.set('dash_admin', ''); LS.set('dash_view', '');
+  showAuth('login');
 }
-document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target && /^lgPass/.test(e.target.id || '')) { doLogin(e.target.id.endsWith('2') ? '2' : ''); } });
+document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target && $('#authWall')) { if (e.target.closest('#authLogin')) { e.preventDefault(); doAuthLogin(); } else if (e.target.closest('#authReg')) { e.preventDefault(); doAuthReg(); } } });
+document.addEventListener('change', e => { const r = e.target.closest && e.target.closest('[data-usrole]'); if (r) { const st = $(`[data-usstore="${CSS.escape(r.dataset.usrole)}"]`); if (st) st.style.display = r.value === 'toko' ? '' : 'none'; } });
 document.addEventListener('click', e => { if (e.target && e.target.id === 'lgGo2') doLogin('2'); });
 init();
 </script>

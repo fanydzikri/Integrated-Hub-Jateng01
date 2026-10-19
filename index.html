@@ -1073,7 +1073,8 @@ async function loadAll() {
   if (Array.isArray(M.det)) { App.detMc = {}; App.detHist = M.det.map(r => ({ d: r[0], c: r[1], gW: r[2], gS: r[3], vW: r[4], vS: r[5], note: r[6] || '' })); }
   if (Array.isArray(M.lost)) App.lost = M.lost.map(r => ({ d: r[0], t: r[1], s: r[2], cn: r[3], mc: r[4], sku: r[5], name: r[6], q: r[7] || 0, price: r[8] || 0, amt: r[9] || 0, reason: r[10], type: r[11], by: r[12] }));
   const months = Object.keys(App.index.sales).sort();
-  const want = months.length ? months.filter(m => m >= addMonths(months[months.length - 1], -3)) : [];
+  /* awal hanya bulan terakhir + bulan sebelumnya (untuk pembanding); bulan lain dimuat saat dibutuhkan */
+  const want = months.length ? months.filter(m => m >= addMonths(months[months.length - 1], -1)) : [];
   const jobs = [['stok', loadStock], ...want.map(m => ['penjualan ' + fmtMonth(m), () => loadMonth(m)])];
   if (!Array.isArray(M.lost)) jobs.push(['lost sales', loadLost]);
   if (!Array.isArray(M.det)) jobs.push(['riwayat detention', loadDetHist]);
@@ -1087,9 +1088,21 @@ function targetsFromDetail() {
   for (const m in App.tgtDetail) { t[m] = {}; for (const c in App.tgtDetail[m]) { const v = basisVal(App.tgtDetail[m][c], App.tgtBasis); if (v) t[m][c] = v; } }
   return t;
 }
+/* ---------- cache data di browser (IndexedDB): data yang tidak berubah tidak diunduh ulang ---------- */
+const IDB = { db: null,
+  open() { if (this.db) return Promise.resolve(this.db); return new Promise(res => { try { const r = indexedDB.open('integrated-hub', 1); r.onupgradeneeded = () => r.result.createObjectStore('c'); r.onsuccess = () => { this.db = r.result; res(this.db); }; r.onerror = () => res(null); } catch (e) { res(null); } }); },
+  async get(k) { const db = await this.open(); if (!db) return null; return new Promise(res => { try { const q = db.transaction('c').objectStore('c').get(k); q.onsuccess = () => res(q.result || null); q.onerror = () => res(null); } catch (e) { res(null); } }); },
+  async put(k, v) { const db = await this.open(); if (!db) return; return new Promise(res => { try { const t = db.transaction('c', 'readwrite'); t.objectStore('c').put(v, k); t.oncomplete = () => res(); t.onerror = () => res(); } catch (e) { res(); } }); }
+};
+const verOf = o => { const s = JSON.stringify(o || {}); let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return s.length + ':' + h; };
+async function apiCached(key, ver, a, params) {
+  const k = key + ':' + (App.admin ? 'a' : 'u'), hit = await IDB.get(k);
+  if (hit && hit.v === ver && hit.d) return hit.d;
+  const d = await api(a, params || {}); IDB.put(k, { v: ver, d }); return d;
+}
 async function loadStock() {
   if (!Object.keys(App.index.stock).length) return;
-  const C = await api('stock');
+  const C = await apiCached('stock', verOf([App.index.stock, (App.log || []).filter(l => l.kind === 'INV').map(l => l.at)]), 'stock');
   for (const c in C.stores || {}) App.stock[c] = C.stores[c];
   mergeSku(C.sku || {}); App.cache = {};
 }
@@ -1103,7 +1116,8 @@ async function loadLost() {
 }
 async function loadMonth(m) {
   if (App.loaded.has(m) || !App.index.sales[m]) return;
-  const C = await api('dsr', { m });
+  const el = $('.loading'); if (el) el.lastChild.textContent = 'Memuat penjualan ' + fmtMonth(m) + '…';
+  const C = await apiCached('dsr:' + m, verOf(App.index.sales[m]), 'dsr', { m });
   mergeSku(C.sku || {});
   App.dsrSku = App.dsrSku || {}; Object.assign(App.dsrSku, C.sku || {});
   for (const c in C.stores || {}) for (const r of C.stores[c]) App.lines.push({ s: c, d: m + '-' + pad(r[0]), t: r[1], o: r[2], st: C.st[r[3]] || '', ty: C.ty[r[4]] || '', sku: r[5], q: r[6], g: r[7], n: r[8], sp: C.sp[r[9]] || '', pm: r[10] || 0, pn: (C.pn || [])[r[11]] || '', pv: r[12] || 0, cv: r[13] || 0, disc: r[14] || 0, cn: (C.cn || [])[r[15]] || '' });

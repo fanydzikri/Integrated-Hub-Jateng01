@@ -2634,70 +2634,84 @@ async function exportRO() {
 /* ================= halaman: Analisa PICA ================= */
 function picaStats(lines) { const trx = new Set(); let q = 0, v = 0; for (const l of lines) { v += VAL(l); if (!isPB(l.sku)) q += l.q; if (l.q > 0) trx.add(l.s + l.d + l.o); } const n = trx.size; return { v, q, n, bs: n ? v / n : null, upt: n ? q / n : null }; }
 const pctChg = (a, b) => a != null && b ? a / b - 1 : null;
-/* semua angka untuk satu toko pada tanggal D */
-function picaData(c, D, R) {
+/* semua angka untuk satu toko (c) atau seluruh area (c = null) pada tanggal D.
+   mode 'cum' = kumulatif 1..D dibanding bulan lalu periode sama; mode 'day' = tanggal D dibanding hari yang sama minggu lalu */
+function picaData(c, D, R, mode) {
   const m = D.slice(0, 7), day = +D.slice(8), pm = addMonths(m, -1), pd = Math.min(day, dim(pm));
-  const row = R.rows.find(r => r.c === c) || {};
-  const cur = picaStats(linesIn(m + '-01', D, c)), prev = picaStats(linesIn(pm + '-01', pm + '-' + pad(pd), c));
-  const d0 = picaStats(linesIn(D, D, c)), w1 = picaStats(linesIn(addDays(D, -7), addDays(D, -7), c));
-  const area = picaStats(linesIn(m + '-01', D));
-  const daysData = Math.max(1, ((App.index.sales[m] || {})[c] || { d: [] }).d.filter(x => x <= day).length);
-  /* growth vs tahun lalu (gross semua item) */
-  let gy = null; if (App.daily && App.daily.map.size) { const ds = []; for (let d = m + '-01'; d <= D; d = addDays(d, 1)) if (tyVal(c, d) != null) ds.push(d); const t = ds.reduce((a, d) => a + (tyVal(c, d) || 0), 0), l = ds.reduce((a, d) => a + (lyVal(c, d, 'date') || 0), 0); const dt = tyVal(c, D), dl = lyVal(c, D, 'date'); gy = { mtd: l ? t / l - 1 : null, day: dt != null && dl ? dt / dl - 1 : null, tyM: t, lyM: l }; }
+  const LI = (a, b) => linesIn(a, b, c || null);
+  const row = c ? (R.rows.find(r => r.c === c) || {}) : R.t;
+  const cum = mode !== 'day';
+  const cur = cum ? picaStats(LI(m + '-01', D)) : picaStats(LI(D, D));
+  const prev = cum ? picaStats(LI(pm + '-01', pm + '-' + pad(pd))) : picaStats(LI(addDays(D, -7), addDays(D, -7)));
+  const prevM = cum ? null : picaStats(LI(pm + '-' + pad(pd), pm + '-' + pad(pd)));
+  const area = cum ? picaStats(linesIn(m + '-01', D)) : picaStats(linesIn(D, D));
+  const nStores = Math.max(1, activeStores().filter(x => ((App.index.sales[m] || {})[x] || { d: [] }).d.length).length);
+  const daysData = c ? Math.max(1, ((App.index.sales[m] || {})[c] || { d: [] }).d.filter(x => x <= day).length) : Math.max(1, day);
+  /* growth vs tahun lalu */
+  let gy = null; const codesG = c ? [c] : activeStores();
+  if (App.daily && App.daily.map.size) { let t = 0, l = 0, dt = 0, dl = 0, any = false;
+    for (let d = m + '-01'; d <= D; d = addDays(d, 1)) for (const cc of codesG) { const v = tyVal(cc, d); if (v == null) continue; any = true; t += v; l += lyVal(cc, d, 'date') || 0; if (d === D) { dt += v; dl += lyVal(cc, d, 'date') || 0; } }
+    if (any) gy = { mtd: l ? t / l - 1 : null, day: dl ? dt / dl - 1 : null }; }
   /* target sisa bulan */
   const T = row.T || 0, rem = Math.max(0, T - (row.cs || 0)), remDays = dim(m) - day;
-  const W = wOf(m); let remW = 0; for (let d = day + 1; d <= dim(m); d++) remW += W ? (W[d] || 0) : 1 / dim(m);
   const needDay = remDays ? rem / remDays : 0, bsNow = cur.bs || area.bs || 0;
-  /* lost sales MTD */
-  const lost = (App.lost || []).filter(x => x.s === c && x.d >= m + '-01' && x.d <= D);
+  const trxDay = cum ? cur.n / daysData : cur.n;
+  /* lost sales (bulan berjalan s/d D, atau tanggal D) */
+  const lost = (App.lost || []).filter(x => (c ? x.s === c : typeOk(x.s)) && (cum ? x.d >= m + '-01' && x.d <= D : x.d === D));
   const lostV = lost.reduce((a, x) => a + lostAmt(x).v, 0), lostTop = Object.entries(lost.reduce((o, x) => { const k = artName(x.name) || x.name; o[k] = (o[k] || 0) + (x.q || 1); return o; }, {})).sort((a, b) => b[1] - a[1]).slice(0, 5);
-  /* produk laris yang stoknya habis */
-  const st30 = linesIn(addDays(D, -29), D, c), byArt = new Map(); for (const l of st30) { if (isPB(l.sku)) continue; byArt.set(artOf(l.sku), (byArt.get(artOf(l.sku)) || 0) + l.q); }
-  const SA = App.stock[c] ? stockByArt(c) : null;
-  const topArts = [...byArt.entries()].sort((a, b) => b[1] - a[1]).slice(0, 30);
-  const oos = SA ? topArts.filter(([a]) => !((SA.get(a) || {}).t > 0)).map(([a, q]) => ({ art: a, name: artInfo(a).name, q })) : null;
-  /* detention, promo, member, RA, jam ramai */
-  const det = App.stock[c] ? detOf(c) : null;
-  const curL = linesIn(m + '-01', D, c), promoV = curL.filter(l => l.pn).reduce((a, l) => a + VAL(l), 0), memV = curL.filter(isMember).reduce((a, l) => a + VAL(l), 0);
+  /* produk laris yang stoknya habis (per toko) */
+  let oos = null;
+  if (c && App.stock[c]) { const byArt = new Map(); for (const l of linesIn(addDays(D, -29), D, c)) { if (isPB(l.sku)) continue; byArt.set(artOf(l.sku), (byArt.get(artOf(l.sku)) || 0) + l.q); }
+    const SA = stockByArt(c); oos = [...byArt.entries()].sort((a, b) => b[1] - a[1]).slice(0, 30).filter(([a]) => !((SA.get(a) || {}).t > 0)).map(([a, q]) => ({ art: a, name: artInfo(a).name, q })); }
+  /* detention */
+  let det = null;
+  if (c) det = App.stock[c] ? detOf(c) : null;
+  else { const ds = activeStores().map(detOf).filter(x => x && !x.old); if (ds.length) { const gW = ds.reduce((a, x) => a + x.gW, 0), gS = ds.reduce((a, x) => a + x.gS, 0); det = { gW, gS, gP: gW ? gS / gW : 1 }; } }
+  const curL = cum ? LI(m + '-01', D) : LI(D, D), promoV = curL.filter(l => l.pn).reduce((a, l) => a + VAL(l), 0), memV = curL.filter(isMember).reduce((a, l) => a + VAL(l), 0);
   const areaL = linesIn(m + '-01', D), areaMem = areaL.length ? areaL.filter(isMember).reduce((a, l) => a + VAL(l), 0) / Math.max(1, areaL.reduce((a, l) => a + VAL(l), 0)) : null;
-  const sp = new Map(); for (const l of curL) { const k = spName(l.sp); if (k === '(TANPA NAMA)') continue; const x = sp.get(k) || { trx: new Set(), q: 0, v: 0 }; if (l.q > 0) x.trx.add(l.d + l.o); if (!isPB(l.sku)) x.q += l.q; x.v += VAL(l); sp.set(k, x); }
-  const spRows = [...sp.entries()].map(([k, x]) => ({ k, n: x.trx.size, upt: x.trx.size ? x.q / x.trx.size : 0, bs: x.trx.size ? x.v / x.trx.size : 0 })).filter(x => x.n >= 5).sort((a, b) => a.upt - b.upt);
-  const ords = ordersOf(curL); const hh = new Map(), ww = new Map(); for (const o of ords) { const h = Math.floor((o.t || 0) / 100); hh.set(h, (hh.get(h) || 0) + 1); const w = dowOf(o.d); ww.set(w, (ww.get(w) || 0) + 1); }
+  let spRows = [];
+  if (c) { const sp = new Map(); for (const l of LI(m + '-01', D)) { const k = spName(l.sp); if (k === '(TANPA NAMA)') continue; const x = sp.get(k) || { trx: new Set(), q: 0, v: 0 }; if (l.q > 0) x.trx.add(l.d + l.o); if (!isPB(l.sku)) x.q += l.q; x.v += VAL(l); sp.set(k, x); }
+    spRows = [...sp.entries()].map(([k, x]) => ({ k, n: x.trx.size, upt: x.trx.size ? x.q / x.trx.size : 0, bs: x.trx.size ? x.v / x.trx.size : 0 })).filter(x => x.n >= 5).sort((a, b) => a.upt - b.upt); }
+  const ords = ordersOf(LI(m + '-01', D)); const hh = new Map(), ww = new Map(); for (const o of ords) { const h = Math.floor((o.t || 0) / 100); hh.set(h, (hh.get(h) || 0) + 1); const w = dowOf(o.d); ww.set(w, (ww.get(w) || 0) + 1); }
   const peakH = [...hh.entries()].sort((a, b) => b[1] - a[1])[0], lowW = [...ww.entries()].sort((a, b) => a[1] - b[1])[0];
-  return { c, name: sName(c), D, row, cur, prev, d0, w1, area, daysData, gy, T, rem, remDays, needDay, needTrx: bsNow ? needDay / bsNow : null, trxDay: cur.n / daysData, salesDay: cur.v / daysData,
-    lost: { n: lost.length, v: lostV, top: lostTop }, oos, det, promoShare: cur.v ? promoV / cur.v : null, memShare: cur.v ? memV / cur.v : null, areaMem, spLow: spRows.slice(0, 3), spCount: spRows.length, peakH: peakH ? peakH[0] : null, lowW: lowW ? lowW[0] : null };
+  return { c, name: c ? sName(c) : 'Area Jateng 01', D, mode: cum ? 'cum' : 'day', row, cur, prev, prevM, area, areaPerStore: c ? null : { bs: area.bs, upt: area.upt }, nStores, daysData, gy, T, rem, remDays, needDay, needTrx: bsNow ? needDay / bsNow : null, trxDay, salesDay: cum ? cur.v / daysData : cur.v,
+    ach: cum ? row.cAch : row.dAch, gap: cum ? row.cDiff : row.dDiff, achTarget: cum ? row.cT : row.dT, achSales: cum ? row.cs : row.ds,
+    curLabel: cum ? 'Bulan ini (1–' + day + ')' : fmtDateS(D), prevLabel: cum ? 'bulan lalu' : '7 hari lalu (' + DOW[dowOf(addDays(D, -7))] + ')',
+    lost: { n: lost.length, v: lostV, top: lostTop }, oos, det, promoShare: cur.v ? promoV / cur.v : null, memShare: cur.v ? memV / cur.v : null, areaMem, spLow: spRows.slice(0, 3), peakH: peakH ? peakH[0] : null, lowW: lowW ? lowW[0] : null };
 }
 /* identifikasi masalah, data yang perlu dicek, dan corrective action (berbasis aturan) */
 function picaRules(P) {
-  const prob = [], check = [], act = [];
-  const tr = pctChg(P.cur.n, P.prev.n), bs = pctChg(P.cur.bs, P.prev.bs), up = pctChg(P.cur.upt, P.prev.upt), upA = pctChg(P.cur.upt, P.area.upt), bsA = pctChg(P.cur.bs, P.area.bs);
-  if (P.gy && P.gy.mtd != null && P.gy.mtd < 0) prob.push({ s: 2, t: `Sales MTD turun <b>${fmtPct(-P.gy.mtd, 1)}</b> dibanding periode yang sama tahun lalu.` });
-  if (tr != null && tr <= -0.05) { prob.push({ s: tr <= -0.15 ? 3 : 2, t: `Jumlah transaksi turun <b>${fmtPct(-tr, 1)}</b> vs bulan lalu (${fmtN(P.cur.n)} vs ${fmtN(P.prev.n)}) — masalah traffic / konversi.` });
+  const prob = [], check = [], act = [], flags = {};
+  const tr = pctChg(P.cur.n, P.prev.n), bs = pctChg(P.cur.bs, P.prev.bs), up = pctChg(P.cur.upt, P.prev.upt), upA = P.c ? pctChg(P.cur.upt, P.area.upt) : null, bsA = P.c ? pctChg(P.cur.bs, P.area.bs) : null;
+  const vs = 'vs ' + P.prevLabel, gyv = P.mode === 'day' ? (P.gy && P.gy.day) : (P.gy && P.gy.mtd);
+  if (gyv != null && gyv < 0) { flags.ly = 1; prob.push({ s: gyv <= -0.15 ? 3 : 2, t: `Sales ${P.mode === 'day' ? 'tanggal ini' : 'MTD'} turun <b>${fmtPct(-gyv, 1)}</b> dibanding periode yang sama tahun lalu.` }); }
+  if (tr != null && tr <= -0.05) { flags.traffic = 1; prob.push({ s: tr <= -0.15 ? 3 : 2, t: `Jumlah transaksi turun <b>${fmtPct(-tr, 1)}</b> ${vs} (${fmtN(P.cur.n)} vs ${fmtN(P.prev.n)}) — masalah traffic / konversi.` });
     check.push('Cek data <b>traffic / pengunjung</b> (people counter) untuk memastikan yang turun pengunjung atau konversinya.');
     act.push('Aktifkan <b>traffic builder</b>: broadcast WA ke member EAC sekitar toko, promo jam sepi, dan aktivasi di depan toko pada jam ramai.');
     act.push('Jalankan <b>greeting & approach</b> aktif: setiap pengunjung disapa < 30 detik; Store Head pantau konversi per shift.'); }
-  if (bs != null && bs <= -0.05) { prob.push({ s: 2, t: `Basket size turun <b>${fmtPct(-bs, 1)}</b> vs bulan lalu (${fmtRpS(P.cur.bs)} vs ${fmtRpS(P.prev.bs)}).` });
+  if (bs != null && bs <= -0.05) { flags.basket = 1; prob.push({ s: 2, t: `Basket size turun <b>${fmtPct(-bs, 1)}</b> ${vs} (${fmtRpS(P.cur.bs)} vs ${fmtRpS(P.prev.bs)}).` });
     act.push('Dorong <b>produk harga lebih tinggi</b> (jaket, tas, sepatu) di area depan dan briefing RA tentang fitur & benefit produk premium.'); }
-  if ((up != null && up <= -0.05) || (upA != null && upA <= -0.1)) { prob.push({ s: 2, t: `UPT ${fmtX(P.cur.upt, 2)} — ` + [up != null ? (up < 0 ? 'turun ' + fmtPct(-up, 1) + ' vs bulan lalu' : 'naik ' + fmtPct(up, 1) + ' vs bulan lalu') : '', upA != null ? (upA < 0 ? fmtPct(-upA, 1) + ' di bawah' : fmtPct(upA, 1) + ' di atas') + ' rata-rata area (' + fmtX(P.area.upt, 2) + ')' : ''].filter(Boolean).join(', ') + '.' });
+  if ((up != null && up <= -0.05) || (upA != null && upA <= -0.1)) { flags.upt = 1;
+    prob.push({ s: 2, t: `UPT ${fmtX(P.cur.upt, 2)} — ` + [up != null ? (up < 0 ? 'turun ' + fmtPct(-up, 1) + ' ' + vs : 'naik ' + fmtPct(up, 1) + ' ' + vs) : '', upA != null ? (upA < 0 ? fmtPct(-upA, 1) + ' di bawah' : fmtPct(upA, 1) + ' di atas') + ' rata-rata area (' + fmtX(P.area.upt, 2) + ')' : ''].filter(Boolean).join(', ') + '.' });
     act.push('Target <b>add-on per transaksi</b>: tawarkan aksesori pelengkap (kaos kaki, topi, botol, pouch) di setiap transaksi; siapkan paket bundling di kasir.');
-    if (P.spLow.length) act.push(`Coaching <b>sales person dengan UPT terendah</b>: ${P.spLow.map(x => x.k + ' (' + fmtX(x.upt, 2) + ')').join(', ')}.`); }
-  if (bsA != null && bsA <= -0.1) prob.push({ s: 1, t: `Basket size ${fmtPct(-bsA, 1)} di bawah rata-rata area (${fmtRpS(P.cur.bs)} vs ${fmtRpS(P.area.bs)}).` });
-  if (P.oos && P.oos.length) { prob.push({ s: P.oos.length >= 5 ? 3 : 2, t: `<b>${P.oos.length} dari 30 artikel terlaris</b> 30 hari terakhir stoknya habis di toko.` });
+    if (P.spLow.length) act.push(`Coaching <b>sales person dengan UPT terendah</b>: ${P.spLow.map(x => esc(x.k) + ' (' + fmtX(x.upt, 2) + ')').join(', ')}.`); }
+  if (bsA != null && bsA <= -0.1) { flags.basket = 1; prob.push({ s: 1, t: `Basket size ${fmtPct(-bsA, 1)} di bawah rata-rata area (${fmtRpS(P.cur.bs)} vs ${fmtRpS(P.area.bs)}).` }); }
+  if (P.oos && P.oos.length) { flags.oos = 1; prob.push({ s: P.oos.length >= 5 ? 3 : 2, t: `<b>${P.oos.length} dari 30 artikel terlaris</b> 30 hari terakhir stoknya habis di toko.` });
     check.push(`Cek stok artikel laris yang kosong: ${P.oos.slice(0, 4).map(x => esc(x.name)).join(', ')}${P.oos.length > 4 ? ', …' : ''}.`);
     act.push('Ajukan <b>transfer antar toko / repeat order</b> untuk artikel laris yang kosong (menu Saran Transfer Stok & Saran Repeat Order).'); }
-  if (P.lost.n) { prob.push({ s: P.lost.v > (P.rem || 1) * 0.05 ? 2 : 1, t: `Lost sales bulan ini <b>${fmtN(P.lost.n)} input · ${fmtRpS(P.lost.v)}</b>${P.lost.top.length ? ' (terbanyak: ' + P.lost.top.slice(0, 3).map(x => esc(x[0])).join(', ') + ')' : ''}.` });
+  if (P.lost.n) { flags.lost = 1; prob.push({ s: P.lost.v > (P.rem || 1) * 0.05 ? 2 : 1, t: `Lost sales ${P.mode === 'day' ? 'tanggal ini' : 'bulan ini'} <b>${fmtN(P.lost.n)} input · ${fmtRpS(P.lost.v)}</b>${P.lost.top.length ? ' (terbanyak: ' + P.lost.top.slice(0, 3).map(x => esc(x[0])).join(', ') + ')' : ''}.` });
     act.push('Tawarkan <b>Endless Aisle</b> untuk setiap barang yang dicari tapi kosong, supaya lost sales menjadi penjualan.'); }
-  else check.push('Lost sales bulan ini belum ada input — pastikan tim mencatat setiap permintaan customer yang tidak terlayani.');
-  if (P.det && !P.det.old && P.det.gP < 0.95) { prob.push({ s: P.det.gP < 0.85 ? 2 : 1, t: `Detention stock: baru <b>${fmtPct(P.det.gP, 1)}</b> generic di gudang yang terdisplay (target 95%).` });
+  else if (P.c) check.push(`Lost sales ${P.mode === 'day' ? 'tanggal ini' : 'bulan ini'} belum ada input — pastikan tim mencatat setiap permintaan customer yang tidak terlayani.`);
+  if (P.det && !P.det.old && P.det.gP < 0.95) { flags.det = 1; prob.push({ s: P.det.gP < 0.85 ? 2 : 1, t: `Detention stock: baru <b>${fmtPct(P.det.gP, 1)}</b> generic di gudang yang terdisplay (target 95%).` });
     act.push(`Display ulang <b>${fmtN(P.det.gW - P.det.gS)} generic</b> yang masih di gudang (daftarnya di menu Detention Stock).`); }
-  if (P.memShare != null && P.areaMem != null && P.memShare < P.areaMem - 0.05) { prob.push({ s: 1, t: `Porsi sales member EAC ${fmtPct(P.memShare, 1)}, di bawah rata-rata area ${fmtPct(P.areaMem, 1)}.` });
+  if (P.c && P.memShare != null && P.areaMem != null && P.memShare < P.areaMem - 0.05) { flags.member = 1; prob.push({ s: 1, t: `Porsi sales member EAC ${fmtPct(P.memShare, 1)}, di bawah rata-rata area ${fmtPct(P.areaMem, 1)}.` });
     act.push('Wajibkan <b>input nama/nomor member</b> di setiap transaksi dan tawarkan pendaftaran EAC ke customer baru.'); }
   if (P.peakH != null) check.push(`Jam paling ramai pukul <b>${pad(P.peakH)}.00</b>${P.lowW != null ? ', hari paling sepi <b>' + DOW[P.lowW] + '</b>' : ''} — cocokkan jadwal shift & jumlah RA di lantai.`);
-  check.push('Bandingkan <b>stok display vs gudang</b> untuk kategori yang penjualannya turun (menu Produk & Detention Stock).');
-  if (!prob.length) prob.push({ s: 1, t: 'Tidak ada indikator yang turun signifikan; gap kemungkinan karena target bulan ini lebih tinggi dari pola penjualan biasa.' });
-  if (P.rem > 0 && P.remDays > 0) act.push(`Kejar <b>${fmtRpS(P.needDay)}/hari</b> selama ${P.remDays} hari tersisa${P.needTrx ? ` (≈ ${fmtN(Math.ceil(P.needTrx))} transaksi/hari dengan basket saat ini; sekarang rata-rata ${fmtN(Math.round(P.trxDay))})` : ''}.`);
+  if (P.c) check.push('Bandingkan <b>stok display vs gudang</b> untuk kategori yang penjualannya turun (menu Produk & Detention Stock).');
+  if (!prob.length) prob.push({ s: 1, t: 'Tidak ada indikator yang turun signifikan; gap kemungkinan karena target lebih tinggi dari pola penjualan biasa.' });
+  if (P.rem > 0 && P.remDays > 0) act.push(`Kejar <b>${fmtRpS(P.needDay)}/hari</b> selama ${P.remDays} hari tersisa${P.needTrx ? ` (≈ ${fmtN(Math.ceil(P.needTrx))} transaksi/hari dengan basket saat ini; ${P.mode === 'day' ? 'tanggal ini' : 'sekarang rata-rata'} ${fmtN(Math.round(P.trxDay))})` : ''}.`);
   prob.sort((a, b) => b.s - a.s);
-  return { prob, check, act: [...new Set(act)].slice(0, 7), tr, bs, up, upA, bsA };
+  return { prob, check, act: [...new Set(act)].slice(0, 7), tr, bs, up, upA, bsA, flags };
 }
 function picaMd(t) { /* markdown sederhana dari AI -> HTML aman */
   const lines = esc(t).split('\n'); let h = '', inList = false;
@@ -2707,74 +2721,152 @@ function picaMd(t) { /* markdown sederhana dari AI -> HTML aman */
     else if (l.trim()) { if (inList) { h += '</ul>'; inList = false; } h += '<p>' + l + '</p>'; } }
   return h + (inList ? '</ul>' : '');
 }
+const PICA_FLAGS = [['ly', 'Growth LY ↓'], ['traffic', 'Transaksi ↓'], ['basket', 'Basket ↓'], ['upt', 'UPT rendah'], ['oos', 'Stok laris kosong'], ['lost', 'Lost sales'], ['det', 'Detention'], ['member', 'Member EAC']];
+const chgH = v => v == null ? '<span class="muted">–</span>' : `<span style="color:${v >= 0 ? 'var(--ok)' : 'var(--bad)'};font-weight:700">${v >= 0 ? '▲' : '▼'} ${fmtPct(Math.abs(v), 1)}</span>`;
+function picaCompareTable(P, X) {
+  const cum = P.mode === 'cum', ar = !P.c;
+  return `<div style="overflow-x:auto;margin-top:14px"><table class="pc-cmp"><thead><tr><th>Indikator</th><th>${esc(P.curLabel)}</th><th>${cum ? 'Bulan lalu (periode sama)' : esc(P.prevLabel.replace(/^./, s => s.toUpperCase()))}</th><th>Perubahan</th>${ar ? '' : '<th>Rata-rata area</th><th>vs area</th>'}</tr></thead><tbody>
+    <tr><td>Sales</td><td>${fmtRpS(P.cur.v)}</td><td>${fmtRpS(P.prev.v)}</td><td>${chgH(pctChg(P.cur.v, P.prev.v))}</td>${ar ? '' : '<td>–</td><td>–</td>'}</tr>
+    <tr><td>Transaksi</td><td>${fmtN(P.cur.n)}${cum ? ` <span class="muted small">(${fmtN(Math.round(P.trxDay))}/hari)</span>` : ''}</td><td>${fmtN(P.prev.n)}</td><td>${chgH(X.tr)}</td>${ar ? '' : '<td>–</td><td>–</td>'}</tr>
+    <tr><td>Basket size</td><td>${fmtRpS(P.cur.bs)}</td><td>${fmtRpS(P.prev.bs)}</td><td>${chgH(X.bs)}</td>${ar ? '' : `<td>${fmtRpS(P.area.bs)}</td><td>${chgH(X.bsA)}</td>`}</tr>
+    <tr><td>UPT</td><td>${fmtX(P.cur.upt, 2)}</td><td>${fmtX(P.prev.upt, 2)}</td><td>${chgH(X.up)}</td>${ar ? '' : `<td>${fmtX(P.area.upt, 2)}</td><td>${chgH(X.upA)}</td>`}</tr>
+    ${!cum && P.prevM ? `<tr><td>Sales vs tanggal sama bulan lalu</td><td>${fmtRpS(P.cur.v)}</td><td>${fmtRpS(P.prevM.v)}</td><td>${chgH(pctChg(P.cur.v, P.prevM.v))}</td>${ar ? '' : '<td>–</td><td>–</td>'}</tr>` : ''}
+    ${cum ? '' : ''}</tbody></table></div>`;
+}
+function picaSections(P, X, who) {
+  return `<div class="grid g2">
+      <section class="card"><div class="card-h"><h3>Problem identification</h3><p class="small muted">otomatis dari data</p></div>
+        <ul class="pc-list">${X.prob.map(x => `<li><span class="pc-tag ${x.s >= 3 ? '' : x.s === 2 ? 'w' : 'l'}">${x.s >= 3 ? 'Tinggi' : x.s === 2 ? 'Sedang' : 'Rendah'}</span>${x.t}</li>`).join('')}</ul></section>
+      <section class="card"><div class="card-h"><h3>Data yang perlu dicek ${who}</h3></div><ul class="pc-list">${X.check.map(t => `<li>${t}</li>`).join('') || '<li>–</li>'}</ul></section>
+    </div>
+    <section class="card"><div class="card-h"><h3>Corrective action</h3><p class="small muted">saran awal berdasarkan masalah di atas</p></div><ol class="pc-list">${X.act.map(t => `<li>${t}</li>`).join('')}</ol></section>`;
+}
+function picaAISection(label) {
+  return `<section class="card"><div class="card-h"><h3>✨ Analisa AI</h3><p class="small muted">analisa lebih dalam & corrective action yang disesuaikan</p></div>
+      <div class="ai-box" style="margin-bottom:12px"><b style="color:var(--navy)">Analisa dengan Claude (akun sendiri, tanpa biaya API)</b>
+        <p class="small" style="margin:6px 0 10px">1) Klik <b>Salin data untuk Claude</b> · 2) Klik <b>Buka claude.ai</b> · 3) Tempel di kolom chat lalu kirim. Data yang disalin hanya angka (tanpa nama customer).</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary" id="pcCopy">📋 Salin data untuk Claude</button><a class="btn" href="https://claude.ai/new" target="_blank" rel="noopener">Buka claude.ai ↗</a></div>
+        <p class="small" id="pcCopyMsg" style="margin:8px 0 0"></p></div>
+      <div id="pcAI">${App.aiReady ? `<button class="btn primary" id="pcAIBtn">Minta analisa AI untuk ${esc(label)}</button>${App.admin ? ' <button class="btn" id="pcAIRe" title="Buat ulang analisa (abaikan hasil tersimpan)">Buat ulang</button>' : ''}<p class="small muted" style="margin:8px 0 0">Hasil disimpan per analisa per tanggal, jadi analisa yang sama tidak memanggil AI dua kali.</p>` : `${App.admin ? '<p class="small muted" style="margin:0">Opsional: analisa AI langsung di dashboard (tanpa salin-tempel) bisa diaktifkan dengan mengisi <b>ANTHROPIC_API_KEY</b> di Apps Script › Script Properties (memakai saldo API Claude Console).</p>' : ''}`}</div></section>`;
+}
 function pagePica(view) {
   const U = App.ui, maxD = repLast();
   if (!maxD) { setHead('Analisa PICA', ''); view.innerHTML = '<div class="empty-state"><h2>Belum ada data penjualan</h2></div>'; return; }
   if (!App.daily) { loadDaily().then(() => { if (App.page === 'pica') render(); }).catch(() => { App.daily = { map: new Map(), names: {} }; }); }
   const D = U.pcDate && U.pcDate <= maxD ? U.pcDate : maxD; U.pcDate = D;
+  const mode = U.pcMode || 'cum', cum = mode === 'cum';
+  const sc = scopeOn() ? App.ui.scope : '';
+  const viewMode = sc ? 'store' : (U.pcView || 'area');
   const R = reportData(D, App.ui.rpVal || SET().defaultValue || 'g'), G = SET().achGreen / 100;
-  const codes = R.rows.map(r => r.c), sc = scopeOn() ? App.ui.scope : '';
+  const achOf = r => cum ? r.cAch : r.dAch;
+  const withT = R.rows.filter(r => r.T);
+  const below = withT.filter(r => achOf(r) != null && achOf(r) < G).sort((a, b) => achOf(a) - achOf(b));
   const showAll = !!U.pcAll;
-  const list = R.rows.filter(r => r.T && (showAll || (r.cAch != null && r.cAch < G) || (r.dAch != null && r.dAch < G)));
-  const st = sc || (U.pcStore && codes.includes(U.pcStore) ? U.pcStore : (list[0] || {}).c || '');
-  setHead('Analisa PICA', `Problem Identification & Corrective Action · tanggal ${fmtDate(D)} · toko yang belum mencapai target harian / kumulatif`);
-  const below = R.rows.filter(r => r.T && r.cAch != null && r.cAch < G).length, belowD = R.rows.filter(r => r.T && r.dAch != null && r.dAch < G).length;
-  const P = st ? picaData(st, D, R) : null, X = P ? picaRules(P) : null;
-  const chg = v => v == null ? '<span class="muted">–</span>' : `<span style="color:${v >= 0 ? 'var(--ok)' : 'var(--bad)'};font-weight:700">${v >= 0 ? '▲' : '▼'} ${fmtPct(Math.abs(v), 1)}</span>`;
-  const r0 = P ? P.row : {};
-  view.innerHTML = `<div class="stack">
-    <div class="filters" style="margin:0"><label class="small muted" for="pcDate">Tanggal</label><input type="date" id="pcDate" class="inp" value="${D}" max="${maxD}">
-      <label class="small muted" for="pcStore">Toko</label><select id="pcStore" class="inp">${(sc ? [sc] : (showAll ? codes : list.map(r => r.c))).map(c => { const r = R.rows.find(x => x.c === c) || {}; return `<option value="${esc(c)}" ${c === st ? 'selected' : ''}>${esc(sName(c))} · kum ${fmtPct(r.cAch, 0)} · hari ${fmtPct(r.dAch, 0)}</option>`; }).join('') || '<option value="">Semua toko sudah capai target</option>'}</select>
-      ${sc ? '' : `<label class="small" style="display:flex;gap:6px;align-items:center;font-weight:700"><input type="checkbox" id="pcAll" ${showAll ? 'checked' : ''}> Tampilkan juga toko yang sudah capai target</label>`}</div>
-    ${!R.rows.some(r => r.T) ? '<div class="note">Target bulan ini belum diupload, sehingga pencapaian belum bisa dihitung. Upload target di Kelola data.</div>' : ''}
-    ${sc ? '' : `<div class="pt-tiles" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr))">
-      <div class="pt-tile" style="background:#C0392B"><span>Belum capai target kumulatif</span><b>${below} / ${R.rows.filter(r => r.T).length}</b><small>toko · s/d ${fmtDateS(D)}</small></div>
-      <div class="pt-tile" style="background:#E46636"><span>Belum capai target harian</span><b>${belowD} / ${R.rows.filter(r => r.T).length}</b><small>toko · ${fmtDateS(D)}</small></div>
-      <div class="pt-tile"><span>Area kumulatif</span><b>${fmtPct(R.t.cAch, 1)}</b><small>gap ${fmtRpS(R.t.cDiff)}</small></div>
-      <div class="pt-tile" style="background:#0B1B4A"><span>Area harian</span><b>${fmtPct(R.t.dAch, 1)}</b><small>gap ${fmtRpS(R.t.dDiff)}</small></div></div>
-    <section class="card"><div class="card-h"><h3>Toko yang perlu PICA</h3><p class="small muted">klik toko untuk analisa</p></div><div id="pcList"></div></section>`}
-    ${P ? `<section class="card"><div class="card-h"><h3>${esc(P.name)} · ${esc(st)}</h3><p class="small muted">${fmtDate(D)}</p></div>
+  const listRows = showAll ? withT.slice().sort((a, b) => achOf(a) - achOf(b)) : below;
+  setHead('Analisa PICA', `Problem Identification & Corrective Action · ${cum ? 'kumulatif 1–' + (+D.slice(8)) + ' ' + MON[+D.slice(5, 7) - 1] : 'tanggal ' + fmtDate(D)} · ${viewMode === 'area' ? 'level area (BM)' : 'per toko'}`);
+  const controls = `<div class="filters" style="margin:0">
+      ${sc ? '' : `<div class="seg" role="group" aria-label="Level analisa"><button data-pcv="area" class="${viewMode === 'area' ? 'on' : ''}">Area (BM)</button><button data-pcv="store" class="${viewMode === 'store' ? 'on' : ''}">Per toko</button></div>`}
+      <div class="seg" role="group" aria-label="Periode analisa"><button data-pcm="cum" class="${cum ? 'on' : ''}">Kumulatif (MTD)</button><button data-pcm="day" class="${cum ? '' : 'on'}">Harian (tanggal ini)</button></div>
+      <label class="small muted" for="pcDate">Tanggal</label><input type="date" id="pcDate" class="inp" value="${D}" max="${maxD}">
+      ${viewMode === 'store' ? `<label class="small muted" for="pcStore">Toko</label><select id="pcStore" class="inp">${(sc ? [sc] : listRows.map(r => r.c)).map(c => { const r = R.rows.find(x => x.c === c) || {}; return `<option value="${esc(c)}" ${c === (U.pcStore) ? 'selected' : ''}>${esc(sName(c))} · ${fmtPct(achOf(r), 0)}</option>`; }).join('') || '<option value="">Semua toko sudah capai target</option>'}</select>
+        ${sc ? '' : `<label class="small" style="display:flex;gap:6px;align-items:center;font-weight:700"><input type="checkbox" id="pcAll" ${showAll ? 'checked' : ''}> Termasuk toko yang sudah capai target</label>`}` : ''}</div>
+    ${!withT.length ? '<div class="note">Target bulan ini belum diupload, sehingga pencapaian belum bisa dihitung. Upload target di Kelola data.</div>' : ''}`;
+  if (viewMode === 'area') {
+    const P = picaData(null, D, R, mode), X = picaRules(P);
+    /* masalah per toko yang belum capai target */
+    const per = below.map(r => { const p = picaData(r.c, D, R, mode), x = picaRules(p); return { c: r.c, name: sName(r.c), ach: achOf(r), gap: cum ? r.cDiff : r.dDiff, flags: x.flags, top: x.prob[0], tr: x.tr, bs: x.bs, up: x.up, n: Object.keys(x.flags).length }; });
+    const freq = PICA_FLAGS.map(([k, l]) => ({ k, l, n: per.filter(p => p.flags[k]).length })).filter(f => f.n).sort((a, b) => b.n - a.n);
+    const gapTot = per.reduce((a, p) => a + Math.min(0, p.gap), 0);
+    const visit = per.slice().sort((a, b) => (a.gap - b.gap) || (b.n - a.n)).slice(0, 5);
+    const areaAct = [];
+    const fN0 = k => (freq.find(f => f.k === k) || {}).n || 0;
+    if (fN0('traffic') >= 2) areaAct.push(`Program <b>traffic builder area</b> (broadcast member EAC, aktivasi depan toko) — prioritas ${per.filter(p => p.flags.traffic).slice(0, 4).map(p => esc(p.name)).join(', ')}.`);
+    if (fN0('upt') >= 2) areaAct.push(`<b>Coaching add-on & bundling</b> serentak untuk toko dengan UPT rendah: ${per.filter(p => p.flags.upt).slice(0, 4).map(p => esc(p.name)).join(', ')}.`);
+    if (fN0('oos') >= 2) areaAct.push(`Koordinasi <b>transfer antar toko & repeat order</b> untuk artikel laris yang kosong di ${fN0('oos')} toko (menu Saran Transfer & Saran RO).`);
+    if (fN0('det') >= 2) areaAct.push(`Target <b>detention ≥ 95%</b> minggu ini untuk ${fN0('det')} toko; cek daftar barang gudang yang belum dipajang di menu Detention Stock.`);
+    if (fN0('lost') >= 2) areaAct.push(`Pastikan <b>Endless Aisle</b> ditawarkan untuk setiap lost sales (${fN0('lost')} toko mencatat lost sales).`);
+    if (fN0('basket') >= 2) areaAct.push(`Dorong <b>produk harga tinggi di area depan</b> untuk toko dengan basket turun: ${per.filter(p => p.flags.basket).slice(0, 4).map(p => esc(p.name)).join(', ')}.`);
+    if (visit.length) areaAct.push(`<b>Kunjungan / call prioritas BM</b>: ${visit.map(p => esc(p.name) + ' (' + fmtPct(p.ach, 0) + ')').join(', ')}.`);
+    if (P.rem > 0 && P.remDays > 0) areaAct.push(`Area perlu <b>${fmtRpS(P.needDay)}/hari</b> selama ${P.remDays} hari tersisa untuk menutup gap ${fmtRpS(P.rem)}.`);
+    view.innerHTML = `<div class="stack">${controls}
       <div class="pt-tiles" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr))">
-        <div class="pt-tile" style="background:${r0.cAch >= G ? '#13806F' : '#C0392B'}"><span>Pencapaian kumulatif</span><b>${fmtPct(r0.cAch, 1)}</b><small>${fmtRpS(r0.cs)} vs target ${fmtRpS(r0.cT)}</small></div>
-        <div class="pt-tile" style="background:${r0.dAch >= G ? '#13806F' : '#E46636'}"><span>Pencapaian harian</span><b>${fmtPct(r0.dAch, 1)}</b><small>${fmtRpS(r0.ds)} vs target ${fmtRpS(r0.dT)}</small></div>
-        <div class="pt-tile"><span>Growth MTD vs ${+D.slice(0, 4) - 1}</span><b>${P.gy && P.gy.mtd != null ? (P.gy.mtd >= 0 ? '+' : '') + fmtPct(P.gy.mtd, 1) : '–'}</b><small>${P.gy && P.gy.day != null ? 'harian ' + (P.gy.day >= 0 ? '+' : '') + fmtPct(P.gy.day, 1) : 'data tahun lalu belum ada'}</small></div>
+        <div class="pt-tile" style="background:${P.ach >= G ? '#13806F' : '#C0392B'}"><span>Pencapaian ${cum ? 'kumulatif' : 'harian'} area</span><b>${fmtPct(P.ach, 1)}</b><small>${fmtRpS(P.achSales)} vs ${fmtRpS(P.achTarget)}</small></div>
+        <div class="pt-tile" style="background:#E46636"><span>Toko belum capai target</span><b>${below.length} / ${withT.length}</b><small>gap ${fmtRpS(gapTot)}</small></div>
+        <div class="pt-tile"><span>Growth vs ${+D.slice(0, 4) - 1}</span><b>${(cum ? P.gy && P.gy.mtd : P.gy && P.gy.day) != null ? ((cum ? P.gy.mtd : P.gy.day) >= 0 ? '+' : '') + fmtPct(cum ? P.gy.mtd : P.gy.day, 1) : '–'}</b><small>${cum ? 'MTD' : 'tanggal ini'}</small></div>
+        <div class="pt-tile" style="background:#0B1B4A"><span>Butuh per hari (area)</span><b>${P.rem > 0 ? fmtRpS(P.needDay) : 'Tercapai'}</b><small>${P.rem > 0 ? 'sisa ' + P.remDays + ' hari' : ''}</small></div></div>
+      <section class="card"><div class="card-h"><h3>Area Jateng 01 · indikator utama</h3><p class="small muted">${cum ? 'dibanding bulan lalu periode sama' : 'dibanding hari yang sama minggu lalu'}</p></div>${picaCompareTable(P, X)}</section>
+      <section class="card"><div class="card-h"><h3>Masalah yang paling sering muncul</h3><p class="small muted">dari ${per.length} toko yang belum capai target</p></div>
+        ${freq.length ? `<div>${freq.map(f => `<div class="dt-bar" style="grid-template-columns:150px 60px minmax(0,1fr);margin:6px 0"><span class="small"><b>${f.l}</b></span><b>${f.n} toko</b><div class="dt-track"><i class="${f.n / Math.max(1, per.length) >= .5 ? 'lv-low' : 'lv-mid'}" style="width:${f.n / Math.max(1, per.length) * 100}%"></i></div></div>`).join('')}</div>` : '<p class="muted small">Belum ada pola masalah yang menonjol.</p>'}</section>
+      <section class="card"><div class="card-h"><h3>Peta masalah per toko</h3><p class="small muted">klik toko untuk analisa detailnya</p></div>
+        <div class="rp-wrap"><table class="rp" style="min-width:900px"><thead><tr><th class="nmh">Toko</th><th>% ${cum ? 'kum' : 'harian'}</th><th>Gap</th>${PICA_FLAGS.map(([, l]) => `<th style="font-size:11px">${l}</th>`).join('')}</tr></thead>
+        <tbody>${per.map(p => `<tr data-pcgo="${esc(p.c)}" style="cursor:pointer"><td class="nm">${esc(p.name)}<small>${p.top ? String(p.top.t).replace(/<[^>]+>/g, '').slice(0, 70) : ''}</small></td><td class="r" style="color:var(--bad)">${fmtPct(p.ach, 1)}</td><td class="r">${fmtRpS(p.gap)}</td>${PICA_FLAGS.map(([k]) => `<td style="text-align:center">${p.flags[k] ? '<span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:var(--bad)"></span>' : ''}</td>`).join('')}</tr>`).join('') || `<tr><td colspan="${3 + PICA_FLAGS.length}" style="text-align:center;padding:20px">Semua toko sudah mencapai target 🎉</td></tr>`}</tbody></table></div></section>
+      <div class="grid g2">
+        <section class="card"><div class="card-h"><h3>Problem identification (area)</h3></div><ul class="pc-list">${X.prob.map(x => `<li><span class="pc-tag ${x.s >= 3 ? '' : x.s === 2 ? 'w' : 'l'}">${x.s >= 3 ? 'Tinggi' : x.s === 2 ? 'Sedang' : 'Rendah'}</span>${x.t}</li>`).join('')}</ul></section>
+        <section class="card"><div class="card-h"><h3>Corrective action area (BM)</h3></div><ol class="pc-list">${areaAct.map(t => `<li>${t}</li>`).join('') || '<li>–</li>'}</ol></section>
+      </div>
+      ${picaAISection('Area Jateng 01')}
+      <p class="small muted">Sumber: Item DSR, target & bobot harian, sales tahun lalu, lost sales, stok toko, dan detention stock. ${cum ? 'Kumulatif dibanding bulan lalu pada rentang tanggal yang sama.' : 'Harian dibanding hari yang sama minggu lalu.'}</p></div>`;
+    App.ui.pcLast = { P, X, area: { per, freq, act: areaAct } };
+    return;
+  }
+  /* ---- per toko ---- */
+  const st = sc || (U.pcStore && R.rows.some(r => r.c === U.pcStore) ? U.pcStore : (listRows[0] || {}).c || '');
+  U.pcStore = st;
+  const P = st ? picaData(st, D, R, mode) : null, X = P ? picaRules(P) : null;
+  view.innerHTML = `<div class="stack">${controls}
+    ${P ? `<section class="card"><div class="card-h"><h3>${esc(P.name)} · ${esc(st)}</h3><p class="small muted">${cum ? 'kumulatif 1–' + (+D.slice(8)) + ' ' + MON[+D.slice(5, 7) - 1] : fmtDate(D)}</p></div>
+      <div class="pt-tiles" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr))">
+        <div class="pt-tile" style="background:${P.row.cAch >= G ? '#13806F' : '#C0392B'}"><span>Pencapaian kumulatif</span><b>${fmtPct(P.row.cAch, 1)}</b><small>${fmtRpS(P.row.cs)} vs target ${fmtRpS(P.row.cT)}</small></div>
+        <div class="pt-tile" style="background:${P.row.dAch >= G ? '#13806F' : '#E46636'}"><span>Pencapaian harian</span><b>${fmtPct(P.row.dAch, 1)}</b><small>${fmtRpS(P.row.ds)} vs target ${fmtRpS(P.row.dT)}</small></div>
+        <div class="pt-tile"><span>Growth ${cum ? 'MTD' : 'harian'} vs ${+D.slice(0, 4) - 1}</span><b>${(cum ? P.gy && P.gy.mtd : P.gy && P.gy.day) != null ? ((cum ? P.gy.mtd : P.gy.day) >= 0 ? '+' : '') + fmtPct(cum ? P.gy.mtd : P.gy.day, 1) : '–'}</b><small>${P.gy ? (cum ? 'harian ' + (P.gy.day != null ? fmtPct(P.gy.day, 1) : '–') : 'MTD ' + (P.gy.mtd != null ? fmtPct(P.gy.mtd, 1) : '–')) : 'data tahun lalu belum ada'}</small></div>
         <div class="pt-tile" style="background:#0B1B4A"><span>Butuh per hari</span><b>${P.rem > 0 ? fmtRpS(P.needDay) : 'Tercapai'}</b><small>${P.rem > 0 ? `sisa ${P.remDays} hari · gap ${fmtRpS(P.rem)}` : 'target bulan sudah terpenuhi'}</small></div></div>
-      <div style="overflow-x:auto;margin-top:14px"><table class="pc-cmp"><thead><tr><th>Indikator</th><th>Bulan ini (1–${+D.slice(8)})</th><th>Bulan lalu (periode sama)</th><th>Perubahan</th><th>Rata-rata area</th><th>vs area</th></tr></thead><tbody>
-        <tr><td>Sales</td><td>${fmtRpS(P.cur.v)}</td><td>${fmtRpS(P.prev.v)}</td><td>${chg(pctChg(P.cur.v, P.prev.v))}</td><td>–</td><td>–</td></tr>
-        <tr><td>Transaksi</td><td>${fmtN(P.cur.n)} <span class="muted small">(${fmtN(Math.round(P.trxDay))}/hari)</span></td><td>${fmtN(P.prev.n)}</td><td>${chg(X.tr)}</td><td>–</td><td>–</td></tr>
-        <tr><td>Basket size</td><td>${fmtRpS(P.cur.bs)}</td><td>${fmtRpS(P.prev.bs)}</td><td>${chg(X.bs)}</td><td>${fmtRpS(P.area.bs)}</td><td>${chg(X.bsA)}</td></tr>
-        <tr><td>UPT</td><td>${fmtX(P.cur.upt, 2)}</td><td>${fmtX(P.prev.upt, 2)}</td><td>${chg(X.up)}</td><td>${fmtX(P.area.upt, 2)}</td><td>${chg(X.upA)}</td></tr>
-        <tr><td>Hari ini vs 7 hari lalu</td><td>${fmtRpS(P.d0.v)} · ${fmtN(P.d0.n)} trx</td><td>${fmtRpS(P.w1.v)} · ${fmtN(P.w1.n)} trx</td><td>${chg(pctChg(P.d0.v, P.w1.v))}</td><td>–</td><td>–</td></tr>
-      </tbody></table></div></section>
-    <div class="grid g2">
-      <section class="card"><div class="card-h"><h3>Problem identification</h3><p class="small muted">otomatis dari data</p></div>
-        <ul class="pc-list">${X.prob.map(x => `<li><span class="pc-tag ${x.s >= 3 ? '' : x.s === 2 ? 'w' : 'l'}">${x.s >= 3 ? 'Tinggi' : x.s === 2 ? 'Sedang' : 'Rendah'}</span>${x.t}</li>`).join('')}</ul></section>
-      <section class="card"><div class="card-h"><h3>Data yang perlu dicek Store Head</h3></div><ul class="pc-list">${X.check.map(t => `<li>${t}</li>`).join('')}</ul></section>
-    </div>
-    <section class="card"><div class="card-h"><h3>Corrective action</h3><p class="small muted">saran awal berdasarkan masalah di atas</p></div><ol class="pc-list">${X.act.map(t => `<li>${t}</li>`).join('')}</ol></section>
-    <section class="card"><div class="card-h"><h3>✨ Analisa AI</h3><p class="small muted">analisa lebih dalam & corrective action yang disesuaikan</p></div><div id="pcAI">${App.aiReady ? `<button class="btn primary" id="pcAIBtn">Minta analisa AI untuk ${esc(P.name)}</button>${App.admin ? ' <button class="btn" id="pcAIRe" title="Buat ulang analisa (abaikan hasil tersimpan)">Buat ulang</button>' : ''}<p class="small muted" style="margin:8px 0 0">Hasil disimpan per toko per tanggal, jadi analisa yang sama tidak memanggil AI dua kali.</p>` : `<p class="small muted" style="margin:0">Fitur AI belum diaktifkan.${App.admin ? ' Admin: isi <b>ANTHROPIC_API_KEY</b> di Apps Script › Project Settings › Script Properties, deploy versi baru, lalu tekan Perbarui cache.' : ''} Sementara itu, analisa otomatis di atas sudah bisa dipakai.</p>`}</div></section>` : ''}
-    <p class="small muted">Sumber: Item DSR (sales, transaksi, basket, UPT, member, promo, sales person), target & bobot harian, sales tahun lalu, lost sales, stok toko, dan detention stock. Bulan lalu dibandingkan pada rentang tanggal yang sama.</p>
+      ${picaCompareTable(P, X)}</section>
+    ${picaSections(P, X, 'Store Head')}
+    ${picaAISection(P.name)}` : '<div class="empty-state"><h2>Semua toko sudah mencapai target 🎉</h2></div>'}
+    <p class="small muted">Sumber: Item DSR (sales, transaksi, basket, UPT, member, promo, sales person), target & bobot harian, sales tahun lalu, lost sales, stok toko, dan detention stock. ${cum ? 'Kumulatif dibanding bulan lalu pada rentang tanggal yang sama.' : 'Harian dibanding hari yang sama minggu lalu dan tanggal yang sama bulan lalu.'}</p>
   </div>`;
-  if ($('#pcList')) $('#pcList').innerHTML = tbl('pcList', { rows: list.map(r => { const s0 = picaStats(linesIn(D.slice(0, 7) + '-01', D, r.c)), pm = addMonths(D.slice(0, 7), -1), p0 = picaStats(linesIn(pm + '-01', pm + '-' + pad(Math.min(+D.slice(8), dim(pm))), r.c)); return { c: r.c, name: sName(r.c), cAch: r.cAch, dAch: r.dAch, gap: r.cDiff, tr: pctChg(s0.n, p0.n), bs: pctChg(s0.bs, p0.bs), up: pctChg(s0.upt, p0.upt) }; }), sort: { k: 'cAch', dir: 'asc' }, limit: 40, onRow: r => { App.ui.pcStore = r.c; render(); setTimeout(() => { const el = $('#pcAI'); if (el) el.closest('.stack').children[3]?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 50); }, cols: [
-    { k: 'name', label: 'Toko', h: r => `<span class="nm">${esc(r.name)}</span><span class="sub">${esc(r.c)}</span>` },
-    { k: 'cAch', label: '% kumulatif', r: 1, h: r => `<b style="color:${r.cAch >= G ? 'var(--ok)' : 'var(--bad)'}">${fmtPct(r.cAch, 1)}</b>` }, { k: 'dAch', label: '% harian', r: 1, h: r => `<b style="color:${r.dAch >= G ? 'var(--ok)' : 'var(--bad)'}">${fmtPct(r.dAch, 1)}</b>` },
-    { k: 'gap', label: 'Gap kumulatif', r: 1, h: r => fmtRpS(r.gap) }, { k: 'tr', label: 'Transaksi vs bln lalu', r: 1, h: r => chg(r.tr) }, { k: 'bs', label: 'Basket', r: 1, h: r => chg(r.bs) }, { k: 'up', label: 'UPT', r: 1, h: r => chg(r.up) }] });
   App.ui.pcLast = P ? { P, X } : null;
 }
+function picaPayload() {
+  const L = App.ui.pcLast; if (!L) return null; const P = L.P, X = L.X;
+  const strip = h => String(h).replace(/<[^>]+>/g, '').replace(/&amp;/g, '&');
+  const r2 = v => v == null ? null : Math.round(v * 1000) / 1000;
+  const data = { level: P.c ? 'toko' : 'AREA (sudut pandang BM, seluruh toko Jateng 01)', periode_analisa: P.mode === 'day' ? 'harian (tanggal ' + P.D + ')' : 'kumulatif 1–' + (+P.D.slice(8)) + ' bulan berjalan',
+    toko: P.name, kode: P.c || 'AREA', tanggal: P.D, target_bulan: Math.round(P.T), pencapaian_kumulatif: r2(P.row.cAch), pencapaian_harian: r2(P.row.dAch), sales_kumulatif: Math.round(P.row.cs || 0), target_kumulatif: Math.round(P.row.cT || 0),
+    sales_harian: Math.round(P.row.ds || 0), target_harian: Math.round(P.row.dT || 0), sisa_target_bulan: Math.round(P.rem), sisa_hari: P.remDays, butuh_sales_per_hari: Math.round(P.needDay), butuh_transaksi_per_hari: P.needTrx ? Math.ceil(P.needTrx) : null,
+    periode_ini: { label: P.curLabel, sales: Math.round(P.cur.v), transaksi: P.cur.n, basket: Math.round(P.cur.bs || 0), upt: r2(P.cur.upt) }, pembanding: { label: P.mode === 'day' ? P.prevLabel : 'bulan lalu periode sama', sales: Math.round(P.prev.v), transaksi: P.prev.n, basket: Math.round(P.prev.bs || 0), upt: r2(P.prev.upt) },
+    rata_rata_area: P.c ? { basket: Math.round(P.area.bs || 0), upt: r2(P.area.upt) } : undefined, growth_vs_tahun_lalu: P.gy ? { mtd: r2(P.gy.mtd), harian: r2(P.gy.day) } : null,
+    lost_sales: { input: P.lost.n, nilai: Math.round(P.lost.v), artikel_terbanyak: P.lost.top.map(x => x[0]) }, artikel_laris_stok_habis: P.c ? (P.oos ? P.oos.slice(0, 8).map(x => x.name) : 'stok belum diupload') : undefined,
+    detention_generic_terdisplay: P.det && !P.det.old ? r2(P.det.gP) : null, porsi_promo: r2(P.promoShare), porsi_member_eac: r2(P.memShare), porsi_member_area: P.c ? r2(P.areaMem) : undefined,
+    sales_person_upt_terendah: P.c ? P.spLow.map(x => ({ nama: x.k, upt: r2(x.upt), transaksi: x.n })) : undefined, jam_ramai: P.peakH, hari_sepi: P.lowW != null ? DOW[P.lowW] : null, temuan_otomatis: X.prob.map(x => strip(x.t)) };
+  if (L.area) { data.toko_belum_capai_target = L.area.per.map(p => ({ toko: p.name, pencapaian: r2(p.ach), gap: Math.round(p.gap), masalah: PICA_FLAGS.filter(([k]) => p.flags[k]).map(([, l]) => l), transaksi_vs_pembanding: r2(p.tr), basket_vs_pembanding: r2(p.bs), upt_vs_pembanding: r2(p.up) }));
+    data.masalah_terbanyak = L.area.freq.map(f => f.l + ': ' + f.n + ' toko'); data.instruksi_tambahan = 'Ini analisa level AREA untuk Branch Manager: fokus pada pola lintas toko, toko prioritas yang harus dikunjungi, dan program area. Ganti "Store Head" dengan "BM" pada judul bagian data yang perlu dicek.'; }
+  return { P, data };
+}
+/* instruksi yang sama dengan AI di server, untuk ditempel manual di claude.ai */
+const PICA_PROMPT = 'Kamu adalah analis retail senior untuk toko EIGER (perlengkapan outdoor) di Indonesia. Di bawah ini data JSON hasil penjualan yang belum mencapai target (bisa level satu toko atau level area/seluruh toko — lihat field "level"): pencapaian harian & kumulatif, growth vs tahun lalu, transaksi, basket size, UPT, perbandingan dengan periode pembanding dan rata-rata area, lost sales, stok produk laris yang kosong, detention stock (barang gudang yang belum dipajang), porsi promo, porsi member EAC, kinerja sales person, dan jam/hari ramai.\n\n' +
+  'Tulis analisa PICA (Problem Identification & Corrective Action) dalam Bahasa Indonesia yang lugas, dengan format:\n' +
+  '## Ringkasan (2-3 kalimat: seberapa jauh dari target dan penyebab utamanya, sebutkan angka)\n## Akar masalah (maksimal 4 poin, urut dari dampak terbesar, dengan angka pendukung)\n' +
+  '## Data yang perlu dicek (maksimal 4 poin, spesifik)\n## Corrective action (4-6 aksi konkret & terukur: apa, siapa, kapan, target angka)\n## Target harian sisa bulan (sales, transaksi, basket/UPT per hari)\n\n' +
+  'Jangan mengarang data yang tidak ada di JSON; kalau data kosong, katakan perlu dicek. Maksimal 400 kata. Catatan: angka persen ditulis sebagai desimal (0,85 = 85%).';
+async function picaCopy() {
+  const X = picaPayload(); if (!X) return;
+  const text = PICA_PROMPT + '\n\nData (JSON):\n' + JSON.stringify(X.data, null, 1);
+  let ok = false;
+  try { await navigator.clipboard.writeText(text); ok = true; } catch (e) {
+    const ta = document.createElement('textarea'); ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0'; document.body.appendChild(ta); ta.select();
+    try { ok = document.execCommand('copy'); } catch (er) { } ta.remove();
+  }
+  const msg = $('#pcCopyMsg');
+  if (msg) msg.innerHTML = ok ? '✅ Data & instruksi analisa sudah disalin. Buka claude.ai, <b>tempel (Ctrl+V / tahan lalu Tempel)</b> di kolom chat, lalu kirim.' : '⚠️ Browser tidak mengizinkan salin otomatis. Coba lagi di Chrome/Safari terbaru.';
+  toast(ok ? 'Tersalin — tinggal tempel di claude.ai' : 'Gagal menyalin');
+}
 async function picaAsk(force) {
-  const L = App.ui.pcLast; if (!L) return; const P = L.P, X = L.X, box = $('#pcAI'); if (!box) return;
-  box.innerHTML = '<div class="loading" style="padding:16px"><span class="spin"></span>AI sedang menganalisa data toko…</div>';
-  const strip = h => String(h).replace(/<[^>]+>/g, '');
-  const data = { toko: P.name, kode: P.c, tanggal: P.D, target_bulan: Math.round(P.T), pencapaian_kumulatif: P.row.cAch, pencapaian_harian: P.row.dAch, sales_kumulatif: Math.round(P.row.cs || 0), target_kumulatif: Math.round(P.row.cT || 0),
-    sales_harian: Math.round(P.row.ds || 0), target_harian: Math.round(P.row.dT || 0), sisa_target: Math.round(P.rem), sisa_hari: P.remDays, butuh_sales_per_hari: Math.round(P.needDay), butuh_transaksi_per_hari: P.needTrx ? Math.ceil(P.needTrx) : null,
-    bulan_ini: { sales: Math.round(P.cur.v), transaksi: P.cur.n, basket: Math.round(P.cur.bs || 0), upt: +(P.cur.upt || 0).toFixed(2), transaksi_per_hari: Math.round(P.trxDay) }, bulan_lalu_periode_sama: { sales: Math.round(P.prev.v), transaksi: P.prev.n, basket: Math.round(P.prev.bs || 0), upt: +(P.prev.upt || 0).toFixed(2) },
-    rata_rata_area: { basket: Math.round(P.area.bs || 0), upt: +(P.area.upt || 0).toFixed(2) }, growth_vs_tahun_lalu: P.gy ? { mtd: P.gy.mtd, harian: P.gy.day } : null,
-    lost_sales_bulan_ini: { input: P.lost.n, nilai: Math.round(P.lost.v), artikel_terbanyak: P.lost.top.map(x => x[0]) }, artikel_laris_stok_habis: P.oos ? P.oos.slice(0, 8).map(x => x.name) : 'stok belum diupload',
-    detention_generic_terdisplay: P.det && !P.det.old ? P.det.gP : null, porsi_promo: P.promoShare, porsi_member_eac: P.memShare, porsi_member_area: P.areaMem,
-    sales_person_upt_terendah: P.spLow.map(x => ({ nama: x.k, upt: +x.upt.toFixed(2), transaksi: x.n })), jam_ramai: P.peakH, hari_sepi: P.lowW != null ? DOW[P.lowW] : null, temuan_otomatis: X.prob.map(x => strip(x.t)) };
+  const X0 = picaPayload(); if (!X0) return; const P = X0.P, data = X0.data, box = $('#pcAI'); if (!box) return;
+  box.innerHTML = '<div class="loading" style="padding:16px"><span class="spin"></span>AI sedang menganalisa data…</div>';
   try {
-    const r = await apiPost({ a: 'pica', id: P.c + '|' + P.D, data, force: !!force, k: LS.get('dash_view') || '' });
-    box.innerHTML = `<div class="ai-box">${picaMd(r.text || '')}</div><p class="small muted" style="margin:8px 0 0">Dibuat ${r.at ? fmtDate(r.at.slice(0, 10)) : ''}${r.cached ? ' (hasil tersimpan)' : ''} · model ${esc(r.model || '')}. Analisa AI adalah saran; tetap cocokkan dengan kondisi di toko.</p>`;
+    const r = await apiPost({ a: 'pica', id: (P.c || 'AREA') + '|' + P.D + '|' + P.mode, data, force: !!force, k: LS.get('dash_view') || '' });
+    box.innerHTML = `<div class="ai-box">${picaMd(r.text || '')}</div><p class="small muted" style="margin:8px 0 0">Dibuat ${r.at ? fmtDate(r.at.slice(0, 10)) : ''}${r.cached ? ' (hasil tersimpan)' : ''} · model ${esc(r.model || '')}. Analisa AI adalah saran; tetap cocokkan dengan kondisi di lapangan.</p>`;
   } catch (e) { box.innerHTML = `<div class="note">AI belum bisa dipakai: ${esc(errMsg(e))}</div>`; }
 }
 
@@ -3403,6 +3495,10 @@ document.addEventListener('click', async e => {
   if (t.id === 'tfXls') { exportTransfer(); return; }
   if (t.id === 'roXls') { exportRO(); return; }
   if (t.id === 'pcAIBtn') { picaAsk(false); return; }
+  const pcv = t.closest('[data-pcv]'); if (pcv) { App.ui.pcView = pcv.dataset.pcv; render(); return; }
+  const pcm = t.closest('[data-pcm]'); if (pcm) { App.ui.pcMode = pcm.dataset.pcm; render(); return; }
+  const pcg = t.closest('[data-pcgo]'); if (pcg) { App.ui.pcView = 'store'; App.ui.pcStore = pcg.dataset.pcgo; render(); window.scrollTo(0, 0); return; }
+  if (t.id === 'pcCopy') { picaCopy(); return; }
   if (t.id === 'pcAIRe') { picaAsk(true); return; }
   if (t.id === 'roClr') { App.ui.roMc = {}; render(); return; }
   if (t.id === 'roAll' || t.id === 'roNone') { const o = App.ui.roOpen = {}; if (t.id === 'roAll') { render(); for (let i = 0; i < 2; i++) { $$('[data-rotog]').forEach(x => { o[x.dataset.rotog] = true; }); render(); } } else render(); return; }

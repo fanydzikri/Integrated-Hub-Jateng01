@@ -438,7 +438,31 @@ body.shot details[open].card{display:none!important}
 body.shot .rp-wrap,body.shot .tbl-wrap{max-height:none!important;overflow:visible!important}
 body.shot{overflow-x:visible}
 body.shot table th,body.shot table td{position:static!important}
-body.shot .rp-wrap>table,body.shot .tbl-wrap>table{width:max-content;min-width:100%}
+/* tabel selalu selebar kartu (tidak menyisakan ruang kosong di kanan) dan baris dibuat rapat supaya gambar tidak terlalu panjang */
+body.shot .rp-wrap>table,body.shot .tbl-wrap>table,body.shot table.tbl{width:100%!important;min-width:0!important}
+body.shot .tbl th{padding:6px 9px;font-size:12px}
+body.shot .tbl td{padding:4px 9px;font-size:12.5px;line-height:1.25}
+body.shot .rp td{padding:3px 6px}body.shot .rp th{padding:5px 6px}
+body.shot .tbl td .nm{display:inline}body.shot .tbl td .sub{display:inline;margin-left:6px;font-size:10.5px}
+body.shot .tbl td .pc{gap:6px}body.shot .pc .th{width:24px;height:24px;border-radius:5px}
+body.shot .stack{gap:12px}
+body.shot .card{padding:12px 16px}body.shot .card-h{margin-bottom:8px}body.shot .card-h h3{font-size:15px}
+body.shot .pt-tile{padding:10px 14px}body.shot .pt-tile b{font-size:22px}
+body.shot .kpi{padding:10px 12px}body.shot .kpi b{font-size:19px}
+body.shot .chart-box{height:210px!important;min-height:0!important;flex:none!important}
+body.shot .grid>.card>.chart-box,body.shot .grid>.stack>.card>.chart-box{height:210px!important}
+body.shot .note,body.shot .oms-up,body.shot .stack>p.small.muted,body.shot .card>p.small.muted:last-child,body.shot .legend+p,body.shot [data-omsdel],body.shot .hub-form{display:none!important}
+body.shot .hub-item{padding:8px 12px}body.shot .bc-a p{font-size:12.5px}
+body.shot .rp-tile{min-height:0}
+body.shot .donut{height:190px!important}body.shot .cat-box{height:150px!important}
+body.shot .bc-rank{gap:8px}body.shot .bc-r{padding:8px 10px}
+body.shot .jk-grid{grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:8px}body.shot .jk-card{padding:9px 11px}
+.shot-x{display:none}
+body.shot .shot-sec{position:relative}body.shot .stack{padding-top:6px}
+body.shot .shot-x{display:block;position:absolute;top:-11px;right:14px;box-shadow:0 2px 6px rgba(11,27,74,.12);z-index:5;border:1px dashed var(--line-strong);background:#fff;color:var(--muted);font-size:11px;font-weight:700;border-radius:999px;padding:3px 9px;cursor:pointer}
+body.shot .shot-x:hover{color:var(--bad);border-color:var(--bad)}
+body.shot .shot-skip{opacity:.35;max-height:56px;overflow:hidden!important;outline:2px dashed var(--line-strong)}
+body.shot.capturing .shot-skip{display:none!important}
 body.shot main.wrap{padding-top:18px;padding-bottom:30px}
 @media (min-width:900px){body.shot main.wrap{width:1240px;max-width:1240px;margin:0 auto}}
 body.shot .card{box-shadow:none}
@@ -1512,7 +1536,10 @@ function tbl(id, o) {
     const c = o.cols.find(c => c.k === st.k); const get = (c && c.v) || (r => r[st.k]);
     rs.sort((a, b) => { const x = get(a), y = get(b); let r; if (typeof x === 'string' || typeof y === 'string') r = String(x ?? '').localeCompare(String(y ?? ''), 'id'); else r = (x ?? -Infinity) - (y ?? -Infinity); return st.dir === 'asc' ? r : -r; });
   }
-  const lim = App.ui.more[id] || o.limit || 25; const shown = rs.slice(0, lim);
+  let lim = App.ui.more[id] || o.limit || 25;
+  /* mode screenshot: daftar artikel/produk dipendekkan supaya gambar tidak terlalu panjang (tabel per toko tetap lengkap) */
+  if (document.body.classList.contains('shot') && SHOT_SHORT.includes(id)) lim = Math.min(lim, 12);
+  const shown = rs.slice(0, lim);
   App.tables[id] = { rows: shown, onRow: o.onRow };
   const head = o.cols.map(c => `<th class="${c.r ? 'r' : ''} ${c.ns ? '' : 's'}" ${c.ns ? '' : `data-sort="${id}|${c.k}"`}>${esc(c.label)}${st && st.k === c.k ? (st.dir === 'asc' ? ' ▲' : ' ▼') : ''}</th>`).join('');
   const body = shown.length ? shown.map((r, i) => `<tr data-row="${id}|${i}" class="${o.onRow ? 'clk' : ''}">${o.cols.map(c => `<td class="${c.r ? 'r' : ''}">${c.h ? c.h(r) : esc(r[c.k])}</td>`).join('')}</tr>`).join('') : `<tr><td class="empty" colspan="${o.cols.length}">${esc(o.empty || 'Tidak ada data untuk periode ini.')}</td></tr>`;
@@ -2046,7 +2073,7 @@ function pageEac(view) {
     </table></div>
     <div class="legend"><span>${rpFull() ? '' : 'Target, Actual & Diff dalam juta rupiah. '}Target s/d tanggal = target bulan × bobot kumulatif. Porsi member = sales member ÷ total sales toko. Basket = sales ÷ jumlah transaksi.</span></div>
     <section class="card"><div class="card-h"><h3>Sales member harian</h3><p class="small muted">batang = sales member, garis = porsi member</p></div><div class="chart-box"><canvas id="cEac"></canvas></div></section>
-    ${App.admin ? `<section class="card"><div class="card-h"><h3>Member dengan belanja terbesar</h3><p class="small muted">hanya terlihat oleh admin · ${fmtN(top.length)} member</p></div><div id="eaTop"></div></section>` : ''}
+    ${App.admin ? `<section class="card shot-skip"><div class="card-h"><h3>Member dengan belanja terbesar</h3><p class="small muted">hanya terlihat oleh admin · ${fmtN(top.length)} member</p></div><div id="eaTop"></div></section>` : ''}
   </div>`;
   const dl = []; for (let d = from; d <= D; d = addDays(d, 1)) dl.push(d);
   mkDual($('#cEac'), dl.map(fmtDateS), dl.map(d => (daily.get(d) || {}).mv || 0), dl.map(d => { const x = daily.get(d); return x && x.v ? x.mv / x.v * 100 : null; }), 'Sales member', 'Porsi member (%)', v => fmtRpS(v), v => fmtX(v, 1) + '%');
@@ -2094,7 +2121,7 @@ function pageRA(view) {
     <section class="card"><div class="card-h"><h3>Performa sales person</h3><p class="small muted">${fmtN(named.length)} sales person · klik judul kolom untuk mengurutkan</p></div><div id="raT"></div>
       ${nn.trx || nn.v ? `<div class="more">Tanpa nama sales person (biasanya transaksi B2B / wholesale): ${fmtN(nn.trx)} transaksi · ${fmtRp(nn.v)} — tidak dimasukkan ke tabel, tetap dihitung di total.</div>` : ''}
       <div class="more" style="font-weight:700;color:var(--ink)">Total keseluruhan: ${fmtN(tot.trx)} transaksi · ${fmtN(tot.q)} qty · UPT ${tot.trx ? fmtX(tot.q / tot.trx, 2) : '–'} · basket ${tot.trx ? fmtRp(tot.v / tot.trx) : '–'} · ${fmtRp(tot.v)}</div></section>
-    <section class="card"><div class="card-h"><h3>UPT by date</h3><p class="small muted">makin gelap makin tinggi · "–" = tidak ada transaksi</p></div>
+    <section class="card shot-skip"><div class="card-h"><h3>UPT by date</h3><p class="small muted">makin gelap makin tinggi · "–" = tidak ada transaksi</p></div>
       <div class="rp-wrap" style="max-height:60vh"><table class="mx"><thead><tr><th class="nm">Sales person</th>${dl.map(d => `<th>${fmtDateS(d)}</th>`).join('')}</tr></thead><tbody>
       ${mxRows.map(r => `<tr><td class="nm">${esc(r.sp)}<small>${esc(sName(r.s))}</small></td>${dl.map(d => { const y = byDay.get(r.k + '|' + d); if (!y || !y.trx.size) return '<td class="muted">–</td>'; const u = y.q / y.trx.size, a = Math.min(1, u / maxU); return `<td style="background:rgba(15,49,146,${(a * .75).toFixed(2)});color:${a > .55 ? '#fff' : 'var(--ink)'}" title="${esc(r.sp)} ${fmtDate(d)}: ${y.trx.size} trx, ${fmtN(y.q)} qty">${fmtX(u, 2)}</td>`; }).join('')}</tr>`).join('') || `<tr><td class="nm">Belum ada data</td></tr>`}
       </tbody></table></div></section>
@@ -2249,8 +2276,8 @@ function pageLost(view) {
       </div>
     </div>
     <section class="card"><div class="card-h"><h3>Artikel paling sering dicari tapi tidak terlayani</h3><p class="small muted">dengan stok area saat ini, untuk bahan transfer / order</p></div><div id="lsArtT"></div></section>
-    <section class="card"><div class="card-h"><h3>Alasan asli (Reason)</h3><p class="small muted">teks asli dari input toko beserta kelompoknya</p></div><div id="lsRawT"></div></section>
-    ${App.admin ? '<section class="card"><div class="card-h"><h3>Detail input</h3><p class="small muted">hanya admin</p></div><div id="lsDetT"></div></section>' : ''}
+    <section class="card shot-skip"><div class="card-h"><h3>Alasan asli (Reason)</h3><p class="small muted">teks asli dari input toko beserta kelompoknya</p></div><div id="lsRawT"></div></section>
+    ${App.admin ? '<section class="card shot-skip"><div class="card-h"><h3>Detail input</h3><p class="small muted">hanya admin</p></div><div id="lsDetT"></div></section>' : ''}
   </div>`;
   const ink = css('--muted');
   const dl = []; for (let d = from; d <= to; d = addDays(d, 1)) dl.push(d);
@@ -3591,14 +3618,17 @@ function pageBC(view) {
 }
 /* ================= Mode screenshot (untuk dikirim ke grup WA) ================= */
 function loadH2C() { if (window.html2canvas) return Promise.resolve(); return new Promise((res, rej) => { const sc = document.createElement('script'); sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js'; sc.onload = res; sc.onerror = () => rej(new Error('Komponen screenshot gagal dimuat')); document.head.appendChild(sc); }); }
+const SHOT_SHORT = ['pt_gen', 'lsArt', 'psArt', 'promoT', 'pT', 'prodT', 'tfT', 'roArt', 'dtMiss', 'eacTop', 'raT', 'lsRaw', 'trendT', 'spT', 'promoS'];
 function addShotBtn(box) { if (!box || ['admin', 'settings', 'home'].includes(App.page) || document.body.classList.contains('shot') || box.querySelector('#shotBtn')) return; box.insertAdjacentHTML('beforeend', '<button class="btn sm shot-btn" id="shotBtn" title="Tampilan rapi untuk di-screenshot & dikirim ke grup WA">📸 Screenshot</button>'); }
 function shotOn() {
-  document.body.classList.add('shot');
+  document.body.classList.add('shot'); render(); document.body.classList.add('shot');
   let h = $('#shotHead'); if (!h) { h = document.createElement('div'); h.id = 'shotHead'; $('main.wrap').prepend(h); }
   const now = new Date();
   h.innerHTML = `<div class="sh-l"><img src="${esc(($('.brandbar img') || {}).src || '')}" alt=""><div><b>${esc($('#pageTitle').textContent)}</b><span>${esc($('#pageSub').textContent)}</span></div></div><div class="sh-r"><b>Integrated Hub Jateng 01</b><span>diambil ${now.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })} ${pad(now.getHours())}.${pad(now.getMinutes())}${App.user ? ' · ' + esc(App.user.name) : ''}</span></div>`;
   let bar = $('#shotBar'); if (!bar) { bar = document.createElement('div'); bar.id = 'shotBar'; document.body.appendChild(bar); }
-  bar.innerHTML = `<span>📸 Mode screenshot</span><button class="btn sm primary" id="shotPng">⬇ Unduh gambar</button><button class="btn sm" id="shotCopy">📋 Salin gambar</button><button class="btn sm" id="shotOff">✕ Selesai</button>`;
+  bar.innerHTML = `<span>📸 Mode screenshot · klik ✕ di tiap bagian untuk menyembunyikan</span><button class="btn sm primary" id="shotPng">⬇ Unduh gambar</button><button class="btn sm" id="shotCopy">📋 Salin gambar</button><button class="btn sm" id="shotOff">✕ Selesai</button>`;
+  /* tombol sembunyikan per bagian (tidak ikut ter-capture) */
+  $$('#view .stack > *').forEach(el => { if (el.querySelector(':scope > .shot-x') || el.classList.contains('filters')) return; el.classList.add('shot-sec'); el.insertAdjacentHTML('afterbegin', `<button class="shot-x" data-html2canvas-ignore title="Sembunyikan bagian ini dari screenshot">${el.classList.contains('shot-skip') ? '＋ Tampilkan' : '✕ Sembunyikan'}</button>`); });
   shotFit();
   window.scrollTo(0, 0);
 }
@@ -3614,13 +3644,14 @@ function shotFit() {
 function shotOff() { const m = $('main.wrap'); if (m) { m.style.width = ''; m.style.maxWidth = ''; } document.body.classList.remove('shot'); const h = $('#shotHead'); if (h) h.remove(); const b = $('#shotBar'); if (b) b.remove(); render(); }
 async function shotCapture(copy) {
   try { toast('Membuat gambar…', 4000); await loadH2C();
-    shotFit(); const el = $('main.wrap'); const W = Math.max(el.scrollWidth, el.offsetWidth);
+    document.body.classList.add('capturing'); shotFit(); const el = $('main.wrap'); const W = Math.max(el.scrollWidth, el.offsetWidth);
     const cv = await window.html2canvas(el, { scale: Math.min(2, window.devicePixelRatio || 1.5), useCORS: true, backgroundColor: getComputedStyle(document.body).backgroundColor || '#F4F6FB', logging: false, width: W, windowWidth: W + 80, scrollX: 0, scrollY: 0 });
+    document.body.classList.remove('capturing');
     const blob = await new Promise(r => cv.toBlob(r, 'image/png'));
     const name = ($('#pageTitle').textContent || 'Integrated Hub').replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '_') + '_' + todayISO() + '.png';
     if (copy && navigator.clipboard && window.ClipboardItem) { await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]); toast('Gambar tersalin — tempel (Ctrl+V) di WhatsApp Web'); return; }
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000); toast('Gambar diunduh: ' + name);
-  } catch (e) { toast('Gagal membuat gambar: ' + (e.message || e) + '. Gunakan screenshot biasa (mode ini sudah rapi).', 5000); }
+  } catch (e) { document.body.classList.remove('capturing'); toast('Gagal membuat gambar: ' + (e.message || e) + '. Gunakan screenshot biasa (mode ini sudah rapi).', 5000); }
 }
 
 /* ================= Share Omset Harian ================= */
@@ -4433,6 +4464,7 @@ document.addEventListener('click', async e => {
   if (t.id === 'pkAuto') { const codes = storeCodes().filter(c => sType(c) !== 'bz'), st0 = Math.max(0, codes.indexOf(($('#pkStart') || {}).value)); $$('[data-pk]').forEach((sel, i) => { sel.value = codes[(st0 + i) % codes.length]; }); toast('Jadwal terisi bergiliran — klik Simpan jadwal'); return; }
   if (t.id === 'pkSave') { const map = {}; $$('[data-pk]').forEach(sel => { if (sel.value) map[sel.dataset.pk] = sel.value; }); const m = (App.ui.omsDate || todayISO()).slice(0, 7); apiPost({ a: 'piket', month: m, map }).then(r => { App.piket = r.piket; toast('Jadwal piket disimpan'); render(); }).catch(er => toast('Gagal: ' + errMsg(er))); return; }
   if (t.id === 'shotOff') { shotOff(); return; }
+  const sx = t.closest('.shot-x'); if (sx) { const sec = sx.parentElement; const off = !sec.classList.contains('shot-skip'); sec.classList.toggle('shot-skip', off); sx.textContent = off ? '＋ Tampilkan' : '✕ Sembunyikan'; shotFit(); return; }
   if (t.id === 'shotPng') { shotCapture(false); return; }
   if (t.id === 'shotCopy') { shotCapture(true); return; }
   const hb = t.closest('[data-hub]'); if (hb) { enterHub(hb.dataset.hub); return; }

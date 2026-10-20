@@ -486,6 +486,15 @@ body.shot .card{box-shadow:none}
 .oms-slot{display:flex;flex-direction:column;align-items:center;min-width:86px;padding:8px 10px;border-radius:10px;font-weight:800;font-size:13px;border:1px solid var(--line);background:var(--surface)}
 .oms-slot small{font-weight:600;font-size:11px;color:var(--muted)}.oms-slot.ok{background:var(--ok-bg);border-color:#BFE3D6;color:var(--ok)}.oms-slot.miss{background:var(--bad-bg);border-color:#F3C3BD;color:var(--bad)}.oms-slot.wait{background:var(--orange-tint);color:var(--orange-deep)}
 .pk-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:6px}.pk-d{display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700}.pk-d span{width:46px;flex:none}.pk-d small{color:var(--muted);font-weight:500}.pk-d select{flex:1;min-width:0}
+.chat-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);gap:16px;align-items:start}
+.chat-pre{margin:0;background:#E7FFDB;border:1px solid #CDEFB9;border-radius:10px;padding:12px 14px;font-family:var(--font-mono);font-size:12.5px;line-height:1.5;white-space:pre-wrap;color:#111}
+@media (max-width:760px){.chat-grid{grid-template-columns:1fr}}
+body.shot .chat-card{display:none!important}
+.prt{width:100%;border-collapse:collapse;font-size:13px}
+.prt th{background:#0F3192;color:#fff;padding:7px 10px;text-align:left}.prt th.r,.prt td.r{text-align:right}
+.prt td{padding:6px 10px;border-bottom:1px solid var(--line)}.prt td.rk{text-align:center;width:52px;color:var(--muted);font-weight:700}
+.prt tfoot td{background:#0B1B4A;color:#fff;font-weight:800;border-bottom:1px solid #22336b}.prt tfoot td.lbl{text-align:center;letter-spacing:.04em}
+.prt td.neg{color:var(--bad)}
 .ck-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}
 .ck-col h4{margin:0 0 8px;font-size:14px;color:var(--navy)}.ck-col h4 small{display:block;font-weight:500;color:var(--muted);font-size:11.5px}
 .ck-col ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
@@ -1720,6 +1729,23 @@ function rpRow(r) {
   return `<tr data-store="${esc(r.c)}" style="cursor:pointer"><td class="site">${esc(r.c)}</td><td class="nm">${esc(r.name)}${r.late ? `<small>${r.last ? 'data s/d ' + fmtDateS(r.last) : 'belum ada data'}</small>` : ''}</td>${rpCells(r)}</tr>`;
 }
 function rpSub(label, t) { return `<tr class="subt"><td></td><td class="nm">Subtotal ${esc(label.toLowerCase())}</td>${rpCells(t, true)}</tr>`; }
+/* ---------- template chat laporan harian ke manajemen (admin) ---------- */
+const CHAT_GREET = 'Semangat Pagi Pak Riadi, Pak Budhi, Pak Andreas, Pak Yohanes';
+function reportChatText(R) {
+  const D = R.D, d0 = +D.slice(8), mon = MONL[+D.slice(5, 7) - 1], y = D.slice(0, 4), t = R.t;
+  const n = v => (v < 0 ? '-' : '') + fmtN(Math.abs(Math.round(v || 0))), L = (k, v) => (k + ' '.repeat(10)).slice(0, 10) + ': ' + v;
+  const greet = (SET().chatGreet || CHAT_GREET).trim();
+  return `${greet}\nBerikut pencapaian sales harian Jateng 01\n\n` +
+    '```\nSales Achievement Jateng 01\n' + `${d0} ${mon} ${y}`.padStart(28) + '\n' + [L('Target', n(t.dT)), L('Sales', n(t.ds)), L('%Ach', fmtPct(t.dAch, 1) + (t.dAch >= SET().achGreen / 100 ? ' 🟢' : ' 🔴')), L('GAP', n(t.dDiff))].join('\n') +
+    '\n\nSales Kumulatif Jateng 01\n' + `1 - ${d0} ${mon} ${y}`.padStart(28) + '\n' + [L('Target', n(t.cT)), L('Sales', n(t.cs)), L('%Ach', fmtPct(t.cAch, 1) + (t.cAch >= SET().achGreen / 100 ? ' 🟢' : ' 🔴')), L('GAP', n(t.cDiff))].join('\n') + '\n```\n\nTerimakasih 🙏';
+}
+function reportChatCard(R) {
+  return `<section class="card chat-card"><div class="card-h"><h3>💬 Template chat ke manajemen</h3><p class="small muted">khusus admin · ${fmtDate(R.D)}</p></div>
+    <div class="chat-grid"><div><label class="fl">Salam pembuka<textarea class="inp" id="chatGreet" rows="2">${esc(SET().chatGreet || CHAT_GREET)}</textarea></label>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary" id="chatCopy">📋 Salin teks</button><button class="btn" id="chatSaveG" title="Simpan salam pembuka untuk dipakai lagi">Simpan salam</button></div>
+      <p class="small muted" style="margin:8px 0 0">Angka di bagian tengah dibungkus format kode WhatsApp (\`\`\`) supaya titik dua sejajar seperti tabel. Biasanya dikirim bersama gambar dari 📸 Screenshot.</p></div>
+      <pre class="chat-pre" id="chatPre">${esc(reportChatText(R))}</pre></div></section>`;
+}
 function pageReport(view) {
   const U = App.ui; const maxD = repLast();
   let D = U.rpDate && U.rpDate <= maxD ? U.rpDate : maxD; U.rpDate = D;
@@ -1754,6 +1780,7 @@ function pageReport(view) {
     </table></div>
     <div class="legend"><span><i style="background:var(--ok)"></i>≥ ${SET().achGreen}%</span><span><i style="background:var(--yellow)"></i>${SET().achYellow}–${SET().achGreen}%</span><span><i style="background:var(--bad)"></i>&lt; ${SET().achYellow}%</span>
       <span>${rpFull() ? '' : 'Target, Sales & Diff dalam juta rupiah. '}UPT = qty terjual ÷ jumlah transaksi. Basket = sales ÷ jumlah transaksi. Target kumulatif = target bulan × bobot kumulatif s/d tanggal laporan. Target harian = target bulan × bobot hari itu. Target memakai kolom ${({ offline: 'Offline', eiger: 'Eiger', total: 'Total' })[App.tgtBasis]}.</span></div>
+    ${App.admin ? reportChatCard(R) : ''}
   </div>`;
   App.ui.rpLast = R;
   getDownloads().then(dl => { const b = $('#rpXls'); if (b && dl && typeof XLSX !== 'undefined') b.hidden = false; });
@@ -1898,6 +1925,13 @@ function pagePromo(view) {
     <div class="filters" style="margin:0"><label class="small muted" for="prDate">Tanggal</label><input type="date" id="prDate" class="inp" value="${D}" max="${maxD}">
       <label class="small muted" for="prStore">Toko</label><select id="prStore" class="inp"><option value="">Semua toko</option>${codes.map(c => `<option value="${esc(c)}" ${c === st ? 'selected' : ''}>${esc(sName(c))}</option>`).join('')}</select></div>
     ${legacy ? '<div class="note">Sebagian data bulan ini diupload sebelum nama promo ikut disimpan. Upload ulang Item DSR bulan ini agar kontribusi promo lengkap.</div>' : ''}
+    ${(() => { const md = U.prMode || 'day'; const key = md === 'day' ? 'dv' : 'cv', T = md === 'day' ? tot.d : tot.c;
+      const L = rows.filter(r => !r.none && r[key]).sort((a, b) => b[key] - a[key]), np = (rows.find(r => r.none) || {})[key] || 0, pv = T - np;
+      return `<section class="card"><div class="card-h"><h3>Kontribusi Promo ${md === 'day' ? fmtDate(D) : '1–' + (+D.slice(8)) + ' ' + fmtMonth(D.slice(0, 7))}</h3>
+        <div class="seg" role="group" aria-label="Periode tabel"><button data-prm="day" class="${md === 'day' ? 'on' : ''}">Harian</button><button data-prm="cum" class="${md === 'cum' ? 'on' : ''}">Kumulatif</button></div></div>
+        <div class="tbl-wrap" style="max-height:none"><table class="prt"><thead><tr><th style="text-align:center">Rank</th><th>Promotion Name</th><th class="r">Sales</th><th class="r">Contribution</th></tr></thead><tbody>
+        ${L.map((r, i) => `<tr><td class="rk">${i + 1}</td><td>${esc(r.pn)}</td><td class="r ${r[key] < 0 ? 'neg' : ''}">${fmtN(r[key])}</td><td class="r">${fmtPct(T ? r[key] / T : null, 2)}</td></tr>`).join('') || '<tr><td colspan="4" class="empty">Tidak ada penjualan promo.</td></tr>'}</tbody>
+        <tfoot><tr><td colspan="2" class="lbl">NON-PROMO</td><td class="r">${fmtN(np)}</td><td class="r">${fmtPct(T ? np / T : null, 2)}</td></tr><tr><td colspan="2" class="lbl">PROMO</td><td class="r">${fmtN(pv)}</td><td class="r">${fmtPct(T ? pv / T : null, 2)}</td></tr><tr><td colspan="2" class="lbl">TOTAL</td><td class="r">${fmtN(T)}</td><td class="r"></td></tr></tfoot></table></div></section>`; })()}
     <div class="kpis">
       <div class="kpi"><span>Sales harian</span><b>${fmtRpS(tot.d)}</b><small>${fmtDate(D)}</small></div>
       <div class="kpi"><span>Porsi promo (harian)</span><b>${fmtPct(shareD, 1)}</b><small>${fmtRpS(tot.d - none.dv)} lewat promo</small></div>
@@ -4495,6 +4529,9 @@ document.addEventListener('click', async e => {
   const tgs = t.closest('[data-tgs]'); if (tgs) { const k = tgs.dataset.tgs, s0 = App.ui.tgtSort || { k: 'c', dir: 'asc' }; App.ui.tgtSort = s0.k === k ? { k, dir: s0.dir === 'asc' ? 'desc' : 'asc' } : { k, dir: ['c', 'type', 'name', 'alias'].includes(k) ? 'asc' : 'desc' }; render(); return; }
   const bcs = t.closest('[data-bcs]'); if (bcs) { const k = bcs.dataset.bcs, s0 = App.ui.bcSort || { k: 'tot', dir: 'asc' }; App.ui.bcSort = s0.k === k ? { k, dir: s0.dir === 'asc' ? 'desc' : 'asc' } : { k, dir: k === 'name' ? 'asc' : 'asc' }; render(); return; }
   if (t.id === 'shotBtn') { shotOn(); return; }
+  const prm = t.closest('[data-prm]'); if (prm) { App.ui.prMode = prm.dataset.prm; render(); return; }
+  if (t.id === 'chatCopy') { const tx = ($('#chatPre') || {}).textContent || ''; navigator.clipboard.writeText(tx).then(() => toast('Teks laporan tersalin — tempel di WA')).catch(() => prompt('Salin teks:', tx)); return; }
+  if (t.id === 'chatSaveG') { saveSettings({ chatGreet: (($('#chatGreet') || {}).value || '').trim() }, 'Salam pembuka disimpan'); return; }
   if (t.id === 'omsRe') { loadOmset(App.ui.omsDate, true).then(render).then(() => toast('Data terbaru dimuat')); return; }
   if (t.id === 'omsWa') { const txt = omsWaText(); navigator.clipboard.writeText(txt).then(() => toast('Teks share omset tersalin — tempel di grup WA')).catch(() => { prompt('Salin teks berikut:', txt); }); return; }
   const omss = t.closest('[data-omss]'); if (omss) { const k = omss.dataset.omss, s0 = App.ui.omsSort || { k: 'ach', dir: 'desc' }; App.ui.omsSort = s0.k === k ? { k, dir: s0.dir === 'asc' ? 'desc' : 'asc' } : { k, dir: k === 'name' ? 'asc' : 'desc' }; render(); return; }
@@ -4604,7 +4641,7 @@ let qTimer;
 document.addEventListener('input', e => {
   const t = e.target;
   const deb = (key) => { App.ui[key] = t.value; App.ui.more = {}; clearTimeout(qTimer); qTimer = setTimeout(() => { const pos = t.selectionStart; const id = t.id; render(); const n = document.getElementById(id); if (n) { n.focus(); try { n.setSelectionRange(pos, pos); } catch (er) { } } }, 300); };
-  if (t.id === 'pq') deb('prodQ'); else if (t.id === 'hq') deb('stQ'); else if (t.id === 'trq') deb('trQ'); else if (t.id === 'tfQ') deb('tfQ'); else if (t.id === 'apQ') deb('apQ'); else if (t.id === 'tkQ') deb('tkQ'); else if (t.id === 'ifQ') deb('ifQ');
+  if (t.id === 'pq') deb('prodQ'); else if (t.id === 'hq') deb('stQ'); else if (t.id === 'trq') deb('trQ'); else if (t.id === 'tfQ') deb('tfQ'); else if (t.id === 'chatGreet') { const R = App.ui.rpLast; if (R) { App.settings = Object.assign({}, SET(), { chatGreet: t.value }); const pre = $('#chatPre'); if (pre) pre.textContent = reportChatText(R); } } else if (t.id === 'apQ') deb('apQ'); else if (t.id === 'tkQ') deb('tkQ'); else if (t.id === 'ifQ') deb('ifQ');
   else if (t.dataset && t.dataset.tgt !== undefined) { const sum = $$('[data-tgt]').reduce((s, i) => s + (Number(String(i.value).replace(/[^0-9]/g, '')) || 0), 0); const el = $('#tgtSum'); if (el) el.textContent = fmtRp(sum); }
 });
 document.addEventListener('change', async e => {
@@ -4619,6 +4656,7 @@ document.addEventListener('change', async e => {
   if (t.id === 'lsM') { App.ui.lsM = t.value; render(); return; }
   if (t.id === 'lsStore') { App.ui.lsStore = t.value; App.ui.more = {}; render(); return; }
   if (t.id === 'ptStore') { App.ui.ptStore = t.value; App.ui.more = {}; render(); return; }
+  if (t.id === 'chatGreet') { const R = App.ui.rpLast; if (R) { const keep = SET().chatGreet; App.settings = Object.assign({}, SET(), { chatGreet: t.value }); const pre = $('#chatPre'); if (pre) pre.textContent = reportChatText(R); } return; }
   if (t.id === 'stOrd') { saveSettings({ storeOrder: t.value }, 'Urutan toko di semua menu: ' + (t.value === 'code' ? 'nomor site' : 'nama toko')); return; }
   if (t.id === 'omsDate') { App.ui.omsDate = t.value || todayISO(); render(); return; }
   if (t.id === 'omsFile') { if (t.files[0]) omsUpload(t.files[0]); t.value = ''; return; }

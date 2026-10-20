@@ -2,7 +2,8 @@
 <html lang="id">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" id="vpMeta" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="format-detection" content="telephone=no, date=no, email=no, address=no">
 <title>Integrated Hub Jateng 01</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 64%22><rect width=%2264%22 height=%2264%22 rx=%2214%22 fill=%22%230F3192%22/><path d=%22M6 50 L23 24 L31 36 L39 22 L58 50 Z%22 fill=%22%23FFFFFF%22/><path d=%22M23 24 L27.5 31 L25 30 L22 33 L19.5 30 Z M39 22 L43.5 29 L41 28.3 L38.6 30.6 L36.4 28.8 Z%22 fill=%22%23C9D3F0%22/><path d=%22M8 44 L20 36 L30 40 L44 24 L53 17%22 fill=%22none%22 stroke=%22%23E46636%22 stroke-width=%225%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22/><path d=%22M45 15 L55 15 L55 25%22 fill=%22none%22 stroke=%22%23E46636%22 stroke-width=%225%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22/></svg>">
 <link rel="apple-touch-icon" href="data:image/png;base64,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">
@@ -68,6 +69,8 @@ img,svg,canvas{max-width:100%}
 .data-chip button.og{background:#E46636}
 .data-chip .scc{display:none}
 body{overflow-x:clip}
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+body.shot,body.shot *{-webkit-text-size-adjust:none!important;text-size-adjust:none!important}
 #navFloat.nav-float{display:block!important;position:fixed!important;left:10px!important;right:10px!important;z-index:90;min-width:0!important;max-height:calc(100vh - 140px);overflow-y:auto}
 .nav-float button{background:none;border:0;cursor:pointer;font-family:inherit}
 .nav-float button.on,.nav-float button:active{background:#EEF2FB}
@@ -1730,14 +1733,16 @@ function rpRow(r) {
 }
 function rpSub(label, t) { return `<tr class="subt"><td></td><td class="nm">Subtotal ${esc(label.toLowerCase())}</td>${rpCells(t, true)}</tr>`; }
 /* ---------- template chat laporan harian ke manajemen (admin) ---------- */
+/* 🟢 ≥ batas hijau (100%) · 🟡 batas kuning–99,9% (95–99,9%) · 🔴 di bawahnya */
+const achEmoji = v => v == null ? '' : v >= SET().achGreen / 100 ? ' 🟢' : v >= SET().achYellow / 100 ? ' 🟡' : ' 🔴';
 const CHAT_GREET = 'Semangat Pagi Pak Riadi, Pak Budhi, Pak Andreas, Pak Yohanes';
 function reportChatText(R) {
   const D = R.D, d0 = +D.slice(8), mon = MONL[+D.slice(5, 7) - 1], y = D.slice(0, 4), t = R.t;
   const n = v => (v < 0 ? '-' : '') + fmtN(Math.abs(Math.round(v || 0))), L = (k, v) => (k + ' '.repeat(10)).slice(0, 10) + ': ' + v;
   const greet = (SET().chatGreet || CHAT_GREET).trim();
   return `${greet}\nBerikut pencapaian sales harian Jateng 01\n\n` +
-    '```\nSales Achievement Jateng 01\n' + `${d0} ${mon} ${y}`.padStart(28) + '\n' + [L('Target', n(t.dT)), L('Sales', n(t.ds)), L('%Ach', fmtPct(t.dAch, 1) + (t.dAch >= SET().achGreen / 100 ? ' 🟢' : ' 🔴')), L('GAP', n(t.dDiff))].join('\n') +
-    '\n\nSales Kumulatif Jateng 01\n' + `1 - ${d0} ${mon} ${y}`.padStart(28) + '\n' + [L('Target', n(t.cT)), L('Sales', n(t.cs)), L('%Ach', fmtPct(t.cAch, 1) + (t.cAch >= SET().achGreen / 100 ? ' 🟢' : ' 🔴')), L('GAP', n(t.cDiff))].join('\n') + '\n```\n\nTerimakasih 🙏';
+    '```\nSales Achievement Jateng 01\n' + `${d0} ${mon} ${y}`.padStart(28) + '\n' + [L('Target', n(t.dT)), L('Sales', n(t.ds)), L('%Ach', fmtPct(t.dAch, 1) + achEmoji(t.dAch)), L('GAP', n(t.dDiff))].join('\n') +
+    '\n\nSales Kumulatif Jateng 01\n' + `1 - ${d0} ${mon} ${y}`.padStart(28) + '\n' + [L('Target', n(t.cT)), L('Sales', n(t.cs)), L('%Ach', fmtPct(t.cAch, 1) + achEmoji(t.cAch)), L('GAP', n(t.cDiff))].join('\n') + '\n```\n\nTerimakasih 🙏';
 }
 function reportChatCard(R) {
   return `<section class="card chat-card"><div class="card-h"><h3>💬 Template chat ke manajemen</h3><p class="small muted">khusus admin · ${fmtDate(R.D)}</p></div>
@@ -3685,7 +3690,14 @@ function pageBC(view) {
 function loadH2C() { if (window.html2canvas) return Promise.resolve(); return new Promise((res, rej) => { const sc = document.createElement('script'); sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js'; sc.onload = res; sc.onerror = () => rej(new Error('Komponen screenshot gagal dimuat')); document.head.appendChild(sc); }); }
 const SHOT_SHORT = ['pt_gen', 'lsArt', 'psArt', 'promoT', 'pT', 'prodT', 'tfT', 'roArt', 'dtMiss', 'eacTop', 'raT', 'lsRaw', 'trendT', 'spT', 'promoS'];
 function addShotBtn(box) { if (!box || ['admin', 'settings', 'home'].includes(App.page) || document.body.classList.contains('shot') || box.querySelector('#shotBtn')) return; box.insertAdjacentHTML('beforeend', '<button class="btn sm shot-btn" id="shotBtn" title="Tampilan rapi untuk di-screenshot & dikirim ke grup WA">📸 Screenshot</button>'); }
+const VP_NORMAL = 'width=device-width, initial-scale=1, viewport-fit=cover';
 function shotOn() {
+  /* di HP: tampilkan layout PC (lebar 1320 px) supaya hasil screenshot sama persis dengan di PC */
+  if (window.innerWidth < 900) { const vp = $('#vpMeta'); if (vp) { App.ui.shotVp = true; vp.setAttribute('content', 'width=1320, initial-scale=' + (window.screen.width / 1320).toFixed(3) + ', viewport-fit=cover'); }
+    setTimeout(shotOn2, 350); return; }
+  shotOn2();
+}
+function shotOn2() {
   document.body.classList.add('shot'); render(); document.body.classList.add('shot');
   let h = $('#shotHead'); if (!h) { h = document.createElement('div'); h.id = 'shotHead'; $('main.wrap').prepend(h); }
   const now = new Date();
@@ -3703,15 +3715,19 @@ function shotFit() {
   main.style.width = ''; main.style.maxWidth = '';
   $$('.rp-wrap,.tbl-wrap').forEach(w => { w.scrollTop = 0; w.scrollLeft = 0; });
   const pad = 48, need = Math.max(0, ...$$('#view table, #view .jk-tl, #view .tk-grid').map(t => t.scrollWidth));
-  if (window.innerWidth >= 900) { const w = Math.max(1240, need + pad); main.style.width = w + 'px'; main.style.maxWidth = w + 'px'; }
+  if (window.innerWidth >= 900 || App.ui.shotVp) { const w = Math.max(1240, need + pad); main.style.width = w + 'px'; main.style.maxWidth = w + 'px'; }
   App.charts.forEach(c => { try { c.resize(); } catch (e) { } });
 }
-function shotOff() { const m = $('main.wrap'); if (m) { m.style.width = ''; m.style.maxWidth = ''; } document.body.classList.remove('shot'); const h = $('#shotHead'); if (h) h.remove(); const b = $('#shotBar'); if (b) b.remove(); render(); }
+function shotOff() { if (App.ui.shotVp) { const vp = $('#vpMeta'); if (vp) vp.setAttribute('content', VP_NORMAL); App.ui.shotVp = false; } const m = $('main.wrap'); if (m) { m.style.width = ''; m.style.maxWidth = ''; } document.body.classList.remove('shot'); const h = $('#shotHead'); if (h) h.remove(); const b = $('#shotBar'); if (b) b.remove(); render(); }
 async function shotCapture(copy) {
   try { toast('Membuat gambar…', 4000); await loadH2C();
+    /* di HP: saat mengambil gambar, zoom dikembalikan ke 100% (layout tetap lebar PC) supaya teks tidak renggang */
+    const vp = $('#vpMeta'), vpZoomed = App.ui.shotVp && vp ? vp.getAttribute('content') : null;
+    if (vpZoomed) { vp.setAttribute('content', 'width=1320, initial-scale=1, viewport-fit=cover'); await new Promise(r => setTimeout(r, 400)); }
     document.body.classList.add('capturing'); shotFit(); const el = $('main.wrap'); const W = Math.max(el.scrollWidth, el.offsetWidth);
-    const cv = await window.html2canvas(el, { scale: Math.min(2, window.devicePixelRatio || 1.5), useCORS: true, backgroundColor: getComputedStyle(document.body).backgroundColor || '#F4F6FB', logging: false, width: W, windowWidth: W + 80, scrollX: 0, scrollY: 0 });
+    const cv = await window.html2canvas(el, { scale: App.ui.shotVp ? 2 : Math.min(2, window.devicePixelRatio || 1.5), useCORS: true, backgroundColor: getComputedStyle(document.body).backgroundColor || '#F4F6FB', logging: false, width: W, windowWidth: W + 80, scrollX: 0, scrollY: 0 });
     document.body.classList.remove('capturing');
+    if (vpZoomed) { vp.setAttribute('content', vpZoomed); }
     const blob = await new Promise(r => cv.toBlob(r, 'image/png'));
     const name = ($('#pageTitle').textContent || 'Integrated Hub').replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '_') + '_' + todayISO() + '.png';
     if (copy && navigator.clipboard && window.ClipboardItem) { await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]); toast('Gambar tersalin — tempel (Ctrl+V) di WhatsApp Web'); return; }
@@ -3831,7 +3847,7 @@ function omsWaText() {
   const d = new Date(X.D + 'T12:00:00');
   return `📊 *SHARE OMSET JATENG 01*\n${DOW[d.getDay()]}, ${fmtDate(X.D)} · update ${X.S ? omsTime(X.S.at) : '–'}\n\n` +
     `*Hari ini:* ${fmtRp(X.tot.sales)} / ${fmtRp(X.tot.tD)} (${fmtPct(X.tot.ach, 1)})\n*Kumulatif:* ${fmtPct(X.tot.cAch, 1)} (${fmtRp(X.tot.cum)})\n\n` +
-    top.map((r, i) => `${i + 1}. ${r.name} — ${fmtRpS(r.sales)} (${fmtPct(r.ach, 0)})${r.ach >= SET().achGreen / 100 ? ' ✅' : ''}`).join('\n') +
+    top.map((r, i) => `${i + 1}. ${r.name} — ${fmtRpS(r.sales)} (${fmtPct(r.ach, 0)})${achEmoji(r.ach)}`).join('\n') +
     `\n\n_Integrated Hub Jateng 01_`;
 }
 

@@ -456,6 +456,12 @@ body.shot .card{box-shadow:none}
 .bc-adv{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:10px}
 .bc-a{border-left:4px solid var(--navy);background:var(--surface);border-radius:10px;padding:10px 12px;border:1px solid var(--line)}.bc-a b{font-size:13.5px}.bc-a p{margin:6px 0 0;font-size:13px;line-height:1.5}
 .bc-a.low{border-left:4px solid var(--bad)}.bc-a.mid{border-left:4px solid var(--orange)}.bc-a.ok{border-left:4px solid var(--ok)}
+.oms-up{display:flex;flex-wrap:wrap;align-items:center;gap:12px;justify-content:space-between;border-left:5px solid var(--orange)}
+.oms-up-l{display:flex;flex-direction:column;gap:3px}.oms-up-l b{color:var(--navy);font-size:15px}
+.oms-slots{display:flex;flex-wrap:wrap;gap:8px}
+.oms-slot{display:flex;flex-direction:column;align-items:center;min-width:86px;padding:8px 10px;border-radius:10px;font-weight:800;font-size:13px;border:1px solid var(--line);background:var(--surface)}
+.oms-slot small{font-weight:600;font-size:11px;color:var(--muted)}.oms-slot.ok{background:var(--ok-bg);border-color:#BFE3D6;color:var(--ok)}.oms-slot.miss{background:var(--bad-bg);border-color:#F3C3BD;color:var(--bad)}.oms-slot.wait{background:var(--orange-tint);color:var(--orange-deep)}
+.pk-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:6px}.pk-d{display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700}.pk-d span{width:46px;flex:none}.pk-d small{color:var(--muted);font-weight:500}.pk-d select{flex:1;min-width:0}
 .ck-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}
 .ck-col h4{margin:0 0 8px;font-size:14px;color:var(--navy)}.ck-col h4 small{display:block;font-weight:500;color:var(--muted);font-size:11.5px}
 .ck-col ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
@@ -632,7 +638,7 @@ function detectSheet(rows, fileName) {
     if (h[0] === 'lokasi' && (rows[i + 1] || []).map(normH).includes('stockaccurate')) return parseBC(rows, i, fileName);
     if (h.includes('createdat') && h.includes('reason') && h.includes('locationcode')) return parseLost(rows, i, h, fileName);
     if ((h.includes('siteid') || h.includes('kodesite') || h.includes('sitecode')) && h.includes('branch') && !h.includes('offline')) { const r = parseDaily(rows, i, h, fileName); if (r) return r; }
-    if (h.includes('locationcode') && h.includes('bruto')) throw new Error('Sales Report tidak dipakai lagi. Upload Item DSR saja.');
+    if (h.includes('locationcode') && h.includes('bruto')) throw new Error('Ini Sales Report CARE untuk Share Omset — upload di menu Sales Performance › Share Omset Harian.');
     if (h.includes('dailyratio') || (h.some(x => x === 'date' || x === 'tanggal') && h.some(x => /ratio|bobot|weight/.test(x)) && !h.includes('orderno'))) return parseWeights(rows, i, h, fileName);
     if ((h.includes('kodesite') || h.includes('sitecode') || h.includes('kodetoko')) && h.filter(x => MON_KEY[x.slice(0, 3)] && /^[a-z]{3,9}\d{0,4}$/.test(x) && !/^(offline|eiger|total)$/.test(x)).length >= 1 && !h.includes('offline')) return parseEac(rows, i, h, fileName);
     if (h.some(x => x.includes('endlessaisle')) && h.some(x => x.includes('taxinvoice') || x.includes('easap') || x.includes('eigerindovoucher'))) return parseOmni(rows, i, h, fileName);
@@ -1172,7 +1178,7 @@ const autoType = c => /^9/.test(c) ? 'bz' : /^[257]/.test(c) ? 'rg' : 'ot';
 const sType = c => (App.stores[c] && App.stores[c].type) || autoType(c);
 const TYPE_LABEL = { rg: 'Reguler', bz: 'Bazaar', ot: 'Lainnya' };
 /* mode tampilan: '' = branch (semua toko), atau kode toko (store head hanya melihat tokonya) */
-const scopeOn = () => !!App.ui.scope && !['admin', 'settings', 'home'].includes(App.page) && !isOps(App.page);
+const scopeOn = () => !!App.ui.scope && !['admin', 'settings', 'home', 'omset'].includes(App.page) && !isOps(App.page);
 const typeOk = c => (!scopeOn() || c === App.ui.scope) && (!App.ui.typeF || sType(c) === App.ui.typeF);
 const activeStores = () => storeCodes().filter(typeOk);
 const hasTypes = () => new Set(storeCodes().map(sType)).size > 1;
@@ -1409,7 +1415,7 @@ const ICON = {
   settings: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>'
 };
 const NAV = [
-  { k: 'sales', label: 'Sales Performance', icon: 'area', items: [['report', 'Monitoring Sales', 'Achievement, UPT & basket size'], ['trend', 'Sales Trend', 'Jam, hari, UPT & basket harian'], ['promo', 'Kontribusi Promo', 'Porsi tiap promo terhadap sales'], ['omni', 'Monitoring OmniChannel', 'EA, Eigerindo Voucher, Tax Invoice, EASAP'], ['eac', 'Sales Member EAC', 'KPI penjualan ke member'], ['ra', 'RA Performance', 'Transaksi, UPT & basket per sales person'], ['pareto', 'Product Pareto', 'Kontribusi kategori & produk (80/20)'], ['growth', 'Growth vs Tahun Lalu', 'Harian, MTD & YTD dibanding tahun lalu']] },
+  { k: 'sales', label: 'Sales Performance', icon: 'area', items: [['omset', 'Share Omset Harian', 'Update sales per 2 jam dari toko piket'], ['report', 'Monitoring Sales', 'Achievement, UPT & basket size'], ['trend', 'Sales Trend', 'Jam, hari, UPT & basket harian'], ['promo', 'Kontribusi Promo', 'Porsi tiap promo terhadap sales'], ['omni', 'Monitoring OmniChannel', 'EA, Eigerindo Voucher, Tax Invoice, EASAP'], ['eac', 'Sales Member EAC', 'KPI penjualan ke member'], ['ra', 'RA Performance', 'Transaksi, UPT & basket per sales person'], ['pareto', 'Product Pareto', 'Kontribusi kategori & produk (80/20)'], ['growth', 'Growth vs Tahun Lalu', 'Harian, MTD & YTD dibanding tahun lalu']] },
   { k: 'inv', label: 'Inventory', icon: 'produk', items: [['produk', 'Produk', 'Penjualan & stok per artikel'], ['transfer', 'Saran Transfer Stok', 'Pindahkan stok dari toko yang menumpuk ke toko yang butuh'], ['ro', 'Saran Repeat Order', 'Order ke gudang HO untuk stok yang menipis'], ['promostock', 'Stok DCNP/SMDS', 'Stok barang diskon per MC Lv2–Lv4'], ['detention', 'Detention Stock', '% generic & varian terdisplay per toko'], ['bc', 'Blind Counting', 'Progres stock opname harian per toko']] },
   { k: 'lost', label: 'Lost Sales', icon: 'lost' },
   { k: 'pica', label: 'Analisa PICA', icon: 'pica' },
@@ -1441,7 +1447,7 @@ function renderPeriod() {
   const box = $('#periodBox');
   if (App.page === 'home' || isOps(App.page)) { box.innerHTML = ''; return; }
   const tsel = hasTypes() && App.page !== 'toko' && !scopeOn() ? `<label class="small muted" for="typeSel">Jenis toko</label><select id="typeSel" class="inp"><option value="">Semua toko</option>${['rg', 'bz', 'ot'].filter(t => storeCodes().some(c => sType(c) === t)).map(t => `<option value="${t}" ${App.ui.typeF === t ? 'selected' : ''}>${TYPE_LABEL[t]}</option>`).join('')}</select>` : '';
-  if (['report', 'promo', 'omni', 'eac', 'lost', 'detention', 'growth', 'stok', 'transfer', 'ro', 'pica', 'juknis', 'bc'].includes(App.page)) { box.innerHTML = tsel; return; }
+  if (['report', 'promo', 'omni', 'eac', 'lost', 'detention', 'growth', 'stok', 'transfer', 'ro', 'pica', 'juknis', 'bc', 'omset'].includes(App.page)) { box.innerHTML = tsel; return; }
   if (!App.lastDate || App.page === 'admin' || App.page === 'settings') { box.innerHTML = ''; return; }
   const L = App.lastDate, cm = L.slice(0, 7);
   const months = Object.keys(App.index.sales).sort().reverse().filter(m => m !== cm);
@@ -1493,8 +1499,8 @@ function render() {
     return;
   }
   if (App.page === 'stok') App.page = 'transfer';
-  if (!isOps(App.page) && App.page !== 'home' && !App.lastDate && !['admin', 'report', 'settings', 'lost', 'detention', 'juknis', 'bc'].includes(App.page)) { App.page = srLast() ? 'report' : 'detention'; }
-  const fn = { area: pageArea, report: pageReport, trend: pageTrend, promo: pagePromo, omni: pageOmni, eac: pageEac, ra: pageRA, pareto: pagePareto, lost: pageLost, promostock: pagePromoStock, detention: pageDetention, growth: pageGrowth, transfer: pageTransfer, ro: pageRO, pica: pagePica, juknis: pageJuknis, home: pageHome, bc: pageBC, ops_approval: pageApproval, ops_task: pageTask, ops_info: pageInfo, toko: pageStore, produk: pageProduct, stok: pageStock, admin: pageAdmin, settings: pageSettings }[App.page] || pageReport;
+  if (!isOps(App.page) && App.page !== 'home' && !App.lastDate && !['admin', 'report', 'settings', 'lost', 'detention', 'juknis', 'bc', 'omset'].includes(App.page)) { App.page = srLast() ? 'report' : 'detention'; }
+  const fn = { area: pageArea, report: pageReport, trend: pageTrend, promo: pagePromo, omni: pageOmni, eac: pageEac, ra: pageRA, pareto: pagePareto, lost: pageLost, promostock: pagePromoStock, detention: pageDetention, growth: pageGrowth, transfer: pageTransfer, ro: pageRO, pica: pagePica, juknis: pageJuknis, home: pageHome, bc: pageBC, omset: pageOmset, ops_approval: pageApproval, ops_task: pageTask, ops_info: pageInfo, toko: pageStore, produk: pageProduct, stok: pageStock, admin: pageAdmin, settings: pageSettings }[App.page] || pageReport;
   try { fn(view); lockScopedSelects(view); if (App.page === 'admin') renderUsers(); if ((App.loadWarn || []).length) view.insertAdjacentHTML('afterbegin', `<div class="note" style="margin-bottom:14px">Sebagian data belum termuat (${esc(App.loadWarn.join(', '))}). Tekan <b>Muat ulang</b> di kanan atas untuk mencoba lagi.</div>`); } catch (e) { console.error(e); view.innerHTML = `<div class="empty-state"><h2>Halaman gagal ditampilkan</h2><p class="muted">${esc(e.message)}</p></div>`; }
 }
 
@@ -3617,6 +3623,122 @@ async function shotCapture(copy) {
   } catch (e) { toast('Gagal membuat gambar: ' + (e.message || e) + '. Gunakan screenshot biasa (mode ini sudah rapi).', 5000); }
 }
 
+/* ================= Share Omset Harian ================= */
+const OMS_SLOTS = [12, 14, 16, 18, 20, 22];
+/* Sales Report CARE: From Date / To Date di atas; kolom Location Code, Location Name, Quantity, Bruto, Netto */
+function parseCareRows(rows, fileName) {
+  let hi = -1; for (let i = 0; i < Math.min(rows.length, 30); i++) { const h = (rows[i] || []).map(normH); if (h.includes('locationcode') && h.includes('bruto')) { hi = i; break; } } if (hi < 0) return null;
+  const h = rows[hi].map(normH), cC = h.indexOf('locationcode'), cN = h.indexOf('locationname'), cQ = h.indexOf('quantity'), cB = h.indexOf('bruto'), cT = h.indexOf('netto');
+  let from = '', to = '';
+  for (let i = 0; i < hi; i++) { const t = String((rows[i] || [])[0] || ''); const m = t.match(/(from|to)\s*date\s*:\s*(\d{4}-\d{2}-\d{2})/i); if (m) { if (/from/i.test(m[1])) from = m[2]; else to = m[2]; } }
+  const out = []; for (let i = hi + 1; i < rows.length; i++) { const r = rows[i] || []; const c = String(r[cC] ?? '').trim().replace(/\.0+$/, ''); if (!/^\d{3,6}$/.test(c)) continue; out.push([c, numV(r[cQ]), numV(r[cB]), numV(r[cT]), String(r[cN] ?? '').trim()]); }
+  if (!out.length) return null;
+  /* waktu data dari nama file SalesReport_DDMMYYYY_HHMMSS */
+  let at = ''; const fm = String(fileName).match(/(\d{2})(\d{2})(20\d{2})_(\d{2})(\d{2})(\d{2})/); if (fm) at = `${fm[3]}-${fm[2]}-${fm[1]}T${fm[4]}:${fm[5]}:${fm[6]}+07:00`;
+  return { from, to: to || from, rows: out, at };
+}
+async function parseCareFile(file) {
+  const wb = XLSX.read(await file.arrayBuffer(), { type: 'array', cellDates: true }); const res = [];
+  for (const sn of wb.SheetNames) { const rows = XLSX.utils.sheet_to_json(wb.Sheets[sn], { header: 1, raw: true, defval: null, blankrows: false }); const r = parseCareRows(rows, file.name); if (r) res.push(Object.assign(r, { sheet: sn })); }
+  return res;
+}
+async function loadOmset(d, force) { App.oms = App.oms || {}; if (App.oms[d] && !force) return App.oms[d]; const r = await api('omset', { d }); App.oms[d] = r.snaps || []; App.piket = r.piket || {}; return App.oms[d]; }
+const omsArea = () => new Set(storeCodes());
+function omsLatest(snaps, kind) { const L = (snaps || []).filter(x => x.kind === kind); return L[L.length - 1] || null; }
+/* jam selalu dalam WIB, apa pun zona waktu perangkat */
+const wibH = iso => { const d = new Date(iso); if (isNaN(d)) return null; const w = new Date(d.getTime() + 7 * 3600e3); return w.getUTCHours() + w.getUTCMinutes() / 60; };
+const omsTime = iso => { const h = wibH(iso); if (h == null) return '–'; const H = Math.floor(h), M = Math.round((h - H) * 60); return pad(H) + '.' + pad(M === 60 ? 59 : M); };
+function pageOmset(view) {
+  const U = App.ui, today = todayISO(), D = U.omsDate || today; U.omsDate = D;
+  if (!App.oms || !App.oms[D]) { view.innerHTML = '<div class="loading"><span class="spin"></span>Mengambil share omset…</div>'; loadOmset(D).then(render).catch(e => { view.innerHTML = `<div class="empty-state"><h2>Gagal memuat</h2><p class="muted">${esc(errMsg(e))}</p></div>`; }); return; }
+  const snaps = App.oms[D], area = omsArea(), m = D.slice(0, 7), day = +D.slice(8);
+  const S = omsLatest(snaps, 'day'), C = snaps.filter(x => x.kind === 'cum' && x.at.slice(0, 10) >= D).pop() || null;
+  const piketM = (App.piket || {})[m] || {}, pk = piketM[day] || piketM[String(day)] || '';
+  const dw = dayWeight(D), cw = cumWeight(m, day);
+  /* sales s/d kemarin dari ringkasan DSR (bila kumulatif CARE tidak ada) */
+  const prevTY = c => { let t = 0; for (let d = m + '-01'; d < D; d = addDays(d, 1)) { const v = tyVal(c, d); if (v) t += v; } return t; };
+  /* share omset untuk grup: selalu tampil seluruh toko area (juga untuk akun toko yang sedang piket) */
+  const tOk = c => !App.ui.typeF || sType(c) === App.ui.typeF;
+  const codes = [...area].filter(c => tOk(c) && (monthTarget(c, m) || (S && S.rows.some(r => r[0] === c))));
+  const rows = codes.map(c => { const T = monthTarget(c, m), tD = T * dw, tC = T * cw, r = S ? S.rows.find(x => x[0] === c) : null, rc = C ? C.rows.find(x => x[0] === c) : null;
+    const sales = r ? r[2] : null, cum = rc ? rc[2] : (sales != null ? prevTY(c) + sales : null);
+    return { c, name: sName(c), tD, sales, q: r ? r[1] : null, ach: tD && sales != null ? sales / tD : null, gap: sales != null ? sales - tD : null, tC, cum, cAch: tC && cum != null ? cum / tC : null, piket: c === pk }; });
+  const sum = k => rows.reduce((a, r) => a + (r[k] || 0), 0);
+  const tot = { tD: sum('tD'), sales: sum('sales'), tC: sum('tC'), cum: sum('cum'), q: sum('q') }; tot.ach = tot.tD ? tot.sales / tot.tD : null; tot.cAch = tot.tC ? tot.cum / tot.tC : null;
+  const G = SET().achGreen / 100, reach = rows.filter(r => r.ach != null && r.ach >= G).length;
+  const st = U.omsSort || { k: 'ach', dir: 'desc' };
+  const srt = rows.slice().sort((a, b) => { const x = a[st.k], y = b[st.k]; const r = typeof x === 'string' ? x.localeCompare(y) : (x ?? -1) - (y ?? -1); return st.dir === 'asc' ? r : -r; });
+  /* status slot jam */
+  const nowH = wibH(new Date().toISOString()), isToday = D === today;
+  const slot = h => { const hit = snaps.filter(x => x.kind === 'day').find(x => { const hh = wibH(x.at); return hh != null && hh >= h - 0.75 && hh < h + 1.25; });
+    if (hit) return `<span class="oms-slot ok" title="diupload ${esc(hit.byName)}">✅ ${pad(h)}.00<small>${omsTime(hit.at)}</small></span>`;
+    if (isToday && nowH < h + 1.25) return `<span class="oms-slot wait">⏳ ${pad(h)}.00<small>${nowH >= h - 0.75 ? 'sekarang' : 'nanti'}</small></span>`;
+    return `<span class="oms-slot miss">❌ ${pad(h)}.00<small>terlewat</small></span>`; };
+  const pc = v => v == null ? '<td class="r">–</td>' : `<td class="r"><b style="color:${v >= G ? 'var(--ok)' : v >= SET().achYellow / 100 ? 'var(--orange-deep)' : 'var(--bad)'}">${fmtPct(v, 1)}</b></td>`;
+  const sh = (k, l) => `<th class="s r" data-omss="${k}">${l}${st.k === k ? (st.dir === 'asc' ? ' ▲' : ' ▼') : ''}</th>`;
+  setHead('Share Omset Harian', `${fmtDate(D)}${S ? ' · update terakhir ' + omsTime(S.at) : ' · belum ada upload'} · bruto`);
+  view.innerHTML = `<div class="stack">
+    <div class="filters" style="margin:0"><label class="small muted" for="omsDate">Tanggal</label><input type="date" id="omsDate" class="inp" value="${D}" max="${today}">
+      <button class="btn" id="omsRe">⟳ Cek update terbaru</button><span style="flex:1"></span><button class="btn" id="omsWa">💬 Salin teks untuk WA</button></div>
+    <section class="card oms-up"><div class="oms-up-l"><b>📤 Upload Sales Report CARE</b><span class="small muted">Petugas piket ${esc(fmtDateS(D))}: <b style="color:var(--navy)">${pk ? esc(pk + ' · ' + sName(pk)) : 'belum dijadwalkan'}</b> · jadwal share: ${OMS_SLOTS.map(h => pad(h) + '.00').join(', ')}</span></div>
+      <label class="btn primary" style="cursor:pointer">Pilih file Sales Report<input type="file" id="omsFile" accept=".xlsx,.xls" hidden></label><div id="omsMsg" class="small" style="flex-basis:100%"></div></section>
+    <div class="oms-slots">${OMS_SLOTS.map(slot).join('')}</div>
+    <div class="pt-tiles" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr))">
+      <div class="pt-tile" style="background:${tot.ach != null && tot.ach >= G ? '#13806F' : '#C0392B'}"><span>Sales hari ini (area)</span><b>${S ? fmtRpS(tot.sales) : '–'}</b><small>${tot.ach != null ? fmtPct(tot.ach, 1) + ' dari target ' + fmtRpS(tot.tD) : 'target harian ' + fmtRpS(tot.tD)}</small></div>
+      <div class="pt-tile"><span>Kumulatif 1–${day} ${MON[+m.slice(5) - 1]}</span><b>${fmtPct(tot.cAch, 1)}</b><small>${fmtRpS(tot.cum)} / ${fmtRpS(tot.tC)}</small></div>
+      <div class="pt-tile" style="background:#E46636"><span>Toko capai target harian</span><b>${reach} / ${rows.length}</b><small>${fmtN(tot.q)} pcs terjual</small></div>
+      <div class="pt-tile" style="background:#0B1B4A"><span>Update terakhir</span><b>${S ? omsTime(S.at) : '–'}</b><small>${S ? 'oleh ' + esc(S.byName) : 'menunggu upload'}</small></div></div>
+    <section class="card"><div class="card-h"><h3>Pencapaian per toko</h3><p class="small muted">target harian = target bulan × bobot hari ini (${fmtPct(dw, 2)})</p></div>
+      <div class="rp-wrap"><table class="tbl" style="min-width:820px"><thead><tr><th class="s" data-omss="name">Toko</th>${sh('tD', 'Target harian')}${sh('sales', 'Sales')}${sh('ach', '% Ach')}${sh('gap', 'Gap')}${sh('cum', 'Kumulatif')}${sh('cAch', '% Kum')}</tr></thead><tbody>
+      ${srt.map(r => `<tr${r.piket ? ' style="background:var(--orange-tint)"' : ''}><td><span class="nm">${esc(r.name)}${r.piket ? ' <span class="jk-b or" style="font-size:10px">piket</span>' : ''}</span><span class="sub">${esc(r.c)}</span></td><td class="r">${fmtN(r.tD)}</td><td class="r"><b>${r.sales == null ? '–' : fmtN(r.sales)}</b></td>${pc(r.ach)}<td class="r" style="color:${(r.gap || 0) >= 0 ? 'var(--ok)' : 'var(--bad)'}">${r.gap == null ? '–' : fmtN(r.gap)}</td><td class="r">${r.cum == null ? '–' : fmtN(r.cum)}</td>${pc(r.cAch)}</tr>`).join('')}
+      </tbody><tfoot><tr style="font-weight:800;background:var(--navy-tint)"><td>TOTAL JATENG 01</td><td class="r">${fmtN(tot.tD)}</td><td class="r">${S ? fmtN(tot.sales) : '–'}</td>${pc(tot.ach)}<td class="r">${S ? fmtN(tot.sales - tot.tD) : '–'}</td><td class="r">${fmtN(tot.cum)}</td>${pc(tot.cAch)}</tr></tfoot></table></div>
+      <p class="small muted" style="margin:8px 0 0">Kumulatif = ${C ? 'Sales Report CARE kumulatif yang diupload' : 'Item DSR s/d kemarin + sales hari ini dari upload terakhir'}.</p></section>
+    <section class="card"><div class="card-h"><h3>Perkembangan sales hari ini</h3><p class="small muted">setiap upload · area</p></div><div class="chart-box" style="height:240px"><canvas id="omsChart"></canvas></div>
+      <div class="small muted" style="margin-top:8px">${snaps.filter(x => x.kind === 'day').map(x => `${omsTime(x.at)} · ${esc(x.byName)}${App.admin ? ` <a href="#" data-omsdel="${x.id}" style="color:var(--bad)">hapus</a>` : ''}`).join(' &nbsp;|&nbsp; ') || 'Belum ada upload.'}</div></section>
+    ${App.admin ? piketEditor(m) : ''}
+  </div>`;
+  if (typeof Chart !== 'undefined') {
+    const L = snaps.filter(x => x.kind === 'day'), ink = css('--muted');
+    App.charts.push(new Chart($('#omsChart'), { type: 'line', data: { labels: L.map(x => omsTime(x.at)), datasets: [
+      { label: 'Sales area', data: L.map(x => x.rows.filter(r => codes.includes(r[0])).reduce((a, r) => a + r[2], 0)), borderColor: css('--navy'), backgroundColor: css('--navy'), tension: .2, pointRadius: 4 },
+      { label: 'Target harian', data: L.map(() => tot.tD), borderColor: css('--ok'), borderDash: [6, 4], pointRadius: 0 }] },
+      options: { maintainAspectRatio: false, plugins: { legend: { labels: { color: ink, boxWidth: 12 } }, tooltip: { callbacks: { label: c => c.dataset.label + ': ' + fmtRpS(c.parsed.y) } } }, scales: { x: { ticks: { color: ink }, grid: { display: false } }, y: { beginAtZero: true, ticks: { color: ink, callback: v => fmtRpS(v) }, grid: { color: css('--line') } } } } }));
+  }
+  App.ui.omsLast = { D, S, rows: srt, tot, pk };
+}
+function piketEditor(m) {
+  const P = (App.piket || {})[m] || {}, n = dim(m), codes = storeCodes().filter(c => sType(c) !== 'bz');
+  return `<details class="card"><summary class="hub-sum">🗓️ Jadwal piket share omset · ${esc(fmtMonth(m))} (admin)</summary>
+    <div class="filters" style="margin:10px 0"><label class="small muted">Isi otomatis bergiliran mulai tgl 1 dari toko</label><select id="pkStart" class="inp">${codes.map(c => `<option value="${esc(c)}">${esc(c)} - ${esc(sName(c))}</option>`).join('')}</select><button class="btn" id="pkAuto">Isi bergiliran</button><button class="btn primary" id="pkSave">Simpan jadwal</button></div>
+    <div class="pk-grid">${Array.from({ length: n }, (_, i) => { const d = i + 1, iso = m + '-' + pad(d); return `<label class="pk-d"><span>${d} <small>${DOW[dowOf(iso)].slice(0, 3)}</small></span><select class="inp sm" data-pk="${d}"><option value="">–</option>${codes.map(c => `<option value="${esc(c)}" ${String(P[d] || '') === c ? 'selected' : ''}>${esc(c)} ${esc(sName(c))}</option>`).join('')}</select></label>`; }).join('')}</div></details>`;
+}
+async function omsUpload(file) {
+  const msg = $('#omsMsg'); if (msg) msg.textContent = 'Membaca file…';
+  try {
+    const R = await parseCareFile(file); if (!R.length) throw new Error('File bukan Sales Report CARE (kolom Location Code & Bruto tidak ditemukan).');
+    const area = omsArea(); let sent = 0;
+    for (const r of R) {
+      const rows = r.rows.filter(x => area.has(x[0])); if (!rows.length) continue;
+      const d = r.to || todayISO(), kind = r.from && r.from !== r.to ? 'cum' : 'day';
+      if (kind === 'cum' && r.from.slice(8) !== '01') continue;
+      const resp = await apiPost({ a: 'omset', date: d, kind, from: r.from, at: r.at || new Date().toISOString(), file: file.name, rows: rows.map(x => [x[0], x[1], x[2], x[3]]) });
+      App.oms = App.oms || {}; App.oms[d] = resp.snaps; sent++;
+      if (kind === 'day') App.ui.omsDate = d;
+    }
+    if (!sent) throw new Error('Tidak ada toko Jateng 01 di file ini.');
+    toast('Share omset terkirim ✓'); render();
+  } catch (e) { if (msg) msg.innerHTML = `<span style="color:var(--bad)">${esc(e.message || errMsg(e))}</span>`; }
+}
+function omsWaText() {
+  const X = App.ui.omsLast; if (!X) return '';
+  const top = X.rows.filter(r => r.sales != null).sort((a, b) => (b.ach ?? -1) - (a.ach ?? -1));
+  const d = new Date(X.D + 'T12:00:00');
+  return `📊 *SHARE OMSET JATENG 01*\n${DOW[d.getDay()]}, ${fmtDate(X.D)} · update ${X.S ? omsTime(X.S.at) : '–'}\n\n` +
+    `*Hari ini:* ${fmtRp(X.tot.sales)} / ${fmtRp(X.tot.tD)} (${fmtPct(X.tot.ach, 1)})\n*Kumulatif:* ${fmtPct(X.tot.cAch, 1)} (${fmtRp(X.tot.cum)})\n\n` +
+    top.map((r, i) => `${i + 1}. ${r.name} — ${fmtRpS(r.sales)} (${fmtPct(r.ach, 0)})${r.ach >= SET().achGreen / 100 ? ' ✅' : ''}`).join('\n') +
+    `\n\n_Integrated Hub Jateng 01_`;
+}
+
 /* ================= halaman: per toko ================= */
 function pageStore(view) {
   const codes = storeCodes(); if (!App.ui.store || !codes.includes(App.ui.store)) App.ui.store = codes[0];
@@ -4265,7 +4387,7 @@ function settingsChange(t) {
 /* ================= navigasi & event ================= */
 /* ---------- alamat link per menu (#/nama-menu) ---------- */
 const SLUG = { report: 'monitoring-sales', trend: 'sales-trend', promo: 'kontribusi-promo', omni: 'omnichannel', eac: 'sales-member-eac', ra: 'ra-performance', pareto: 'product-pareto', growth: 'growth', toko: 'per-toko',
-  produk: 'produk', transfer: 'saran-transfer', ro: 'saran-repeat-order', promostock: 'stok-dcnp-smds', detention: 'detention-stock', lost: 'lost-sales', pica: 'analisa-pica', juknis: 'promo', admin: 'kelola-data', settings: 'pengaturan', home: 'home', bc: 'blind-counting', ops_approval: 'ops/approval', ops_task: 'ops/task', ops_info: 'ops/informasi' };
+  produk: 'produk', transfer: 'saran-transfer', ro: 'saran-repeat-order', promostock: 'stok-dcnp-smds', detention: 'detention-stock', lost: 'lost-sales', pica: 'analisa-pica', juknis: 'promo', admin: 'kelola-data', settings: 'pengaturan', home: 'home', bc: 'blind-counting', omset: 'share-omset', ops_approval: 'ops/approval', ops_task: 'ops/task', ops_info: 'ops/informasi' };
 const PAGE_OF = Object.fromEntries(Object.entries(SLUG).map(([k, v]) => [v, k]));
 function hashFor() { const sl = SLUG[App.page] || 'monitoring-sales'; return '#/' + sl + (App.page === 'toko' && App.ui.store ? '/' + App.ui.store : ''); }
 function applyHash() {
@@ -4304,6 +4426,12 @@ document.addEventListener('click', async e => {
   if (t.id === 'pcAIBtn') { picaAsk(false); return; }
   const bcs = t.closest('[data-bcs]'); if (bcs) { const k = bcs.dataset.bcs, s0 = App.ui.bcSort || { k: 'tot', dir: 'asc' }; App.ui.bcSort = s0.k === k ? { k, dir: s0.dir === 'asc' ? 'desc' : 'asc' } : { k, dir: k === 'name' ? 'asc' : 'asc' }; render(); return; }
   if (t.id === 'shotBtn') { shotOn(); return; }
+  if (t.id === 'omsRe') { loadOmset(App.ui.omsDate, true).then(render).then(() => toast('Data terbaru dimuat')); return; }
+  if (t.id === 'omsWa') { const txt = omsWaText(); navigator.clipboard.writeText(txt).then(() => toast('Teks share omset tersalin — tempel di grup WA')).catch(() => { prompt('Salin teks berikut:', txt); }); return; }
+  const omss = t.closest('[data-omss]'); if (omss) { const k = omss.dataset.omss, s0 = App.ui.omsSort || { k: 'ach', dir: 'desc' }; App.ui.omsSort = s0.k === k ? { k, dir: s0.dir === 'asc' ? 'desc' : 'asc' } : { k, dir: k === 'name' ? 'asc' : 'desc' }; render(); return; }
+  const omd = t.closest('[data-omsdel]'); if (omd) { e.preventDefault(); if (confirm('Hapus upload ini?')) apiPost({ a: 'omset', op: 'delete', date: App.ui.omsDate, id: omd.dataset.omsdel }).then(r => { App.oms[App.ui.omsDate] = r.snaps; render(); }).catch(er => toast('Gagal: ' + errMsg(er))); return; }
+  if (t.id === 'pkAuto') { const codes = storeCodes().filter(c => sType(c) !== 'bz'), st0 = Math.max(0, codes.indexOf(($('#pkStart') || {}).value)); $$('[data-pk]').forEach((sel, i) => { sel.value = codes[(st0 + i) % codes.length]; }); toast('Jadwal terisi bergiliran — klik Simpan jadwal'); return; }
+  if (t.id === 'pkSave') { const map = {}; $$('[data-pk]').forEach(sel => { if (sel.value) map[sel.dataset.pk] = sel.value; }); const m = (App.ui.omsDate || todayISO()).slice(0, 7); apiPost({ a: 'piket', month: m, map }).then(r => { App.piket = r.piket; toast('Jadwal piket disimpan'); render(); }).catch(er => toast('Gagal: ' + errMsg(er))); return; }
   if (t.id === 'shotOff') { shotOff(); return; }
   if (t.id === 'shotPng') { shotCapture(false); return; }
   if (t.id === 'shotCopy') { shotCapture(true); return; }
@@ -4418,6 +4546,8 @@ document.addEventListener('change', async e => {
   if (t.id === 'lsM') { App.ui.lsM = t.value; render(); return; }
   if (t.id === 'lsStore') { App.ui.lsStore = t.value; App.ui.more = {}; render(); return; }
   if (t.id === 'ptStore') { App.ui.ptStore = t.value; App.ui.more = {}; render(); return; }
+  if (t.id === 'omsDate') { App.ui.omsDate = t.value || todayISO(); render(); return; }
+  if (t.id === 'omsFile') { if (t.files[0]) omsUpload(t.files[0]); t.value = ''; return; }
   if (t.id === 'bcDate') { App.ui.bcDate = t.value; render(); return; }
   if (t.id === 'bcStore') { App.ui.bcStore = t.value; render(); return; }
   if (t.id === 'apStore') { App.ui.apStore = t.value; render(); return; }

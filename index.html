@@ -3397,7 +3397,7 @@ function pageApproval(view) {
         ${a.remarks ? `<span class="hi-rem">💬 ${esc(a.remarks)}${a.decidedBy ? ' — ' + esc(a.decidedBy) : ''}</span>` : ''}
         <span class="small muted">Diajukan ${a.created ? fmtDate(a.created.slice(0, 10)) : '–'} oleh ${esc(a.byName || a.by || '–')}${a.next ? ' · next approval ' + fmtDate(a.next) : ''}</span></div>
         <div class="hi-act">${App.admin ? `<button class="btn sm primary" data-apdec="${a.id}|Disetujui">Setujui</button><button class="btn sm" data-apdec="${a.id}|Revisi">Revisi</button><button class="btn sm danger" data-apdec="${a.id}|Ditolak">Tolak</button>` : ''}
-          ${(App.admin || a.by === me.u) && a.status !== 'Disetujui' ? `<button class="btn sm" data-apedit="${a.id}">Ubah link</button>` : ''}${App.admin || (a.by === me.u && a.status !== 'Disetujui') ? `<button class="btn sm danger" data-hubdel="approval|${a.id}" title="Hapus">🗑</button>` : ''}</div></div>`; }).join('') || '<p class="muted small" style="padding:12px">Tidak ada pengajuan di daftar ini.</p>'}
+          ${App.admin ? `<button class="btn sm" data-hubedit="approval|${a.id}">✏️ Ubah</button>` : a.by === me.u && a.status !== 'Disetujui' ? `<button class="btn sm" data-apedit="${a.id}">Ubah link</button>` : ''}${App.admin || (a.by === me.u && a.status !== 'Disetujui') ? `<button class="btn sm danger" data-hubdel="approval|${a.id}" title="Hapus">🗑</button>` : ''}</div></div>`; }).join('') || '<p class="muted small" style="padding:12px">Tidak ada pengajuan di daftar ini.</p>'}
       ${rows.length > (U.apMore || 60) ? `<button class="btn" data-apmore="1">Tampilkan lebih banyak (${rows.length - (U.apMore || 60)} lagi)</button>` : ''}</div>
   </div>`;
 }
@@ -3460,7 +3460,7 @@ function pageTask(view) {
           <b>${esc(t.title)}</b><span class="small">PIC ${esc(t.pic || '–')} · instruksi ${t.date ? fmtDateS(t.date) : '–'} · deadline ${t.deadline ? fmtDate(t.deadline) : '–'}</span>
           ${t.note ? `<span class="small muted">${esc(t.note)}</span>` : ''}${t.link ? `<a class="hi-link" href="${esc(t.link)}" target="_blank" rel="noopener">🔗 Buka link</a>` : ''}
           <div class="tk-bar"><i style="width:${S.pct * 100}%"></i></div><span class="small">${S.done.length}/${S.targets.length} toko selesai${S.miss.length && S.miss.length <= 8 && !lockStore ? ' · belum: ' + S.miss.map(c => esc(hubName(c))).join(', ') : S.miss.length && !lockStore ? ' · ' + S.miss.length + ' toko belum' : ''}</span></div>
-          <div class="hi-act">${lockStore && S.targets.includes(lockStore) ? `<button class="btn sm ${mine ? '' : 'primary'}" data-tkck="${t.id}|${lockStore}|${mine ? 0 : 1}">${mine ? '↺ Batalkan centang' : '✓ Tandai selesai'}</button>` : ''}${App.admin || t.by === me.u ? `<button class="btn sm danger" data-hubdel="task|${t.id}" title="Hapus">🗑</button>` : ''}</div></div>`; }).join('') || '<p class="muted small" style="padding:12px">Tidak ada task di daftar ini.</p>'}</div>`}
+          <div class="hi-act">${lockStore && S.targets.includes(lockStore) ? `<button class="btn sm ${mine ? '' : 'primary'}" data-tkck="${t.id}|${lockStore}|${mine ? 0 : 1}">${mine ? '↺ Batalkan centang' : '✓ Tandai selesai'}</button>` : ''}${App.admin || t.by === me.u ? `<button class="btn sm" data-hubedit="task|${t.id}">✏️ Ubah</button><button class="btn sm danger" data-hubdel="task|${t.id}" title="Hapus">🗑</button>` : ''}</div></div>`; }).join('') || '<p class="muted small" style="padding:12px">Tidak ada task di daftar ini.</p>'}</div>`}
   </div>`;
 }
 /* ---------- Informasi ---------- */
@@ -3490,8 +3490,37 @@ function pageInfo(view) {
         <b>${esc(i.title)}</b>${i.desc ? `<span class="small">${esc(i.desc)}</span>` : ''}${i.pic ? `<span class="small muted">PIC/notulen: ${esc(i.pic)}</span>` : ''}
         ${i.link ? `<a class="hi-link" href="${esc(i.link)}" target="_blank" rel="noopener">📎 ${esc(i.linkText || 'Buka materi')}</a>` : i.linkText ? `<span class="small muted">📎 ${esc(i.linkText)}</span>` : ''}
         <span class="small muted">ditambahkan ${esc(i.byName || i.by || '')}</span></div>
-        <div class="hi-act">${App.admin || i.by === me.u ? `<button class="btn sm danger" data-hubdel="info|${i.id}" title="Hapus">🗑</button>` : ''}</div></div>`; }).join('') || '<p class="muted small" style="padding:12px">Belum ada informasi.</p>'}</div>
+        <div class="hi-act">${App.admin || i.by === me.u ? `<button class="btn sm" data-hubedit="info|${i.id}">✏️ Ubah</button><button class="btn sm danger" data-hubdel="info|${i.id}" title="Hapus">🗑</button>` : ''}</div></div>`; }).join('') || '<p class="muted small" style="padding:12px">Belum ada informasi.</p>'}</div>
   </div>`;
+}
+/* ---------- ubah data (admin & pembuat) ---------- */
+function openHubEdit(col, id) {
+  const it = (App.hub[col] || []).find(x => x.id === id); if (!it) return;
+  const f = (lbl, inner, wide) => `<label class="fl"${wide ? ' style="grid-column:1/-1"' : ''}>${lbl}${inner}</label>`;
+  const inp = (k, v, type) => `<input class="inp" data-ef="${k}" ${type ? `type="${type}"` : ''} value="${esc(v || '')}">`;
+  const sel = (k, v, opts) => `<select class="inp" data-ef="${k}">${opts.map(o => `<option ${o === v ? 'selected' : ''}>${esc(o)}</option>`).join('')}</select>`;
+  const ta = (k, v) => `<textarea class="inp" rows="3" data-ef="${k}">${esc(v || '')}</textarea>`;
+  let body = '', title = '';
+  if (col === 'approval') { title = 'Ubah pengajuan approval';
+    body = f('Toko', `<select class="inp" data-ef="store">${hubStores().map(r => `<option value="${esc(r[0])}" ${r[0] === it.store ? 'selected' : ''}>${esc(r[0])} - ${esc(r[1])}</option>`).join('')}</select>`) + f('Jenis pengajuan', inp('jenis', it.jenis)) + f('Link pengajuan', inp('link', it.link, 'url'), 1) + f('Nama file / keterangan link', inp('linkText', it.linkText)) + f('Next approval', inp('next', it.next, 'date')) + f('Prioritas', sel('prio', it.prio || 'Sedang', ['Tinggi', 'Sedang', 'Rendah'])) + f('Catatan', ta('desc', it.desc), 1)
+      + (App.admin ? f('Status', sel('_status', it.status || 'Menunggu', ['Menunggu', 'Proses Review', 'Revisi', 'Disetujui', 'Ditolak'])) + f('Remarks untuk toko', ta('_remarks', it.remarks), 1) : ''); }
+  if (col === 'task') { title = 'Ubah task'; const tg = new Set(it.stores && it.stores.length ? it.stores : hubReg());
+    body = f('Task / progresan', inp('title', it.title), 1) + f('PIC', inp('pic', it.pic)) + f('Prioritas', sel('prio', it.prio || 'Sedang', ['Tinggi', 'Sedang', 'Rendah'])) + f('Tanggal instruksi', inp('date', it.date, 'date')) + f('Deadline', inp('deadline', it.deadline, 'date')) + f('Link materi / form', inp('link', it.link, 'url'), 1) + f('Keterangan', ta('note', it.note), 1)
+      + `<div class="fl" style="grid-column:1/-1">Toko yang dituju <span class="small muted">(checklist toko yang dihapus dari daftar ikut hilang)</span><div class="chips" style="margin-top:6px">${[...new Set([...hubStores().map(r => r[0]), ...tg])].sort().map(c => `<label class="chip flat"><input type="checkbox" data-efstore value="${esc(c)}" ${tg.has(c) ? 'checked' : ''}> ${esc(c)} ${esc(hubName(c) !== c ? hubName(c) : '')}</label>`).join('')}</div></div>`; }
+  if (col === 'info') { title = 'Ubah informasi'; const cats = [...new Set(['Informasi HO', 'MoM Meeting', ...App.hub.info.map(i => i.cat).filter(Boolean)])];
+    body = f('Tanggal', inp('date', it.date, 'date')) + f('Kategori', sel('cat', it.cat || 'Informasi HO', cats)) + f('Judul', inp('title', it.title), 1) + f('Deskripsi', ta('desc', it.desc), 1) + f('Link materi', inp('link', it.link, 'url')) + f('Nama file', inp('linkText', it.linkText)) + f('PIC / notulen', inp('pic', it.pic)); }
+  openDrawer(`<h2 style="margin:0 0 4px">${title}</h2><p class="small muted" style="margin:0 0 12px">dibuat ${esc(it.byName || it.by || '')}${it.created ? ' · ' + fmtDate(it.created.slice(0, 10)) : ''}</p>
+    <div class="hub-form" id="hubEditForm">${body}</div><div style="display:flex;gap:8px;margin-top:10px"><button class="btn primary" data-hubsave="${col}|${id}">Simpan perubahan</button><button class="btn" data-hubcancel="1">Batal</button></div>`);
+}
+async function saveHubEdit(col, id) {
+  const it = (App.hub[col] || []).find(x => x.id === id); if (!it) return;
+  const item = {}; let status = null, remarks = null;
+  $$('#hubEditForm [data-ef]').forEach(el => { const k = el.dataset.ef, v = el.value.trim(); if (k === '_status') status = v; else if (k === '_remarks') remarks = v; else item[k] = v; });
+  if (col === 'task') { item.stores = $$('#hubEditForm [data-efstore]:checked').map(x => x.value); if (!item.stores.length) { toast('Pilih minimal satu toko'); return; } if (!item.title) { toast('Nama task wajib diisi'); return; } }
+  if (item.link && !/^https?:\/\//i.test(item.link)) { toast('Link harus diawali https://'); return; }
+  const ok = await hubPost(col, { op: 'update', id, item }, null); if (!ok) return;
+  if (col === 'approval' && App.admin && status != null && (status !== it.status || remarks !== (it.remarks || ''))) await hubPost('approval', { op: 'decide', id, status, remarks: remarks || '' }, null);
+  closeDrawer(); toast('Perubahan disimpan');
 }
 /* ---------- import dari Excel Operational Hub (admin, sekali migrasi) ---------- */
 async function importHubExcel(file) {
@@ -4491,6 +4520,9 @@ document.addEventListener('click', async e => {
     U0.apLastStore = item.store; U0.apOpen = false; hubPost('approval', { op: 'add', item }, 'Pengajuan terkirim ke BM'); return; }
   const apd = t.closest('[data-apdec]'); if (apd) { const [id, st] = apd.dataset.apdec.split('|'); const rm = st === 'Disetujui' ? (prompt('Catatan untuk toko (opsional):', '') ?? null) : prompt(st === 'Revisi' ? 'Apa yang perlu direvisi?' : 'Alasan ditolak:', ''); if (rm === null) return; hubPost('approval', { op: 'decide', id, status: st, remarks: rm }, 'Status: ' + st); return; }
   const ape = t.closest('[data-apedit]'); if (ape) { const it = App.hub.approval.find(x => x.id === ape.dataset.apedit); const nl = prompt('Link pengajuan baru (setelah revisi):', it ? it.link : ''); if (!nl) return; if (!/^https?:\/\//i.test(nl)) { toast('Link harus diawali https://'); return; } hubPost('approval', { op: 'update', id: ape.dataset.apedit, item: { link: nl } }, 'Link diperbarui, dikirim ulang ke BM'); return; }
+  const he = t.closest('[data-hubedit]'); if (he) { const [col, id] = he.dataset.hubedit.split('|'); openHubEdit(col, id); return; }
+  const hs = t.closest('[data-hubsave]'); if (hs) { const [col, id] = hs.dataset.hubsave.split('|'); saveHubEdit(col, id); return; }
+  if (t.closest('[data-hubcancel]')) { closeDrawer(); return; }
   const hd = t.closest('[data-hubdel]'); if (hd) { const [col, id] = hd.dataset.hubdel.split('|'); if (confirm('Hapus data ini?')) hubPost(col, { op: 'delete', id }, 'Dihapus'); return; }
   const tck = t.closest('[data-tkck]'); if (tck) { const [id, st, d] = tck.dataset.tkck.split('|'); const T = App.hub.task.find(x => x.id === id); if (T) { T.done = T.done || {}; if (d === '1') T.done[st] = { at: new Date().toISOString(), by: (App.user || {}).name }; else delete T.done[st]; render(); } apiPost({ a: 'hub', col: 'task', op: 'check', id, store: st, done: d === '1' }).then(r => { App.hub.task = r.items; }).catch(e => { toast('Gagal: ' + errMsg(e)); loadHub(true).then(render); }); return; }
   if (t.id === 'tkGo') { const v = id => ($('#' + id) || {}).value || ''; const all = ($('#tkAll') || {}).checked; const stores = all ? hubReg() : $$('#tkStores input:checked').map(x => x.value);

@@ -1733,8 +1733,8 @@ function rpRow(r) {
 }
 function rpSub(label, t) { return `<tr class="subt"><td></td><td class="nm">Subtotal ${esc(label.toLowerCase())}</td>${rpCells(t, true)}</tr>`; }
 /* ---------- template chat laporan harian ke manajemen (admin) ---------- */
-/* 🟢 ≥ batas hijau (100%) · 🟡 batas kuning–99,9% (95–99,9%) · 🔴 di bawahnya */
-const achEmoji = v => v == null ? '' : v >= SET().achGreen / 100 ? ' 🟢' : v >= SET().achYellow / 100 ? ' 🟡' : ' 🔴';
+/* 🟢 ≥ 100% · 🟡 95–99,9% · 🔴 < 95% (ambang dari Pengaturan; bila kosong/tidak valid pakai 100 dan 95) */
+const achEmoji = v => { if (v == null || isNaN(v)) return ''; const G = (+SET().achGreen || 100) / 100, Y = Math.min((+SET().achYellow || 95) / 100, G), p = Math.round(v * 1e4) / 1e4; return p >= G ? ' 🟢' : p >= Y ? ' 🟡' : ' 🔴'; };
 const CHAT_GREET = 'Semangat Pagi Pak Riadi, Pak Budhi, Pak Andreas, Pak Yohanes';
 function reportChatText(R) {
   const D = R.D, d0 = +D.slice(8), mon = MONL[+D.slice(5, 7) - 1], y = D.slice(0, 4), t = R.t;
@@ -3709,13 +3709,26 @@ function shotOn2() {
   shotFit();
   window.scrollTo(0, 0);
 }
-/* lebarkan halaman mengikuti tabel terlebar supaya tidak ada kolom yang terpotong */
+/* hitung lebar halaman agar tabel terlebar muat penuh (dipakai di halaman asli DAN di salinan yang dirender html2canvas) */
+function shotLayout(main) {
+  const doc = main.ownerDocument, cs = doc.defaultView.getComputedStyle(main);
+  main.style.width = ''; main.style.maxWidth = '';
+  doc.querySelectorAll('.rp-wrap,.tbl-wrap').forEach(w => { w.scrollTop = 0; w.scrollLeft = 0; });
+  const els = () => Array.from(main.querySelectorAll('#view table, #view .jk-tl, #view .tk-grid'));
+  const pl = parseFloat(cs.paddingLeft) || 0, pr = parseFloat(cs.paddingRight) || 0, pad = (pl + pr) || 48;
+  let w = Math.max(1240, Math.max(0, ...els().map(t => Math.max(t.scrollWidth, Math.ceil(t.getBoundingClientRect().width)))) + pad + 2);
+  for (let i = 0; i < 5; i++) {
+    main.style.width = w + 'px'; main.style.maxWidth = w + 'px';
+    const edge = main.getBoundingClientRect().right - pr;
+    const over = Math.max(0, ...els().map(t => Math.ceil(t.getBoundingClientRect().right - edge)));
+    if (over <= 0) break; w += over + 2;
+  }
+  return w;
+}
 function shotFit() {
   const main = $('main.wrap'); if (!main) return;
-  main.style.width = ''; main.style.maxWidth = '';
-  $$('.rp-wrap,.tbl-wrap').forEach(w => { w.scrollTop = 0; w.scrollLeft = 0; });
-  const pad = 48, need = Math.max(0, ...$$('#view table, #view .jk-tl, #view .tk-grid').map(t => t.scrollWidth));
-  if (window.innerWidth >= 900 || App.ui.shotVp) { const w = Math.max(1240, need + pad); main.style.width = w + 'px'; main.style.maxWidth = w + 'px'; }
+  if (window.innerWidth >= 900 || App.ui.shotVp) shotLayout(main);
+  else { main.style.width = ''; main.style.maxWidth = ''; $$('.rp-wrap,.tbl-wrap').forEach(w => { w.scrollTop = 0; w.scrollLeft = 0; }); }
   App.charts.forEach(c => { try { c.resize(); } catch (e) { } });
 }
 function shotOff() { if (App.ui.shotVp) { const vp = $('#vpMeta'); if (vp) vp.setAttribute('content', VP_NORMAL); App.ui.shotVp = false; } const m = $('main.wrap'); if (m) { m.style.width = ''; m.style.maxWidth = ''; } document.body.classList.remove('shot'); const h = $('#shotHead'); if (h) h.remove(); const b = $('#shotBar'); if (b) b.remove(); render(); }
@@ -3724,11 +3737,21 @@ async function shotCapture(copy) {
     /* di HP: saat mengambil gambar, zoom dikembalikan ke 100% (layout tetap lebar PC) supaya teks tidak renggang */
     const vp = $('#vpMeta'), vpZoomed = App.ui.shotVp && vp ? vp.getAttribute('content') : null;
     if (vpZoomed) { vp.setAttribute('content', 'width=1320, initial-scale=1, viewport-fit=cover'); await new Promise(r => setTimeout(r, 400)); }
-    document.body.classList.add('capturing'); shotFit(); const el = $('main.wrap'); const W = Math.max(el.scrollWidth, el.offsetWidth);
-    const cv = await window.html2canvas(el, { scale: App.ui.shotVp ? 2 : Math.min(2, window.devicePixelRatio || 1.5), useCORS: true, backgroundColor: getComputedStyle(document.body).backgroundColor || '#F4F6FB', logging: false, width: W, windowWidth: W + 80, scrollX: 0, scrollY: 0 });
+    document.body.classList.add('capturing');
+    try { if (document.fonts && document.fonts.ready) await document.fonts.ready; } catch (e) { }
+    shotFit(); const el = $('main.wrap');
+    /* batasi skala supaya kanvas tidak melewati batas memori browser HP (kalau lewat, gambar terpotong/kosong) */
+    const w0 = Math.max(el.scrollWidth, el.offsetWidth), h0 = Math.max(el.scrollHeight, el.offsetHeight);
+    const want = App.ui.shotVp ? 2 : Math.min(2, window.devicePixelRatio || 1.5);
+    const scale = Math.max(.6, Math.min(want, Math.sqrt(14e6 / (w0 * h0 * 1.2)), 15000 / (h0 * 1.2)));
+    /* lebar & tinggi gambar TIDAK dipatok dari layout HP: dihitung ulang di salinan (layout desktop) lewat onclone,
+       jadi tabel selalu muat penuh dan hasilnya sama dengan di PC */
+    const cv = await window.html2canvas(el, { scale, useCORS: true, backgroundColor: getComputedStyle(document.body).backgroundColor || '#F4F6FB', logging: false, windowWidth: 2400, scrollX: 0, scrollY: 0,
+      onclone: doc => { const m = doc.querySelector('main.wrap'); if (!m) return; m.style.margin = '0'; const w = shotLayout(m); doc.body.style.minWidth = w + 'px'; doc.documentElement.style.minWidth = w + 'px'; } });
     document.body.classList.remove('capturing');
     if (vpZoomed) { vp.setAttribute('content', vpZoomed); }
     const blob = await new Promise(r => cv.toBlob(r, 'image/png'));
+    if (!blob) throw new Error('gambar terlalu besar untuk memori perangkat, sembunyikan beberapa bagian lalu coba lagi');
     const name = ($('#pageTitle').textContent || 'Integrated Hub').replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '_') + '_' + todayISO() + '.png';
     if (copy && navigator.clipboard && window.ClipboardItem) { await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]); toast('Gambar tersalin — tempel (Ctrl+V) di WhatsApp Web'); return; }
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000); toast('Gambar diunduh: ' + name);

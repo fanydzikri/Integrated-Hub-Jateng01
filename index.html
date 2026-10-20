@@ -1039,7 +1039,7 @@ const DEFAULT_SETTINGS = {
   windowDays: 90, targetCover: 2, promoShare: 60, statementPct: 75,
   autoThreshold: true, manual: { t1: 1, t2: 2, t3: 4 },
   excludeBrands: 'Z, SERVICE', excludeKeywords: 'PAPER BAG, VOUCHER, REPARASI, PACKING, FREE GIFT',
-  billStatuses: {}, txTypes: {}, achGreen: 100, achYellow: 95, defaultValue: 'g', excludeSales: true
+  billStatuses: {}, txTypes: {}, achGreen: 100, achYellow: 95, defaultValue: 'g', excludeSales: true, storeOrder: 'code'
 };
 const splitList = v => String(v || '').split(',').map(x => x.trim().toUpperCase()).filter(Boolean);
 function quantile(arr, p) { if (!arr.length) return 0; const pos = (arr.length - 1) * p, lo = Math.floor(pos), hi = Math.ceil(pos); return arr[lo] + (arr[hi] - arr[lo]) * (pos - lo); }
@@ -1184,7 +1184,9 @@ function storeCodes() {
   const set = new Set(Object.keys(App.stores));
   for (const m in App.index.sales) for (const c in App.index.sales[m]) set.add(c);
   for (const c in App.index.stock) set.add(c);
-  return [...set].sort((a, b) => sName(a).localeCompare(sName(b), 'id'));
+  /* urutan toko di semua menu & dropdown: nomor site (default) atau nama toko — diatur di Kelola data */
+  const byCode = (SET().storeOrder || 'code') === 'code';
+  return [...set].sort((a, b) => byCode ? (Number(a) - Number(b) || a.localeCompare(b)) : sName(a).localeCompare(sName(b), 'id'));
 }
 const shortName = n => String(n || '').replace(/\s+/g, ' ').replace(/^EIGER\s+((Adventure|Adv\.?)\s+)?Store\s*/i, '').replace(/^EIGER\s+/i, '').trim() || n;
 const sName = c => { const s = App.stores[c]; return (s && s.alias) || shortName(s && s.name) || c; };
@@ -4000,6 +4002,11 @@ function pageAdmin(view) {
   const tmOpts = [...new Set([addMonths(tm, -1), tm, addMonths(tm, 1), ...Object.keys(App.targets), ...months])].sort().reverse();
   const codes = storeCodes().filter(c => sType(c) !== 'bz' || monthTarget(c, tm) || (App.index.sales[tm] || {})[c] || (App.tgtDetail[tm] || {})[c]);
   const allCodes = storeCodes();
+  /* urutan tabel Target & nama toko (klik judul kolom) */
+  const tsS = App.ui.tgtSort || { k: 'c', dir: 'asc' };
+  const tgv = c => tsS.k === 'c' ? Number(c) : tsS.k === 'type' ? sType(c) : tsS.k === 'name' ? ((App.stores[c] || {}).name || '') : tsS.k === 'alias' ? sName(c) : tsS.k === 'used' ? (monthTarget(c, tm) || 0) : ((App.tgtDetail[tm] || {})[c] || {})[tsS.k] || 0;
+  const codesT = codes.slice().sort((a, b) => { const x = tgv(a), y = tgv(b); const r = typeof x === 'string' ? x.localeCompare(y, 'id') : x - y; return tsS.dir === 'asc' ? r : -r; });
+  const tsh = (k, l, cls) => `<th class="s ${cls || ''}" data-tgs="${k}" style="cursor:pointer">${l}${tsS.k === k ? (tsS.dir === 'asc' ? ' ▲' : ' ▼') : ''}</th>`;
   view.innerHTML = `<div class="stack">${permNote}
     ${uploadChecklist()}
     <section class="card"><div class="card-h"><h3>Akun pengguna</h3><p class="small muted">${App.pendingUsers ? `<b style="color:var(--bad)">${App.pendingUsers} pendaftaran menunggu persetujuan</b>` : 'setujui pendaftaran & atur akses'}</p></div><div id="usersBox"></div></section>
@@ -4012,11 +4019,12 @@ function pageAdmin(view) {
       <p class="small muted" style="margin-top:10px">File yang diupload bersamaan digabung otomatis, jadi DSR boleh dipecah per toko, per tanggal, atau per bagian. Tanggal yang sama untuk toko yang sama di upload berikutnya akan diganti dengan data baru, jadi aman upload ulang. Untuk stok, yang disimpan hanya snapshot terbaru tiap toko.</p></section>
     <section class="card"><div class="card-h"><h3>Kelengkapan data</h3><select id="covM" class="inp sm">${months.map(m => `<option value="${m}" ${m === cm ? 'selected' : ''}>${fmtMonth(m)}</option>`).join('') || '<option>Belum ada</option>'}</select></div><div id="cov" style="overflow-x:auto"></div></section>
     <section class="card"><div class="card-h"><h3>Target & nama toko</h3><div class="filters" style="margin:0"><select id="tgtM" class="inp sm">${tmOpts.map(m => `<option value="${m}" ${m === tm ? 'selected' : ''}>${fmtMonth(m)}</option>`).join('')}</select>
+      <label class="small muted" for="stOrd">Urutan toko di semua menu</label><select id="stOrd" class="inp sm"><option value="code" ${(SET().storeOrder || 'code') === 'code' ? 'selected' : ''}>Nomor site</option><option value="name" ${SET().storeOrder === 'name' ? 'selected' : ''}>Nama toko (A–Z)</option></select>
       <label class="small muted" for="tgtB">Target yang dipakai</label><select id="tgtB" class="inp sm">${[['offline', 'Offline'], ['eiger', 'Eiger (Offline + EA + WAB)'], ['total', 'Total (Eiger + Outlive)']].map(([k, l]) => `<option value="${k}" ${App.tgtBasis === k ? 'selected' : ''}>${l}</option>`).join('')}</select></div></div>
       <p class="small muted" style="margin:-4px 0 12px">Toko baru otomatis terdaftar dari file target, DSR, atau stok. Jenis toko ditentukan dari digit pertama site code (2, 5, 7 = reguler; 9 = bazaar) dan bisa diubah manual. Upload file target bulanan (format Site Code, Site Name, Offline, EA, WAB, Eiger, Outlive, Total) lewat kotak Upload di atas. Kolom terakhir bisa diubah manual bila perlu.</p>
       ${codes.length ? (() => { const D = App.tgtDetail[tm] || {}; const hasD = Object.keys(D).length > 0; const dc = hasD ? TGT_COLS : [];
-        return `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Kode</th><th>Jenis</th><th>Nama di sistem</th><th>Nama tampil</th>${dc.map(k => `<th class="r">${TGT_LABEL[k]}</th>`).join('')}<th class="r">Target dipakai ${esc(fmtMonth(tm))}</th></tr></thead><tbody>
-      ${codes.map(c => `<tr><td class="tn">${esc(c)}</td><td><select class="inp sm" data-type="${esc(c)}">${['rg', 'bz', 'ot'].map(t => `<option value="${t}" ${sType(c) === t ? 'selected' : ''}>${TYPE_LABEL[t]}${t === autoType(c) ? ' (otomatis)' : ''}</option>`).join('')}</select></td><td class="small">${esc((App.stores[c] || {}).name || '')}</td><td><input class="inp sm" data-alias="${esc(c)}" value="${esc((App.stores[c] || {}).alias || '')}" placeholder="${esc(shortName((App.stores[c] || {}).name || c))}"></td>${dc.map(k => `<td class="r small">${D[c] && D[c][k] ? fmtN(D[c][k]) : '–'}</td>`).join('')}<td class="r"><input class="inp sm tinp" inputmode="numeric" data-tgt="${esc(c)}" value="${monthTarget(c, tm) ? fmtN(monthTarget(c, tm)) : ''}" placeholder="0"></td></tr>`).join('')}
+        return `<div class="tbl-wrap"><table class="tbl"><thead><tr>${tsh('c', 'Kode')}${tsh('type', 'Jenis')}${tsh('name', 'Nama di sistem')}${tsh('alias', 'Nama tampil')}${dc.map(k => tsh(k, TGT_LABEL[k], 'r')).join('')}${tsh('used', 'Target dipakai ' + esc(fmtMonth(tm)), 'r')}</tr></thead><tbody>
+      ${codesT.map(c => `<tr><td class="tn">${esc(c)}</td><td><select class="inp sm" data-type="${esc(c)}">${['rg', 'bz', 'ot'].map(t => `<option value="${t}" ${sType(c) === t ? 'selected' : ''}>${TYPE_LABEL[t]}${t === autoType(c) ? ' (otomatis)' : ''}</option>`).join('')}</select></td><td class="small">${esc((App.stores[c] || {}).name || '')}</td><td><input class="inp sm" data-alias="${esc(c)}" value="${esc((App.stores[c] || {}).alias || '')}" placeholder="${esc(shortName((App.stores[c] || {}).name || c))}"></td>${dc.map(k => `<td class="r small">${D[c] && D[c][k] ? fmtN(D[c][k]) : '–'}</td>`).join('')}<td class="r"><input class="inp sm tinp" inputmode="numeric" data-tgt="${esc(c)}" value="${monthTarget(c, tm) ? fmtN(monthTarget(c, tm)) : ''}" placeholder="0"></td></tr>`).join('')}
       <tr><td></td><td></td><td></td><td class="r"><b>Total area</b></td>${dc.map(k => `<td class="r small"><b>${fmtN(codes.reduce((s, c) => s + ((D[c] || {})[k] || 0), 0))}</b></td>`).join('')}<td class="r"><b id="tgtSum">${fmtRp(codes.reduce((s, c) => s + monthTarget(c, tm), 0))}</b></td></tr></tbody></table></div>
       <div class="row-act"><button class="btn primary" id="tgtSave">Simpan target & nama</button></div>`; })() : '<p class="muted">Toko muncul di sini setelah file pertama diupload.</p>'}</section>
     <section class="card"><div class="card-h"><h3>Bobot target harian</h3><select id="wgtM" class="inp sm">${[...new Set([tm, ...Object.keys(App.weights)])].sort().reverse().map(m => `<option value="${m}" ${m === wm ? 'selected' : ''}>${fmtMonth(m)}</option>`).join('')}</select></div>
@@ -4455,6 +4463,7 @@ document.addEventListener('click', async e => {
   if (t.id === 'tfXls') { exportTransfer(); return; }
   if (t.id === 'roXls') { exportRO(); return; }
   if (t.id === 'pcAIBtn') { picaAsk(false); return; }
+  const tgs = t.closest('[data-tgs]'); if (tgs) { const k = tgs.dataset.tgs, s0 = App.ui.tgtSort || { k: 'c', dir: 'asc' }; App.ui.tgtSort = s0.k === k ? { k, dir: s0.dir === 'asc' ? 'desc' : 'asc' } : { k, dir: ['c', 'type', 'name', 'alias'].includes(k) ? 'asc' : 'desc' }; render(); return; }
   const bcs = t.closest('[data-bcs]'); if (bcs) { const k = bcs.dataset.bcs, s0 = App.ui.bcSort || { k: 'tot', dir: 'asc' }; App.ui.bcSort = s0.k === k ? { k, dir: s0.dir === 'asc' ? 'desc' : 'asc' } : { k, dir: k === 'name' ? 'asc' : 'asc' }; render(); return; }
   if (t.id === 'shotBtn') { shotOn(); return; }
   if (t.id === 'omsRe') { loadOmset(App.ui.omsDate, true).then(render).then(() => toast('Data terbaru dimuat')); return; }
@@ -4578,6 +4587,7 @@ document.addEventListener('change', async e => {
   if (t.id === 'lsM') { App.ui.lsM = t.value; render(); return; }
   if (t.id === 'lsStore') { App.ui.lsStore = t.value; App.ui.more = {}; render(); return; }
   if (t.id === 'ptStore') { App.ui.ptStore = t.value; App.ui.more = {}; render(); return; }
+  if (t.id === 'stOrd') { saveSettings({ storeOrder: t.value }, 'Urutan toko di semua menu: ' + (t.value === 'code' ? 'nomor site' : 'nama toko')); return; }
   if (t.id === 'omsDate') { App.ui.omsDate = t.value || todayISO(); render(); return; }
   if (t.id === 'omsFile') { if (t.files[0]) omsUpload(t.files[0]); t.value = ''; return; }
   if (t.id === 'bcDate') { App.ui.bcDate = t.value; render(); return; }

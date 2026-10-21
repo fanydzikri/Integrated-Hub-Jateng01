@@ -1544,7 +1544,7 @@ function render() {
   }
   if (App.page === 'stok') App.page = 'transfer';
   if (!isOps(App.page) && App.page !== 'home' && !App.lastDate && !['admin', 'report', 'settings', 'lost', 'detention', 'juknis', 'bc', 'omset'].includes(App.page)) { App.page = srLast() ? 'report' : 'detention'; }
-  const fn = { area: pageArea, report: pageReport, trend: pageTrend, promo: pagePromo, omni: pageOmni, eac: pageEac, ra: pageRA, pareto: pagePareto, lost: pageLost, promostock: pagePromoStock, detention: pageDetention, growth: pageGrowth, transfer: pageTransfer, ro: pageRO, pica: pagePica, juknis: pageJuknis, home: pageHome, bc: pageBC, omset: pageOmset, ops_approval: pageApproval, ops_task: pageTask, ops_info: pageInfo, toko: pageStore, produk: pageProduct, stok: pageStock, admin: pageAdmin, settings: pageSettings }[App.page] || pageReport;
+  const fn = { area: pageArea, report: pageReport, trend: pageTrend, promo: pagePromo, omni: pageOmni, eac: pageEac, ra: pageRA, pareto: pagePareto, lost: pageLost, promostock: pagePromoStock, detention: pageDetention, growth: pageGrowth, transfer: pageTransfer, ro: pageRO, pica: pagePica, juknis: pageJuknis, home: pageHome, bc: pageBC, omset: pageOmset, ops_approval: pageApproval, ops_task: pageTask, ops_info: pageInfo, ops_ess: pageEss, toko: pageStore, produk: pageProduct, stok: pageStock, admin: pageAdmin, settings: pageSettings }[App.page] || pageReport;
   try { fn(view); lockScopedSelects(view); if (App.page === 'admin') renderUsers(); if ((App.loadWarn || []).length) view.insertAdjacentHTML('afterbegin', `<div class="note" style="margin-bottom:14px">Sebagian data belum termuat (${esc(App.loadWarn.join(', '))}). Tekan <b>Muat ulang</b> di kanan atas untuk mencoba lagi.</div>`); } catch (e) { console.error(e); view.innerHTML = `<div class="empty-state"><h2>Halaman gagal ditampilkan</h2><p class="muted">${esc(e.message)}</p></div>`; }
 }
 
@@ -3410,7 +3410,8 @@ const OPS_NAV = [
   { k: 'home', label: 'Beranda', icon: 'home' },
   { k: 'ops_approval', label: 'Approval', icon: 'approval' },
   { k: 'ops_task', label: 'Task', icon: 'task' },
-  { k: 'ops_info', label: 'Informasi', icon: 'info' }
+  { k: 'ops_info', label: 'Informasi', icon: 'info' },
+  { k: 'ops_ess', label: 'ESS Self Assessment', icon: 'task' }
 ];
 const isOps = pg => /^ops_/.test(pg || '');
 const hubName = c => (App.stores && App.stores[c] && (App.stores[c].alias || App.stores[c].name)) || ((App.hub && App.hub.stores || []).find(r => r[0] === c) || [])[1] || c;
@@ -3438,7 +3439,7 @@ function pageHome(view) {
   const newInfo = H.info.filter(i => i.date && dayDiff(i.date, today) <= 7).length;
   view.innerHTML = `<div class="hub-home">
     <button class="hub-tile" data-hub="store"><span class="hub-ic">📊</span><b>Store Management</b><span>Monitoring sales, OmniChannel, EAC, RA, growth, inventory, lost sales, analisa PICA & promo</span><em>Masuk →</em></button>
-    <button class="hub-tile ops" data-hub="ops"><span class="hub-ic">🗂️</span><b>Operational Hub</b><span>Approval pengajuan, task & checklist toko, informasi terbaru dari HO</span>
+    <button class="hub-tile ops" data-hub="ops"><span class="hub-ic">🗂️</span><b>Operational Hub</b><span>Approval pengajuan, task & checklist toko, informasi terbaru dari HO, ESS self assessment</span>
       <span class="hub-badges">${pend ? `<i class="red">${pend} approval menunggu</i>` : ''}${od ? `<i class="red">${od} task overdue</i>` : ''}${act ? `<i>${act} task berjalan</i>` : ''}${newInfo ? `<i class="ok">${newInfo} info baru</i>` : ''}</span><em>Masuk →</em></button>
   </div>`;
   if (!App.hub) loadHub().then(() => { if (App.page === 'home') render(); }).catch(() => { });
@@ -4582,7 +4583,7 @@ function settingsChange(t) {
 /* ================= navigasi & event ================= */
 /* ---------- alamat link per menu (#/nama-menu) ---------- */
 const SLUG = { report: 'monitoring-sales', trend: 'sales-trend', promo: 'kontribusi-promo', omni: 'omnichannel', eac: 'sales-member-eac', ra: 'ra-performance', pareto: 'product-pareto', growth: 'growth', toko: 'per-toko',
-  produk: 'produk', transfer: 'saran-transfer', ro: 'saran-repeat-order', promostock: 'stok-dcnp-smds', detention: 'detention-stock', lost: 'lost-sales', pica: 'analisa-pica', juknis: 'promo', admin: 'kelola-data', settings: 'pengaturan', home: 'home', bc: 'blind-counting', omset: 'share-omset', ops_approval: 'ops/approval', ops_task: 'ops/task', ops_info: 'ops/informasi' };
+  produk: 'produk', transfer: 'saran-transfer', ro: 'saran-repeat-order', promostock: 'stok-dcnp-smds', detention: 'detention-stock', lost: 'lost-sales', pica: 'analisa-pica', juknis: 'promo', admin: 'kelola-data', settings: 'pengaturan', home: 'home', bc: 'blind-counting', omset: 'share-omset', ops_approval: 'ops/approval', ops_task: 'ops/task', ops_info: 'ops/informasi', ops_ess: 'ops/ess' };
 const PAGE_OF = Object.fromEntries(Object.entries(SLUG).map(([k, v]) => [v, k]));
 function hashFor() { const sl = SLUG[App.page] || 'monitoring-sales'; return '#/' + sl + (App.page === 'toko' && App.ui.store ? '/' + App.ui.store : ''); }
 function applyHash() {
@@ -4890,5 +4891,138 @@ document.addEventListener('change', e => { const r = e.target.closest && e.targe
 document.addEventListener('click', e => { if (e.target && e.target.id === 'lgGo2') doLogin('2'); });
 init();
 </script>
+<style>
+.ess-card{padding:0;overflow:hidden}.ess-head{background:#F6F8FC;border-bottom:1px solid #E3E8F2;padding:16px 18px}.ess-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.ess-badge{background:#4F46E5;color:#fff;border-radius:999px;padding:4px 12px;font-size:12px;font-weight:800}.ess-q{font-size:17px;font-weight:800;margin:10px 0 4px;color:#0F3192}
+.ess-pt{padding:12px 18px;border-top:1px solid #EEF1F7}.ess-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.ess-no{font:600 12px ui-monospace,monospace;background:#EEF1F7;color:#334155;border-radius:6px;padding:4px 8px;white-space:nowrap}
+.ess-tx{flex:1 1 280px;font-weight:600}.ess-btn{border:1px solid #D5DBE8;background:#F1F4F9;color:#64748B;border-radius:999px;padding:8px 16px;font-weight:700;cursor:pointer}
+.ess-btn.p.on{background:#DCFCE7;border-color:#86EFAC;color:#166534}.ess-btn.k.on,.ess-btn.k:hover{background:#FEE2E2;border-color:#FCA5A5;color:#B91C1C}
+.ess-note{display:flex;align-items:center;gap:10px;margin-top:8px}.ess-note span{font-size:12px;font-weight:700;color:#7B8AA5;white-space:nowrap}.ess-note .inp{flex:1}
+.ess-foot{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:14px 18px;border-top:1px solid #EEF1F7;flex-wrap:wrap;background:#FAFBFE}.ess-timer{font-size:15px;color:#334155}
+.ess-prog{height:6px;background:#E5EAF3;border-radius:6px;margin:6px 0;width:min(320px,70vw)}.ess-prog i{display:block;height:100%;width:0;background:#4F46E5;border-radius:6px;transition:width 1s linear}
+.ess-chip{display:inline-flex;gap:6px;align-items:center;background:#EEF2FB;border-radius:999px;padding:3px 6px 3px 10px;margin:3px;font-size:12.5px}.ess-chip button{border:0;background:#CBD5E1;border-radius:50%;width:18px;height:18px;line-height:16px;cursor:pointer}
+</style>
+<script>
+/* ================= ESS Self Assessment (reminder briefing siang untuk WIGA/RA) ================= */
+const ESS_SEC = 180; /* waktu minimal per slide (detik) */
+const ESS_J = [
+  { id: 'F', tp: 'Touchpoint 06 • Pengalaman Mencoba Produk', q: 'Kalau ada customer lagi lihat-lihat jaket terus kelihatan tertarik, menurut Bapak/Ibu urutan idealnya RA ngapain aja?', pts: [
+    [1, 'RA menawarkan pelanggan untuk mencoba produk yang diminati (inisiatif RA, bukan menunggu diminta)'],
+    [2, 'RA menawarkan bantuan untuk mencoba produk - berlaku untuk tas, jaket, sepatu, helm, jas hujan, tenda'],
+    [3, 'RA memberikan tanggapan / masukan yang relevan terhadap produk yang dicoba'],
+    [4, 'Fitting room bersih, rapi, terawat, kunci pintu berfungsi, lampu menyala warna putih terang']] },
+  { id: 'G', tp: 'Touchpoint 07 • Rekomendasi Untuk Membeli Produk', q: 'Kalau customer udah mantap mau beli, sebelum ke kasir idealnya RA ngapain aja?', pts: [
+    [5, 'RA meminta customer mengecek kembali produk yang akan dibeli + menginformasikan fitur yang perlu dicek'],
+    [6, 'RA menjelaskan cara perawatan produk SECARA SPONTAN (tanpa ditanya / tanpa dipancing)'],
+    [7, 'RA menawarkan produk tambahan sesuai kebutuhan (Cross/Up Selling / Eigerindo Voucher / EASAP)'],
+    [8, 'RA berinisiatif memberitahu aktivitas promosi yang berlaku & relevan dengan kebutuhan pelanggan'],
+    [9, 'RA bertanya apakah pelanggan sudah memiliki member Eiger (EAC)'],
+    [10, 'Jika belum member: RA memandu pendaftaran via EIGER Adventure Mobile Apps / website + menanyakan nama, lalu mulai memanggil pakai nama'],
+    [11, 'Jika belum / tidak bersedia member: RA menjelaskan manfaat menjadi member'],
+    [12, 'RA memberikan nomor transaksi untuk lanjut ke pembayaran (khusus Flagship)']] }
+];
+function essState() { return App.ess || (App.ess = { tab: 'isi', step: 0, code: '', ra: '', sid: '', ans: {}, left: ESS_J.map(() => ESS_SEC), timer: null, d: todayISO() }); }
+const essName = c => { const s = ((App.hub && App.hub.stores) || []).find(r => r[0] === c); return s ? s[1] : c; };
+function essRender() { const y = window.scrollY; render(); window.scrollTo(0, y); }
+async function essLoad() {
+  if (essLoad.b) return; essLoad.b = 1;
+  try { if (!App.hub) await loadHub(); } catch (e) { App.hub = { approval: [], task: [], info: [], stores: [] }; }
+  try { App.essRoster = (await api('essRoster')).roster || {}; } catch (e) { toast('Gagal memuat daftar RA: ' + errMsg(e)); App.essRoster = App.essRoster || {}; }
+  essLoad.b = 0; if (App.page === 'ops_ess') render();
+}
+async function essLoadRes(d) {
+  if (essLoadRes.b) return; essLoadRes.b = 1;
+  try { App.essRes = { d, rows: (await api('essRes', { d })).rows || [] }; } catch (e) { toast('Gagal memuat hasil: ' + errMsg(e)); App.essRes = { d, rows: [] }; }
+  essLoadRes.b = 0; if (App.page === 'ops_ess') render();
+}
+function essOk(j) { const E = App.ess; return j.pts.every(p => { const a = E.ans[p[0]]; return a && (a.v === 'P' || (a.v === 'K' && (a.n || '').trim().length >= 5)); }); }
+function essPaint() {
+  const E = App.ess, i = E.step - 1, j = ESS_J[i]; if (!j) return;
+  const t = $('#essTimer'), b = $('#essNext'); if (!t || !b) return;
+  const l = E.left[i], ok = essOk(j);
+  t.innerHTML = l > 0 ? `⏱ <b>${String(Math.floor(l / 60)).padStart(2, '0')}:${String(l % 60).padStart(2, '0')}</b> lagi — baca & diskusikan dulu bersama tim` : '✅ Waktu baca terpenuhi';
+  const bar = $('#essBar'); if (bar) bar.style.width = ((ESS_SEC - l) / ESS_SEC * 100) + '%';
+  b.disabled = !(l === 0 && ok);
+  const w = $('#essWhy'); if (w) w.textContent = l > 0 ? 'Tombol lanjut aktif setelah timer selesai (timer berhenti kalau tab ditinggal).' : !ok ? 'Isi semua poin. Jika memilih Kendala, catatan wajib diisi (min. 5 huruf).' : '';
+}
+function essTick() {
+  const E = App.ess;
+  if (!E || App.page !== 'ops_ess' || E.step < 1 || E.step > ESS_J.length) { if (E && E.timer) { clearInterval(E.timer); E.timer = null; } return; }
+  if (document.visibilityState !== 'visible') return;
+  if (E.left[E.step - 1] > 0) E.left[E.step - 1]--; essPaint();
+}
+function essSlide(j, i) {
+  const E = App.ess, last = i === ESS_J.length - 1;
+  return `<div class="card ess-card"><div class="ess-head"><div class="ess-top"><span class="ess-badge">JOURNEY ${j.id}</span><b>${esc(j.tp)}</b><span class="small muted" style="margin-left:auto">${j.pts.length} Poin Standar · Slide ${i + 1}/${ESS_J.length}</span></div>
+    <div class="ess-q">❝ "${esc(j.q)}"</div><div class="small muted"><i>Panduan: bahas poin satu per satu bersama tim. Pilih "Paham" bila sudah mengerti dan biasa menerapkan; pilih "Kendala" bila belum paham / sulit dijalankan, lalu tulis kendalanya.</i></div></div>
+    ${j.pts.map((p, k) => { const a = E.ans[p[0]] || {}; return `<div class="ess-pt"><div class="ess-row"><span class="ess-no">#${p[0]} (Poin ${String(k + 1).padStart(2, '0')})</span><span class="ess-tx">${esc(p[1])}</span>
+      <button class="ess-btn p ${a.v === 'P' ? 'on' : ''}" data-ea="${p[0]}:P">✔ Paham</button><button class="ess-btn k ${a.v === 'K' ? 'on' : ''}" data-ea="${p[0]}:K">⚠ Kendala</button></div>
+      <div class="ess-note"><span>Catatan RA:</span><input class="inp" data-en="${p[0]}" value="${esc(a.n || '')}" placeholder="${a.v === 'K' ? 'Wajib: apa yang belum paham / jadi kendala…' : 'Opsional: contoh penerapan / pertanyaan…'}"></div></div>`; }).join('')}
+    <div class="ess-foot"><div><div id="essTimer" class="ess-timer"></div><div class="ess-prog"><i id="essBar"></i></div><div id="essWhy" class="small muted"></div></div>
+      <button class="btn primary" id="essNext" data-ess="${last ? 'submit' : 'next'}" disabled>${last ? 'Kirim Self Assessment ✔' : 'Lanjut ke Journey ' + ESS_J[i + 1].id + ' →'}</button></div></div>`;
+}
+function essIsi(E, me) {
+  if (E.step >= 1 && E.step <= ESS_J.length) return essSlide(ESS_J[E.step - 1], E.step - 1);
+  if (E.step > ESS_J.length) return `<div class="card" style="text-align:center;padding:34px"><div style="font-size:42px">🎉</div><h2 style="margin:8px 0">Terima kasih, ${esc(E.ra)}!</h2><p class="muted">Self assessment ${esc(essName(E.code))} sudah terkirim.</p><button class="btn primary" data-ess="again">Isi untuk RA lain</button></div>`;
+  const R = App.essRoster || {}, names = R[E.code] || [], locked = me.role === 'toko', stores = ((App.hub && App.hub.stores) || []).filter(r => !locked || r[0] === me.store);
+  return `<div class="card" style="max-width:620px"><h3 style="margin:0 0 6px">Mulai Self Assessment</h3><p class="small muted" style="margin:0 0 14px">Ada ${ESS_J.length} slide journey. Tiap slide minimal <b>${ESS_SEC / 60} menit</b> supaya benar-benar dibaca & didiskusikan — tombol lanjut baru aktif setelah waktu habis.</p>
+    <label class="fl">1. Pilih toko<select class="inp" id="essCode" ${locked ? 'disabled' : ''}><option value="">— pilih toko —</option>${stores.map(r => `<option value="${esc(r[0])}" ${r[0] === E.code ? 'selected' : ''}>${esc(r[0])} · ${esc(r[1])}</option>`).join('')}</select></label>
+    <label class="fl" style="margin-top:10px">2. Pilih nama RA<select class="inp" id="essRa" ${E.code ? '' : 'disabled'}><option value="">— pilih nama —</option>${names.map(n => `<option ${n === E.ra ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select></label>
+    ${E.code && !names.length ? '<p class="small" style="color:#B45309">Daftar RA toko ini belum diisi admin. Hubungi admin untuk menambahkan nama kamu.</p>' : ''}
+    <button class="btn primary" style="margin-top:14px" data-ess="start" ${E.code && E.ra ? '' : 'disabled'}>Mulai ▶</button></div>`;
+}
+function essHasil(E) {
+  const R = App.essRoster || {}, rows = App.essRes && App.essRes.d === E.d ? App.essRes.rows : null, admin = App.user && App.user.role === 'admin';
+  const bar = `<div class="card" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><label class="fl" style="margin:0">Tanggal <input class="inp" type="date" id="essD" value="${esc(E.d)}"></label><span class="small muted">Menampilkan siapa yang sudah / belum mengisi, dan poin yang jadi kendala.</span></div>`;
+  if (!rows) { essLoadRes(E.d); return bar + '<div class="loading"><span class="spin"></span>Memuat hasil…</div>'; }
+  const done = new Set(rows.map(r => r.code + '|' + r.ra)), codes = Object.keys(R).sort(), reg = codes.reduce((a, c) => a + R[c].length, 0), K = rows.reduce((a, r) => a + r.ans.filter(x => x[1] === 'K').length, 0);
+  const per = codes.map(c => { const miss = R[c].filter(n => !done.has(c + '|' + n)); return `<tr><td><b>${esc(c)}</b> ${esc(essName(c))}</td><td>${R[c].length}</td><td>${R[c].length - miss.length}</td><td class="small">${miss.length ? esc(miss.join(', ')) : '✅ semua sudah'}</td></tr>`; }).join('');
+  const stat = ESS_J.flatMap(j => j.pts.map(p => { let P = 0, Kn = 0; rows.forEach(r => r.ans.forEach(a => { if (+a[0] === p[0]) a[1] === 'K' ? Kn++ : P++; })); return `<tr><td>${j.id} #${p[0]}</td><td>${esc(p[1])}</td><td>${P}</td><td style="color:#C0392B;font-weight:700">${Kn}</td></tr>`; })).join('');
+  const kend = rows.flatMap(r => r.ans.filter(a => a[1] === 'K').map(a => `<tr><td>${esc(r.code)}</td><td>${esc(r.ra)}</td><td>#${+a[0]}</td><td class="small">${esc(a[2])}</td></tr>`)).join('');
+  return bar + `<div class="pt-tiles" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))"><div class="pt-tile"><span>RA terdaftar</span><b>${fmtN(reg)}</b></div><div class="pt-tile" style="background:#13806F"><span>Sudah mengisi</span><b>${fmtN(rows.length)}</b></div><div class="pt-tile" style="background:#E46636"><span>Belum mengisi</span><b>${fmtN(Math.max(0, reg - codes.reduce((a, c) => a + R[c].filter(n => done.has(c + '|' + n)).length, 0)))}</b></div><div class="pt-tile" style="background:#B42318"><span>Jawaban Kendala</span><b>${fmtN(K)}</b></div></div>
+    <div class="card"><h3 style="margin:0 0 8px">Per toko</h3><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Toko</th><th>RA</th><th>Sudah</th><th>Belum mengisi</th></tr></thead><tbody>${per || '<tr><td colspan="4" class="muted">Daftar RA belum diisi.</td></tr>'}</tbody></table></div></div>
+    <div class="card"><h3 style="margin:0 0 8px">Per poin</h3><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Poin</th><th>Pernyataan</th><th>Paham</th><th>Kendala</th></tr></thead><tbody>${stat}</tbody></table></div></div>
+    <div class="card"><h3 style="margin:0 0 8px">Catatan kendala</h3><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Toko</th><th>RA</th><th>Poin</th><th>Catatan</th></tr></thead><tbody>${kend || '<tr><td colspan="4" class="muted">Belum ada kendala dilaporkan.</td></tr>'}</tbody></table></div></div>
+    ${admin && rows.length ? `<div class="card"><h3 style="margin:0 0 8px">Hapus isian</h3>${rows.map(r => `<span class="ess-chip">${esc(r.code)} · ${esc(r.ra)} <button title="Hapus isian ini" data-essrm="${esc(r.id)}">×</button></span>`).join('')}</div>` : ''}`;
+}
+function essRoster() {
+  const R = App.essRoster || {};
+  return `<div class="card"><h3 style="margin:0 0 6px">Daftar RA per toko</h3><p class="small muted" style="margin:0 0 8px">Tempel satu baris per RA: <code>kodeToko;Nama RA</code> (boleh pakai tab / koma). <b>Tambahkan</b> = menambah nama baru. <b>Ganti daftar toko</b> = daftar toko yang ada di tempelan diganti seluruhnya (cocok saat ada resign/mutasi).</p>
+    <textarea class="inp" id="essBulk" rows="7" style="width:100%;font-family:ui-monospace,monospace" placeholder="2278;Budi Santoso&#10;2278;Sari Wulandari&#10;7016;Rizky Pratama"></textarea>
+    <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary" data-ess="bulk:merge">➕ Tambahkan</button><button class="btn" data-ess="bulk:replace">♻ Ganti daftar toko</button></div></div>
+    <div class="card"><h3 style="margin:0 0 8px">Daftar saat ini (${Object.values(R).reduce((a, x) => a + x.length, 0)} RA)</h3>${Object.keys(R).sort().map(c => `<div style="margin:6px 0"><b>${esc(c)}</b> <span class="small muted">${esc(essName(c))}</span><br>${R[c].map(n => `<span class="ess-chip">${esc(n)} <button title="Hapus" data-essdel="${esc(c)}|${esc(n)}">×</button></span>`).join('')}</div>`).join('') || '<p class="muted">Belum ada.</p>'}</div>`;
+}
+function pageEss(view) {
+  setHead('ESS Self Assessment', 'Reminder briefing siang: bahas journey ESS satu per satu, lalu isi Paham / Kendala');
+  const me = App.user || {}, E = essState(); if (me.role === 'toko') E.code = me.store;
+  if (!App.hub || !App.essRoster) { view.innerHTML = '<div class="loading"><span class="spin"></span>Memuat…</div>'; essLoad(); return; }
+  const admin = me.role === 'admin', running = E.step >= 1 && E.step <= ESS_J.length;
+  const tabs = [['isi', '📝 Isi Self Assessment'], ['hasil', '📊 Hasil'], ...(admin ? [['roster', '👥 Daftar RA']] : [])];
+  view.innerHTML = `<div class="stack">${running ? '' : `<div class="seg" role="group">${tabs.map(([k, l]) => `<button class="${E.tab === k ? 'on' : ''}" data-ess="tab:${k}">${l}</button>`).join('')}</div>`}${running || E.tab === 'isi' ? essIsi(E, me) : E.tab === 'hasil' ? essHasil(E) : essRoster()}</div>`;
+  if (running) { essPaint(); if (!E.timer) E.timer = setInterval(essTick, 1000); }
+}
+document.addEventListener('input', e => { const n = e.target.dataset && e.target.dataset.en; if (!n || App.page !== 'ops_ess') return; const a = App.ess.ans[n] || (App.ess.ans[n] = {}); a.n = e.target.value; essPaint(); });
+document.addEventListener('change', e => {
+  if (App.page !== 'ops_ess') return; const t = e.target, E = essState();
+  if (t.id === 'essCode') { E.code = t.value; E.ra = ''; essRender(); } else if (t.id === 'essRa') { E.ra = t.value; essRender(); } else if (t.id === 'essD') { E.d = t.value || todayISO(); essRender(); }
+});
+document.addEventListener('click', async e => {
+  const t = e.target.closest && e.target.closest('[data-ess],[data-ea],[data-essdel],[data-essrm]'); if (!t || App.page !== 'ops_ess') return;
+  const E = essState(), d = t.dataset;
+  try {
+    if (d.ea) { const [no, v] = d.ea.split(':'), a = E.ans[no] || (E.ans[no] = {}); a.v = v; essRender(); return; }
+    if (d.essdel) { const [c, n] = d.essdel.split('|'); App.essRoster = (await apiPost({ a: 'ess', op: 'rdel', code: c, name: n })).roster; essRender(); return; }
+    if (d.essrm) { if (!confirm('Hapus isian ini?')) return; await apiPost({ a: 'ess', op: 'del', id: d.essrm }); App.essRes = null; essRender(); return; }
+    const k = d.ess || '';
+    if (k.startsWith('tab:')) { E.tab = k.slice(4); App.essRes = null; essRender(); }
+    else if (k === 'start') { const r = await apiPost({ a: 'ess', op: 'start', code: E.code, ra: E.ra }); E.sid = r.sid; E.ans = {}; E.left = ESS_J.map(() => ESS_SEC); E.step = 1; render(); window.scrollTo(0, 0); }
+    else if (k === 'next') { E.step++; render(); window.scrollTo(0, 0); }
+    else if (k === 'submit') { const ans = ESS_J.flatMap(j => j.pts.map(p => [p[0], E.ans[p[0]].v, (E.ans[p[0]].n || '').trim()])); t.disabled = true; await apiPost({ a: 'ess', op: 'submit', sid: E.sid, code: E.code, ra: E.ra, slides: ESS_J.length, answers: ans }); E.step = ESS_J.length + 1; App.essRes = null; render(); window.scrollTo(0, 0); }
+    else if (k === 'again') { E.step = 0; E.ra = ''; E.ans = {}; E.left = ESS_J.map(() => ESS_SEC); render(); }
+    else if (k.startsWith('bulk:')) { const txt = ($('#essBulk') || {}).value || ''; if (!txt.trim()) { toast('Tempel daftar RA dulu.'); return; } const r = await apiPost({ a: 'ess', op: 'roster', mode: k.slice(5), text: txt }); App.essRoster = r.roster; toast('Tersimpan: ' + r.stores + ' toko diperbarui'); essRender(); }
+  } catch (er) { toast('Gagal: ' + errMsg(er)); if (t.id === 'essNext') t.disabled = false; }
+});
+</script>
+
 </body>
 </html>

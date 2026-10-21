@@ -4934,9 +4934,36 @@ function essRoster(E, me) {
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-top:8px"><label class="fl" style="margin:0">NIK<input class="inp" id="essRk" placeholder="NIK karyawan" style="width:160px"></label><label class="fl" style="margin:0;flex:1;min-width:180px">Nama RA<input class="inp" id="essRn" placeholder="Nama lengkap"></label><button class="btn primary" data-ess="radd">➕ Tambah</button></div>
     <div class="tbl-wrap" style="margin-top:12px"><table class="tbl"><thead><tr><th>NIK</th><th>Nama</th><th style="width:90px">Aksi</th></tr></thead><tbody>${list.map(x => `<tr><td>${esc(x.k)}</td><td>${esc(x.n)}</td><td><button class="ess-ic" title="Ubah nama" data-redit="${esc(code)}|${esc(x.k)}">✎</button><button class="ess-ic" title="Hapus (resign / pindah)" data-essdel="${esc(code)}|${esc(x.k)}">🗑</button></td></tr>`).join('') || '<tr><td colspan="3" class="muted">Belum ada RA di toko ini.</td></tr>'}</tbody></table></div>
     <p class="small muted" style="margin:8px 0 0">Gunakan <b>NIK karyawan</b> (bukan nomor KTP). Mengubah NIK: hapus lalu tambah ulang.</p></div>
+    <div class="card"><h3 style="margin:0 0 6px">📥 Upload dari Excel</h3><p class="small muted" style="margin:0 0 10px">Unduh template, isi Kode Toko / NIK / Nama RA, lalu unggah. Cocok untuk update rutin karena turnover tinggi.</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" data-ess="tpl">⬇ Unduh template Excel</button><button class="btn primary" data-ess="xl:merge">⬆ Unggah (Tambahkan)</button><button class="btn" data-ess="xl:replace">⬆ Unggah (Ganti daftar)</button></div><input type="file" id="essFile" accept=".xlsx,.xls,.csv" hidden></div>
     <div class="card"><h3 style="margin:0 0 6px">Tempel banyak sekaligus</h3><p class="small muted" style="margin:0 0 8px">Satu baris per RA: <code>${admin ? 'kodeToko;NIK;Nama' : 'NIK;Nama'}</code> (boleh pakai tab / koma). <b>Tambahkan</b> = menambah / memperbarui nama. <b>Ganti daftar</b> = daftar ${admin ? 'toko yang ada di tempelan' : 'tokomu'} diganti seluruhnya (cocok saat ada resign / mutasi).</p>
     <textarea class="inp" id="essBulk" rows="6" style="width:100%;font-family:ui-monospace,monospace" placeholder="${admin ? '2278;220450;Budi Santoso' : '220450;Budi Santoso'}"></textarea>
     <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary" data-ess="bulk:merge">➕ Tambahkan</button><button class="btn" data-ess="bulk:replace">♻ Ganti daftar</button></div></div>`;
+}
+/* ---- upload / template Excel daftar RA ---- */
+function essTemplate() {
+  const me = App.user || {}, admin = me.role === 'admin', stores = (App.hub && App.hub.stores) || [], sc = admin ? '2278' : (me.store || '');
+  const ws = XLSX.utils.aoa_to_sheet([['Kode Toko', 'NIK', 'Nama RA'], [sc, '220450', 'Contoh Nama RA 1'], [sc, '220451', 'Contoh Nama RA 2']]);
+  for (let r = 1; r < 400; r++) for (let c = 0; c < 3; c++) { const a = XLSX.utils.encode_cell({ r, c }); if (!ws[a]) ws[a] = { t: 's', v: '' }; ws[a].z = '@'; }
+  ws['!ref'] = 'A1:C400'; ws['!cols'] = [{ wch: 12 }, { wch: 18 }, { wch: 36 }];
+  const help = XLSX.utils.aoa_to_sheet([['Petunjuk pengisian'], ['1. Isi satu baris per RA pada sheet "Daftar RA": Kode Toko, NIK, Nama RA.'], ['2. Hapus 2 baris contoh sebelum mengunggah.'], ['3. Kolom NIK sudah berformat teks; gunakan NIK karyawan (bukan KTP).'], ['4. ' + (admin ? 'Kode Toko wajib diisi (lihat sheet "Kode Toko").' : 'Kode Toko harus kode tokomu (' + sc + ').')], ['5. Unggah di menu ESS Self Assessment > Daftar RA. "Tambahkan" = menambah / memperbarui; "Ganti daftar" = mengganti seluruh daftar toko yang ada di file.']]);
+  help['!cols'] = [{ wch: 110 }];
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Daftar RA'); XLSX.utils.book_append_sheet(wb, help, 'Petunjuk');
+  if (admin) { const ks = XLSX.utils.aoa_to_sheet([['Kode Toko', 'Nama Toko']].concat(stores.map(r => [r[0], r[1]]))); ks['!cols'] = [{ wch: 12 }, { wch: 40 }]; XLSX.utils.book_append_sheet(wb, ks, 'Kode Toko'); }
+  XLSX.writeFile(wb, 'Template_Daftar_RA.xlsx');
+}
+async function essUpload(file, mode) {
+  const me = App.user || {}, norm = x => String(x).toLowerCase().replace(/[^a-z]/g, '');
+  const wb = XLSX.read(await file.arrayBuffer(), { type: 'array' }), data = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: false, defval: '' });
+  const hi = data.findIndex(r => r.some(c => norm(c) === 'nik')); if (hi < 0) throw new Error('Kolom "NIK" tidak ditemukan. Gunakan template yang disediakan.');
+  const h = data[hi].map(norm), ik = h.indexOf('nik'), ic = h.findIndex(x => ['kodetoko', 'kode', 'site', 'kodesite'].includes(x)), inn = h.findIndex(x => x === 'namara' || x === 'nama');
+  if (inn < 0) throw new Error('Kolom "Nama RA" tidak ditemukan. Gunakan template yang disediakan.');
+  const lines = [], codes = new Set();
+  data.slice(hi + 1).forEach(r => { const k = String(r[ik] || '').trim(), n = String(r[inn] || '').replace(/[;\t,|]/g, ' ').trim(); let c = ic >= 0 ? String(r[ic] || '').trim() : ''; if (!k && !n) return; if (!c && me.role === 'toko') c = me.store; codes.add(c); lines.push([c, k, n].join(';')); });
+  if (!lines.length) throw new Error('Tidak ada baris data di file.');
+  if (!confirm('Unggah ' + lines.length + ' RA dari ' + codes.size + ' toko dengan mode "' + (mode === 'replace' ? 'Ganti daftar (daftar lama toko tsb dihapus)' : 'Tambahkan / perbarui') + '"?')) return;
+  const r = await apiPost({ a: 'ess', op: 'roster', mode, text: lines.join('\n') });
+  App.essRoster = r.roster; toast('Selesai. Baru: ' + r.added + ' · diperbarui: ' + r.updated + ((r.skipped || []).length ? ' · dilewati: ' + r.skipped.length + ' (' + r.skipped.slice(0, 2).join(' | ') + ')' : ''), 8000); essRender();
 }
 function pageEss(view) {
   setHead('ESS Self Assessment', 'Reminder briefing siang: RA mengisi Paham / Kendala lewat link khusus (tanpa login)');
@@ -4951,6 +4978,7 @@ function pageEss(view) {
 document.addEventListener('change', e => {
   if (App.page !== 'ops_ess') return; const t = e.target, E = essState();
   if (t.id === 'essRs') { E.code = t.value; essRender(); } else if (t.id === 'essD') { E.d = t.value || todayISO(); essRender(); }
+  else if (t.id === 'essFile' && t.files && t.files[0]) { const f = t.files[0]; essUpload(f, E.xlMode || 'merge').catch(er => toast('Gagal: ' + errMsg(er), 6000)); }
 });
 document.addEventListener('click', async e => {
   const t = e.target.closest && e.target.closest('[data-ess],[data-essdel],[data-redit],[data-essrm]'); if (!t || App.page !== 'ops_ess') return;
@@ -4962,6 +4990,8 @@ document.addEventListener('click', async e => {
     if (d.essrm) { if (!confirm('Hapus isian ini?')) return; await apiPost({ a: 'ess', op: 'del', id: d.essrm }); App.essRes = null; essRender(); return; }
     const k = d.ess || '';
     if (k === 'copy') { const u = $('#essUrl'); try { await navigator.clipboard.writeText(u.value); } catch (er) { u.select(); document.execCommand('copy'); } toast('Link disalin'); }
+    else if (k === 'tpl') essTemplate();
+    else if (k.startsWith('xl:')) { E.xlMode = k.slice(3); const f = $('#essFile'); f.value = ''; f.click(); }
     else if (k.startsWith('tab:')) { E.tab = k.slice(4); App.essRes = null; essRender(); }
     else if (k === 'radd') { const nk = ($('#essRk').value || '').trim(), n = ($('#essRn').value || '').trim(); if (!nk || !n) { toast('Isi NIK dan nama.'); return; } const r = await apiPost({ a: 'ess', op: 'radd', code, k: nk, n }); done(r); if (!(r.skipped || []).length) toast('Tersimpan'); }
     else if (k.startsWith('bulk:')) { const txt = ($('#essBulk') || {}).value || ''; if (!txt.trim()) { toast('Tempel daftar RA dulu.'); return; } if (k === 'bulk:replace' && !confirm('Ganti seluruh daftar RA untuk toko yang ada di tempelan?')) return; const r = await apiPost({ a: 'ess', op: 'roster', mode: k.slice(5), text: txt }); toast('Baru: ' + r.added + ' · diperbarui: ' + r.updated + ((r.skipped || []).length ? ' · dilewati: ' + r.skipped.length : '')); done(r); }

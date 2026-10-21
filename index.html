@@ -65,6 +65,10 @@ img,svg,canvas{max-width:100%}
 .data-chip{margin-left:auto;display:inline-flex;align-items:center;gap:10px;background:#EEF2FB;color:#0F3192;border-radius:999px;padding:5px 6px 5px 14px;font-size:12.5px;font-weight:600;white-space:nowrap}
 .data-chip button{border:0;background:#0F3192;color:#fff;border-radius:999px;padding:4px 12px;font-size:12px;font-weight:700}
 .data-chip button:hover{background:#0A2470}
+.onl-chip{margin-left:auto;border:1px solid #CFE9D8;background:#EFFAF3;color:#14532D;border-radius:999px;padding:5px 12px;font-size:12.5px;font-weight:700;cursor:pointer;white-space:nowrap}
+.onl-chip+.data-chip{margin-left:8px}
+#onlinePop{position:fixed;top:64px;right:14px;z-index:90;background:var(--surface,#fff);color:var(--ink,#111);border:1px solid var(--line,#ddd);border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.18);padding:12px 14px;width:min(320px,calc(100vw - 28px));max-height:60vh;overflow:auto;font-size:13px}
+#onlinePop h4{margin:0 0 8px;font-size:13.5px}#onlinePop .r{display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-top:1px solid var(--line,#eee)}#onlinePop .r small{color:#6B7280}
 .data-chip button.sc{background:#fff;color:#0F3192;border:1px solid #C8D0E0;max-width:200px;overflow:hidden;text-overflow:ellipsis}
 .data-chip button.og{background:#E46636}
 .data-chip .scc{display:none}
@@ -582,6 +586,7 @@ table.rp{border-collapse:separate;border-spacing:0;font-size:12px;width:100%;min
       <span class="sep"></span>
       <svg width="30" height="30" aria-hidden="true" style="flex:none;display:block" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#0F3192"/><path d="M6 50 L23 24 L31 36 L39 22 L58 50 Z" fill="#FFFFFF"/><path d="M23 24 L27.5 31 L25 30 L22 33 L19.5 30 Z M39 22 L43.5 29 L41 28.3 L38.6 30.6 L36.4 28.8 Z" fill="#C9D3F0"/><path d="M8 44 L20 36 L30 40 L44 24 L53 17" fill="none" stroke="#E46636" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/><path d="M45 15 L55 15 L55 25" fill="none" stroke="#E46636" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg>
       <span class="app">Integrated Hub<small>Jateng 01 · Regional 3</small></span>
+      <button class="onl-chip" id="onlineChip" type="button" hidden></button>
       <span class="data-chip" id="sideFoot"></span>
     </div>
     <nav class="nav" id="nav" aria-label="Menu"></nav>
@@ -1083,6 +1088,7 @@ async function api1(a, params) {
   return j;
 }
 async function apiPost(body, pw) {
+  if (!['login', 'register', 'logout'].includes(body.a)) PRES.mine = Date.now();
   try { return await apiPost1(body, pw); } catch (e) { if (e && e.code === 'auth' && App.user && !['login', 'register'].includes(body.a)) sessionExpired(); throw e; }
 }
 async function apiPost1(body, pw) {
@@ -1733,8 +1739,8 @@ function rpRow(r) {
 }
 function rpSub(label, t) { return `<tr class="subt"><td></td><td class="nm">Subtotal ${esc(label.toLowerCase())}</td>${rpCells(t, true)}</tr>`; }
 /* ---------- template chat laporan harian ke manajemen (admin) ---------- */
-/* 🟢 ≥ batas hijau (100%) · 🟡 batas kuning–99,9% (95–99,9%) · 🔴 di bawahnya */
-const achEmoji = v => v == null ? '' : v >= SET().achGreen / 100 ? ' 🟢' : v >= SET().achYellow / 100 ? ' 🟡' : ' 🔴';
+/* 🟢 ≥ 100% · 🟡 95–99,9% · 🔴 < 95% (ambang dari Pengaturan; bila kosong/tidak valid pakai 100 dan 95) */
+const achEmoji = v => { if (v == null || isNaN(v)) return ''; const G = (+SET().achGreen || 100) / 100, Y = Math.min((+SET().achYellow || 95) / 100, G), p = Math.round(v * 1e4) / 1e4; return p >= G ? ' 🟢' : p >= Y ? ' 🟡' : ' 🔴'; };
 const CHAT_GREET = 'Semangat Pagi Pak Riadi, Pak Budhi, Pak Andreas, Pak Yohanes';
 function reportChatText(R) {
   const D = R.D, d0 = +D.slice(8), mon = MONL[+D.slice(5, 7) - 1], y = D.slice(0, 4), t = R.t;
@@ -3297,7 +3303,51 @@ function showAuth(mode, msg) {
     <p class="small muted" style="margin:18px 0 0;text-align:center">Dashboard ini dibuat oleh <b>Fany Dzikri Hakim</b></p></div>`;
   setTimeout(() => { const f = $(mode === 'login' ? '#auU' : '#arU'); if (f) f.focus(); }, 50);
 }
+/* ---------- status online: sinyal tiap 60 dtk selama tab terlihat & ada aktivitas (maks. 5 menit tanpa aktivitas) ---------- */
+const PRES = { last: Date.now(), timer: null, dv: null, mine: 0, pingAt: 0, busy: false };
+['click', 'keydown', 'touchstart', 'scroll', 'mousemove'].forEach(ev => window.addEventListener(ev, () => { PRES.last = Date.now(); }, { passive: true }));
+function renderOnline() {
+  const ch = $('#onlineChip'); if (!ch) return;
+  const L = (App.online || []).filter(o => o.ago < 180);
+  ch.hidden = !App.user; ch.textContent = '🟢 ' + L.length + ' online';
+  const pop = $('#onlinePop'); if (pop) pop.innerHTML = onlinePopHtml();
+}
+function onlinePopHtml() {
+  const all = App.online || [], now = all.filter(o => o.ago < 180), rec = all.filter(o => o.ago >= 180 && o.ago < 3600);
+  const row = o => `<div class="r"><span>${esc(o.name || o.u)}${o.store ? ' · ' + esc(o.store) : ''}<br><small>${esc(o.job || '')}${o.pg ? ' · ' + esc(o.pg) : ''}</small></span><small>${o.ago < 180 ? '🟢 online' : Math.round(o.ago / 60) + ' mnt lalu'}</small></div>`;
+  return `<h4>🟢 Online sekarang (${now.length})</h4>${now.map(row).join('') || '<small>Belum ada yang online.</small>'}${rec.length ? `<h4 style="margin-top:12px">Baru saja aktif</h4>${rec.map(row).join('')}` : ''}`;
+}
+/* auto refresh: data berubah di server (upload admin / Hub diubah orang lain) → muat ulang diam-diam tanpa mengganggu yang sedang mengetik */
+async function autoRefresh() {
+  if (PRES.busy) return; PRES.busy = true;
+  try {
+    await sleep(Math.random() * 15000);                       /* acak 0-15 dtk supaya server tidak dibanjiri bersamaan */
+    for (let i = 0; i < 6; i++) {                             /* tunda bila sedang membuka dialog / mengisi form */
+      const ae = document.activeElement, typing = ae && /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName) && ae.closest('#view');
+      if (!$('#ov') && !$('.modal-ov') && !$('#authWall') && !typing) break; await sleep(10000);
+      if (i === 5) { PRES.dv = 'retry'; return; }                /* masih sibuk: coba lagi di ping berikutnya */
+    }
+    const y = window.scrollY;
+    if (App.mode === 'store' && App.storeLoaded) { await loadAll(); renderNav(); }
+    if (App.hub || isOps(App.page) || App.page === 'home') await loadHub(true);
+    render(); window.scrollTo(0, y); toast('🔄 Data terbaru sudah dimuat', 2500);
+  } catch (e) { PRES.dv = 'retry'; } finally { PRES.busy = false; }
+}
+async function presPing() {
+  if (!App.user || !App.token || document.visibilityState !== 'visible' || Date.now() - PRES.last > 5 * 60e3) return;
+  try {
+    const t0 = Date.now(), r = await api1('ping', { pg: App.page || '' });
+    App.online = r.online || []; renderOnline();
+    const own = (PRES.mine || 0) > (PRES.pingAt || 0);        /* perubahan dari aksi kita sendiri tidak perlu dimuat ulang */
+    PRES.pingAt = t0;
+    if (r.dv) { if (PRES.dv && r.dv !== PRES.dv && !own) autoRefresh(); PRES.dv = r.dv; }
+  } catch (e) { }
+}
+function presStop() { if (PRES.timer) { clearInterval(PRES.timer); PRES.timer = null; } }
+function presStart() { presStop(); presPing(); PRES.timer = setInterval(presPing, 60000); }
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') presPing(); });
 async function routeAfterLogin() {
+  presStart();
   const had = applyHash();
   if (had && isOps(App.page)) { const pg = App.page; App.mode = 'ops'; $('#view').innerHTML = '<div class="loading"><span class="spin"></span>Memuat Operational Hub…</div>'; renderNav(); try { await loadHub(); } catch (e) { } App.page = pg; render(); return; }
   if (had && App.page !== 'home') { App.mode = 'store'; App.storeLoaded = true; await boot(); return; }
@@ -3328,21 +3378,25 @@ async function doAuthReg() {
   try { await apiPost({ a: 'register', u, p, name: n, job: j, store: s }); showAuth('login', `✅ Pendaftaran <b>${esc(u)}</b> terkirim. Kamu bisa login setelah admin menyetujui akunmu.`); const f = $('#auU'); if (f) f.value = u; }
   catch (e) { if (btn) { btn.disabled = false; btn.textContent = 'Kirim pendaftaran'; } toast(e.message || errMsg(e)); }
 }
-function sessionExpired(msg) { App.token = ''; App.adminPw = ''; App.admin = false; App.user = null; showAuth('login', msg || 'Sesi berakhir. Silakan login lagi.'); }
-async function doLogout() { try { await apiPost({ a: 'logout' }); } catch (e) { } App.token = ''; App.adminPw = ''; App.admin = false; App.user = null; App.ui.scopeLocked = false; App.ui.scope = ''; App.ui.scopeAsked = false; App.hub = null; App.storeLoaded = false; App.mode = null; App.page = 'home'; try { history.replaceState(null, '', '#/home'); } catch (e) { } showAuth('login', 'Kamu sudah keluar.'); }
+function sessionExpired(msg) { presStop(); App.token = ''; App.adminPw = ''; App.admin = false; App.user = null; showAuth('login', msg || 'Sesi berakhir. Silakan login lagi.'); }
+async function doLogout() { presStop(); try { await apiPost({ a: 'logout' }); } catch (e) { } App.token = ''; App.adminPw = ''; App.admin = false; App.user = null; App.ui.scopeLocked = false; App.ui.scope = ''; App.ui.scopeAsked = false; App.hub = null; App.storeLoaded = false; App.mode = null; App.page = 'home'; try { history.replaceState(null, '', '#/home'); } catch (e) { } showAuth('login', 'Kamu sudah keluar.'); }
 /* kelola akun (admin) */
 async function renderUsers() {
   const box = $('#usersBox'); if (!box || !App.admin) return;
   box.innerHTML = '<div class="loading" style="padding:12px"><span class="spin"></span>Memuat akun…</div>';
-  let L = []; try { L = (await api('users')).users || []; } catch (e) { box.innerHTML = `<p class="small" style="color:var(--bad)">${esc(errMsg(e))}</p>`; return; }
+  let L = [], ON = []; try { const rr = await api('users'); L = rr.users || []; ON = rr.online || []; } catch (e) { box.innerHTML = `<p class="small" style="color:var(--bad)">${esc(errMsg(e))}</p>`; return; }
   App.pendingUsers = L.filter(x => x.status === 'pending').length; renderNav();
   const tab = App.ui.usTab || (App.pendingUsers ? 'pending' : 'approved');
   const shown = L.filter(x => tab === 'all' ? true : x.status === tab);
+  const onM = {}; ON.forEach(o => { onM[String(o.u).toLowerCase()] = o; });
+  const seen = x => { const o = onM[String(x.u).toLowerCase()]; return !o ? '' : o.ago < 180 ? ' · <b style="color:var(--ok)">🟢 online</b>' : ' · aktif ' + (o.ago < 3600 ? Math.round(o.ago / 60) + ' mnt' : Math.floor(o.ago / 3600) + ' jam') + ' lalu'; };
+  const nowOn = ON.filter(o => o.ago < 180);
+  const onlineBar = `<div class="small" style="margin-bottom:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b>🟢 Online sekarang (${nowOn.length})</b><span>${nowOn.map(o => esc(o.name || o.u) + (o.store ? ' (' + esc(o.store) + ')' : '') + (o.pg ? ' · ' + esc(o.pg) : '')).join(', ') || 'tidak ada'}</span><button class="btn sm" id="usRef" title="Segarkan status online">⟳</button></div>`;
   const roleTxt = x => x.role === 'admin' ? 'Admin' : x.role === 'toko' ? 'Toko ' + (x.store || '?') : 'Semua toko';
   const stTxt = { pending: '⏳ Menunggu', approved: '✅ Aktif', rejected: '❌ Ditolak', disabled: '⛔ Nonaktif' };
-  box.innerHTML = `<div class="seg" role="group" style="margin-bottom:10px">${[['pending', 'Menunggu (' + L.filter(x => x.status === 'pending').length + ')'], ['approved', 'Aktif (' + L.filter(x => x.status === 'approved').length + ')'], ['all', 'Semua (' + L.length + ')']].map(([k, l]) => `<button data-ustab="${k}" class="${tab === k ? 'on' : ''}">${l}</button>`).join('')}</div>
+  box.innerHTML = onlineBar + `<div class="seg" role="group" style="margin-bottom:10px">${[['pending', 'Menunggu (' + L.filter(x => x.status === 'pending').length + ')'], ['approved', 'Aktif (' + L.filter(x => x.status === 'approved').length + ')'], ['all', 'Semua (' + L.length + ')']].map(([k, l]) => `<button data-ustab="${k}" class="${tab === k ? 'on' : ''}">${l}</button>`).join('')}</div>
     <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Akun</th><th>Jabatan / toko</th><th>Status</th><th>Akses</th><th>Aksi</th></tr></thead><tbody>
-    ${shown.map(x => `<tr><td><span class="nm">${esc(x.u)}</span><span class="sub">${esc(x.name)} · daftar ${x.created ? fmtDateS(x.created.slice(0, 10)) : '–'}${x.last ? ' · login ' + fmtDateS(x.last.slice(0, 10)) : ''}</span></td>
+    ${shown.map(x => `<tr><td><span class="nm">${esc(x.u)}</span><span class="sub">${esc(x.name)} · daftar ${x.created ? fmtDateS(x.created.slice(0, 10)) : '–'}${x.last ? ' · login ' + fmtDateS(x.last.slice(0, 10)) : ''}${seen(x)}</span></td>
       <td class="small">${esc(x.job || '–')}${x.store ? ' · ' + esc(x.store) + ' ' + esc(sName(x.store) !== x.store ? sName(x.store) : '') : ''}</td><td class="small">${stTxt[x.status] || esc(x.status)}</td>
       <td><select class="inp sm" data-usrole="${esc(x.u)}"><option value="viewer" ${x.role !== 'toko' ? 'selected' : ''}>Semua toko</option><option value="toko" ${x.role === 'toko' ? 'selected' : ''}>Hanya toko…</option></select>
         <input class="inp sm" style="width:72px;${x.role === 'toko' ? '' : 'display:none'}" data-usstore="${esc(x.u)}" value="${esc(x.store)}" placeholder="kode"></td>
@@ -3709,13 +3763,26 @@ function shotOn2() {
   shotFit();
   window.scrollTo(0, 0);
 }
-/* lebarkan halaman mengikuti tabel terlebar supaya tidak ada kolom yang terpotong */
+/* hitung lebar halaman agar tabel terlebar muat penuh (dipakai di halaman asli DAN di salinan yang dirender html2canvas) */
+function shotLayout(main) {
+  const doc = main.ownerDocument, cs = doc.defaultView.getComputedStyle(main);
+  main.style.width = ''; main.style.maxWidth = '';
+  doc.querySelectorAll('.rp-wrap,.tbl-wrap').forEach(w => { w.scrollTop = 0; w.scrollLeft = 0; });
+  const els = () => Array.from(main.querySelectorAll('#view table, #view .jk-tl, #view .tk-grid'));
+  const pl = parseFloat(cs.paddingLeft) || 0, pr = parseFloat(cs.paddingRight) || 0, pad = (pl + pr) || 48;
+  let w = Math.max(1240, Math.max(0, ...els().map(t => Math.max(t.scrollWidth, Math.ceil(t.getBoundingClientRect().width)))) + pad + 2);
+  for (let i = 0; i < 5; i++) {
+    main.style.width = w + 'px'; main.style.maxWidth = w + 'px';
+    const edge = main.getBoundingClientRect().right - pr;
+    const over = Math.max(0, ...els().map(t => Math.ceil(t.getBoundingClientRect().right - edge)));
+    if (over <= 0) break; w += over + 2;
+  }
+  return w;
+}
 function shotFit() {
   const main = $('main.wrap'); if (!main) return;
-  main.style.width = ''; main.style.maxWidth = '';
-  $$('.rp-wrap,.tbl-wrap').forEach(w => { w.scrollTop = 0; w.scrollLeft = 0; });
-  const pad = 48, need = Math.max(0, ...$$('#view table, #view .jk-tl, #view .tk-grid').map(t => t.scrollWidth));
-  if (window.innerWidth >= 900 || App.ui.shotVp) { const w = Math.max(1240, need + pad); main.style.width = w + 'px'; main.style.maxWidth = w + 'px'; }
+  if (window.innerWidth >= 900 || App.ui.shotVp) shotLayout(main);
+  else { main.style.width = ''; main.style.maxWidth = ''; $$('.rp-wrap,.tbl-wrap').forEach(w => { w.scrollTop = 0; w.scrollLeft = 0; }); }
   App.charts.forEach(c => { try { c.resize(); } catch (e) { } });
 }
 function shotOff() { if (App.ui.shotVp) { const vp = $('#vpMeta'); if (vp) vp.setAttribute('content', VP_NORMAL); App.ui.shotVp = false; } const m = $('main.wrap'); if (m) { m.style.width = ''; m.style.maxWidth = ''; } document.body.classList.remove('shot'); const h = $('#shotHead'); if (h) h.remove(); const b = $('#shotBar'); if (b) b.remove(); render(); }
@@ -3724,11 +3791,21 @@ async function shotCapture(copy) {
     /* di HP: saat mengambil gambar, zoom dikembalikan ke 100% (layout tetap lebar PC) supaya teks tidak renggang */
     const vp = $('#vpMeta'), vpZoomed = App.ui.shotVp && vp ? vp.getAttribute('content') : null;
     if (vpZoomed) { vp.setAttribute('content', 'width=1320, initial-scale=1, viewport-fit=cover'); await new Promise(r => setTimeout(r, 400)); }
-    document.body.classList.add('capturing'); shotFit(); const el = $('main.wrap'); const W = Math.max(el.scrollWidth, el.offsetWidth);
-    const cv = await window.html2canvas(el, { scale: App.ui.shotVp ? 2 : Math.min(2, window.devicePixelRatio || 1.5), useCORS: true, backgroundColor: getComputedStyle(document.body).backgroundColor || '#F4F6FB', logging: false, width: W, windowWidth: W + 80, scrollX: 0, scrollY: 0 });
+    document.body.classList.add('capturing');
+    try { if (document.fonts && document.fonts.ready) await document.fonts.ready; } catch (e) { }
+    shotFit(); const el = $('main.wrap');
+    /* batasi skala supaya kanvas tidak melewati batas memori browser HP (kalau lewat, gambar terpotong/kosong) */
+    const w0 = Math.max(el.scrollWidth, el.offsetWidth), h0 = Math.max(el.scrollHeight, el.offsetHeight);
+    const want = App.ui.shotVp ? 2 : Math.min(2, window.devicePixelRatio || 1.5);
+    const scale = Math.max(.6, Math.min(want, Math.sqrt(14e6 / (w0 * h0 * 1.2)), 15000 / (h0 * 1.2)));
+    /* lebar & tinggi gambar TIDAK dipatok dari layout HP: dihitung ulang di salinan (layout desktop) lewat onclone,
+       jadi tabel selalu muat penuh dan hasilnya sama dengan di PC */
+    const cv = await window.html2canvas(el, { scale, useCORS: true, backgroundColor: getComputedStyle(document.body).backgroundColor || '#F4F6FB', logging: false, windowWidth: 2400, scrollX: 0, scrollY: 0,
+      onclone: doc => { const m = doc.querySelector('main.wrap'); if (!m) return; m.style.margin = '0'; const w = shotLayout(m); doc.body.style.minWidth = w + 'px'; doc.documentElement.style.minWidth = w + 'px'; } });
     document.body.classList.remove('capturing');
     if (vpZoomed) { vp.setAttribute('content', vpZoomed); }
     const blob = await new Promise(r => cv.toBlob(r, 'image/png'));
+    if (!blob) throw new Error('gambar terlalu besar untuk memori perangkat, sembunyikan beberapa bagian lalu coba lagi');
     const name = ($('#pageTitle').textContent || 'Integrated Hub').replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '_') + '_' + todayISO() + '.png';
     if (copy && navigator.clipboard && window.ClipboardItem) { await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]); toast('Gambar tersalin — tempel (Ctrl+V) di WhatsApp Web'); return; }
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000); toast('Gambar diunduh: ' + name);
@@ -4523,6 +4600,7 @@ function go(page) { App.page = page; App.ui.navOpen = null; const f = $('#navFlo
 window.addEventListener('resize', () => { if (App.ui.navOpen) renderNav(); });
 document.addEventListener('click', async e => {
   const t = e.target;
+  { const pop = $('#onlinePop'); if (t.id === 'onlineChip') { if (pop) pop.remove(); else { const d = document.createElement('div'); d.id = 'onlinePop'; d.innerHTML = onlinePopHtml(); document.body.appendChild(d); } return; } if (pop && !pop.contains(t)) pop.remove(); }
   if (App.page === 'settings' && settingsClick(t)) return;
   const dl = t.closest && t.closest('[data-dellog]'); if (dl) { deleteByLog(dl.dataset.dellog); return; }
   const ng = t.closest('[data-navg]'); if (ng) { App.ui.navOpen = App.ui.navOpen === ng.dataset.navg ? null : ng.dataset.navg; renderNav(); return; }
@@ -4547,6 +4625,7 @@ document.addEventListener('click', async e => {
   if (t.id === 'shotBtn') { shotOn(); return; }
   const prm = t.closest('[data-prm]'); if (prm) { App.ui.prMode = prm.dataset.prm; render(); return; }
   if (t.id === 'chatCopy') { const tx = ($('#chatPre') || {}).textContent || ''; navigator.clipboard.writeText(tx).then(() => toast('Teks laporan tersalin — tempel di WA')).catch(() => prompt('Salin teks:', tx)); return; }
+  if (t.id === 'usRef') { renderUsers(); return; }
   if (t.id === 'chatSaveG') { saveSettings({ chatGreet: (($('#chatGreet') || {}).value || '').trim() }, 'Salam pembuka disimpan'); return; }
   if (t.id === 'omsRe') { loadOmset(App.ui.omsDate, true).then(render).then(() => toast('Data terbaru dimuat')); return; }
   if (t.id === 'omsWa') { const txt = omsWaText(); navigator.clipboard.writeText(txt).then(() => toast('Teks share omset tersalin — tempel di grup WA')).catch(() => { prompt('Salin teks berikut:', txt); }); return; }

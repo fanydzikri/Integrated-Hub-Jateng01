@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ESS Self Assessment · Eiger Jateng 01</title>
+<style>
+:root{--navy:#0F3192;--ink:#0F172A;--mut:#64748B;--line:#E3E8F2;--bg:#F4F6FB}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{background:var(--navy);color:#fff;padding:14px 18px}header b{font-size:16px}header small{display:block;opacity:.8}
+main{max-width:860px;margin:0 auto;padding:16px}.card{background:#fff;border:1px solid var(--line);border-radius:14px;overflow:hidden;margin-bottom:14px}.pad{padding:18px}
+h2{margin:0 0 6px;font-size:19px}.mut{color:var(--mut);font-size:13.5px}label{display:block;font-weight:700;font-size:13px;margin:12px 0 4px}
+select,input[type=text]{width:100%;padding:11px 12px;border:1px solid #CBD5E1;border-radius:10px;font:inherit;background:#fff}
+.btn{border:0;background:var(--navy);color:#fff;border-radius:10px;padding:12px 20px;font:inherit;font-weight:700;cursor:pointer}.btn:disabled{background:#CBD5E1;cursor:not-allowed}.btn.sec{background:#EEF2FB;color:var(--navy)}
+.err{background:#FEE2E2;color:#991B1B;border-radius:10px;padding:10px 12px;margin-top:12px;font-size:14px}
+.head{background:#F6F8FC;border-bottom:1px solid var(--line);padding:16px 18px}.top{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.badge{background:#4F46E5;color:#fff;border-radius:999px;padding:4px 12px;font-size:12px;font-weight:800}.q{font-size:17px;font-weight:800;margin:10px 0 4px;color:var(--navy)}
+.pt{padding:12px 18px;border-top:1px solid #EEF1F7}.row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.no{font:600 12px ui-monospace,monospace;background:#EEF1F7;border-radius:6px;padding:4px 8px;white-space:nowrap}
+.tx{flex:1 1 260px;font-weight:600}.ab{border:1px solid #D5DBE8;background:#F1F4F9;color:var(--mut);border-radius:999px;padding:8px 16px;font-weight:700;font:inherit;cursor:pointer}
+.ab.p.on{background:#DCFCE7;border-color:#86EFAC;color:#166534}.ab.k.on{background:#FEE2E2;border-color:#FCA5A5;color:#B91C1C}
+.note{display:flex;align-items:center;gap:10px;margin-top:8px}.note span{font-size:12px;font-weight:700;color:#7B8AA5;white-space:nowrap}.note input{flex:1}
+.foot{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:14px 18px;border-top:1px solid #EEF1F7;flex-wrap:wrap;background:#FAFBFE;position:sticky;bottom:0}
+.prog{height:6px;background:#E5EAF3;border-radius:6px;margin:6px 0;width:min(320px,70vw)}.prog i{display:block;height:100%;width:0;background:#4F46E5;border-radius:6px;transition:width 1s linear}
+.center{text-align:center;padding:34px 18px}
+</style></head><body>
+<header><b>ESS Self Assessment</b><small>Briefing siang · Eiger Jateng 01</small></header>
+<main id="app"></main>
+<script src="ess-data.js"></script>
+<script>
+const API = "https://script.google.com/macros/s/AKfycbwJAbY6vgj6TW9fbUCkvZTF1_QwTLWt1S3BnnF7_AWoxhclR07cJOtkPMrUGrPePsbZbg/exec";
+const $ = s => document.querySelector(s), esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+async function call(opt) {
+  let r; try { r = await fetch(opt.url, opt.init); } catch (e) { throw new Error('Tidak bisa terhubung. Cek internet lalu coba lagi.'); }
+  const j = await r.json().catch(() => ({ error: 'x', message: 'Jawaban server tidak terbaca.' })); if (j && j.error) throw new Error(j.message || j.error); return j;
+}
+const get = a => call({ url: API + '?a=' + a, init: { redirect: 'follow' } });
+const post = b => call({ url: API, init: { method: 'POST', redirect: 'follow', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(b) } });
+const S = { step: 'load', stores: [], code: '', nik: '', name: '', sid: '', i: 0, ans: {}, left: ESS_J.map(() => ESS_SEC), err: '', busy: false, timer: null };
+async function init() { try { S.stores = (await get('essPubStores')).stores || []; S.step = 'id'; } catch (e) { S.err = e.message; S.step = 'id'; } draw(); }
+function okJ(j) { return j.pts.every(p => { const a = S.ans[p[0]]; return a && (a.v === 'P' || (a.v === 'K' && (a.n || '').trim().length >= 5)); }); }
+function paint() {
+  const j = ESS_J[S.i]; if (S.step !== 'slide' || !j) return; const l = S.left[S.i], ok = okJ(j), t = $('#tm'), b = $('#nx'); if (!t || !b) return;
+  t.innerHTML = l > 0 ? `⏱ <b>${String(Math.floor(l / 60)).padStart(2, '0')}:${String(l % 60).padStart(2, '0')}</b> lagi — baca & diskusikan dulu bersama tim` : '✅ Waktu baca terpenuhi';
+  $('#bar').style.width = ((ESS_SEC - l) / ESS_SEC * 100) + '%'; b.disabled = S.busy || !(l === 0 && ok);
+  $('#why').textContent = l > 0 ? 'Tombol lanjut aktif setelah timer selesai (timer berhenti kalau halaman ditinggal).' : !ok ? 'Isi semua poin. Jika memilih Kendala, catatan wajib diisi (min. 5 huruf).' : '';
+}
+function tick() { if (S.step !== 'slide') { clearInterval(S.timer); S.timer = null; return; } if (document.visibilityState !== 'visible') return; if (S.left[S.i] > 0) S.left[S.i]--; paint(); }
+function draw() {
+  const A = $('#app'), e = S.err ? `<div class="err">${esc(S.err)}</div>` : '';
+  if (S.step === 'load') { A.innerHTML = '<p class="mut">Memuat…</p>'; return; }
+  if (S.step === 'id') {
+    A.innerHTML = `<div class="card pad"><h2>Mulai Self Assessment</h2><p class="mut" style="margin:0">Ada ${ESS_J.length} slide journey. Tiap slide minimal <b>${ESS_SEC / 60} menit</b> supaya benar-benar dibaca & didiskusikan. Tombol lanjut baru aktif setelah waktu habis.</p>
+      <label>1. Pilih toko</label><select id="st"><option value="">— pilih toko —</option>${S.stores.map(r => `<option value="${esc(r[0])}" ${r[0] === S.code ? 'selected' : ''}>${esc(r[1])} (${esc(r[0])})</option>`).join('')}</select>
+      <label>2. Masukkan NIK</label><input type="text" id="nk" inputmode="text" autocomplete="off" placeholder="NIK karyawan" value="${esc(S.nik)}">
+      ${e}<div style="margin-top:16px"><button class="btn" id="go" ${S.busy ? 'disabled' : ''}>${S.busy ? 'Memeriksa…' : 'Lanjut ▶'}</button></div></div>`; return;
+  }
+  if (S.step === 'confirm') { A.innerHTML = `<div class="card center"><div style="font-size:40px">👋</div><h2>Halo, ${esc(S.name)}!</h2><p class="mut">Toko ${esc((S.stores.find(r => r[0] === S.code) || [])[1] || S.code)}. Benar ini kamu?</p>${e}<button class="btn" id="yes">Ya, mulai ▶</button> <button class="btn sec" id="no">Bukan, ganti</button></div>`; return; }
+  if (S.step === 'done') { A.innerHTML = `<div class="card center"><div style="font-size:42px">🎉</div><h2>Terima kasih, ${esc(S.name)}!</h2><p class="mut">Self assessment kamu sudah terkirim.</p><button class="btn sec" id="again">Isi untuk RA lain</button></div>`; return; }
+  const j = ESS_J[S.i], last = S.i === ESS_J.length - 1;
+  A.innerHTML = `<div class="card"><div class="head"><div class="top"><span class="badge">JOURNEY ${j.id}</span><b>${esc(j.tp)}</b><span class="mut" style="margin-left:auto">${j.pts.length} Poin Standar · Slide ${S.i + 1}/${ESS_J.length}</span></div>
+    <div class="q">❝ "${esc(j.q)}"</div><div class="mut"><i>Panduan: bahas poin satu per satu bersama tim. Pilih "Paham" bila sudah mengerti dan biasa menerapkan; pilih "Kendala" bila belum paham / sulit dijalankan, lalu tulis kendalanya.</i></div></div>
+    ${j.pts.map((p, k) => { const a = S.ans[p[0]] || {}; return `<div class="pt"><div class="row"><span class="no">#${p[0]} (Poin ${String(k + 1).padStart(2, '0')})</span><span class="tx">${esc(p[1])}</span>
+      <button class="ab p ${a.v === 'P' ? 'on' : ''}" data-a="${p[0]}:P">✔ Paham</button><button class="ab k ${a.v === 'K' ? 'on' : ''}" data-a="${p[0]}:K">⚠ Kendala</button></div>
+      <div class="note"><span>Catatan RA:</span><input type="text" data-n="${p[0]}" value="${esc(a.n || '')}" placeholder="${a.v === 'K' ? 'Wajib: apa yang belum paham / jadi kendala…' : 'Opsional: contoh penerapan / pertanyaan…'}"></div></div>`; }).join('')}
+    <div class="foot"><div><div id="tm"></div><div class="prog"><i id="bar"></i></div><div id="why" class="mut"></div>${e}</div><button class="btn" id="nx" disabled>${last ? 'Kirim Self Assessment ✔' : 'Lanjut ke Journey ' + ESS_J[S.i + 1].id + ' →'}</button></div></div>`;
+  paint(); if (!S.timer) S.timer = setInterval(tick, 1000);
+}
+document.addEventListener('input', e => { const n = e.target.dataset && e.target.dataset.n; if (n) { (S.ans[n] = S.ans[n] || {}).n = e.target.value; paint(); } if (e.target.id === 'nk') S.nik = e.target.value; });
+document.addEventListener('change', e => { if (e.target.id === 'st') S.code = e.target.value; });
+document.addEventListener('click', async e => {
+  const t = e.target.closest('button'); if (!t) return;
+  if (t.dataset.a) { const [no, v] = t.dataset.a.split(':'); (S.ans[no] = S.ans[no] || {}).v = v; const y = scrollY; draw(); scrollTo(0, y); return; }
+  try {
+    if (t.id === 'go') { S.err = ''; S.nik = $('#nk').value.trim(); S.code = $('#st').value; if (!S.code || !S.nik) { S.err = 'Pilih toko dan isi NIK dulu.'; draw(); return; } S.busy = true; draw();
+      try { const r = await post({ a: 'essPub', op: 'start', code: S.code, nik: S.nik }); S.sid = r.sid; S.name = r.name; S.step = 'confirm'; } catch (er) { S.err = er.message; } S.busy = false; draw(); }
+    else if (t.id === 'no') { S.step = 'id'; S.err = ''; S.sid = ''; draw(); }
+    else if (t.id === 'yes') { S.step = 'slide'; S.i = 0; S.ans = {}; S.left = ESS_J.map(() => ESS_SEC); S.err = ''; draw(); scrollTo(0, 0); }
+    else if (t.id === 'again') { S.step = 'id'; S.nik = ''; S.err = ''; S.sid = ''; draw(); }
+    else if (t.id === 'nx') {
+      if (S.i < ESS_J.length - 1) { S.i++; S.err = ''; draw(); scrollTo(0, 0); return; }
+      const ans = ESS_J.flatMap(j => j.pts.map(p => [p[0], S.ans[p[0]].v, (S.ans[p[0]].n || '').trim()])); S.busy = true; S.err = ''; paint();
+      try { await post({ a: 'essPub', op: 'submit', sid: S.sid, slides: ESS_J.length, answers: ans }); S.step = 'done'; } catch (er) { S.err = er.message; } S.busy = false; draw(); scrollTo(0, 0);
+    }
+  } catch (er) { S.err = er.message; S.busy = false; draw(); }
+});
+init();
+</script></body></html>

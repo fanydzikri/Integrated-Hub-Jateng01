@@ -6,12 +6,12 @@ const ESS_SEC = 180;      /* waktu minimal default per slide (detik); tiap journ
 const ESS_NOTE_MIN = 5;   /* minimal jumlah huruf catatan RA (wajib di setiap poin) */
 /* PENTING: bila mengubah 'sec' di bawah, samakan juga ESS_SECS di Code.gs (pengecekan waktu di server) */
 const ESS_J = [
-  { id: 'F', sec: 120, tp: 'Touchpoint 06 • Pengalaman Mencoba Produk', q: 'Kalau ada customer lagi lihat-lihat jaket terus kelihatan tertarik, menurut Bapak/Ibu urutan idealnya RA ngapain aja?', pts: [
+  { id: 'F', sec: 60, tp: 'Touchpoint 06 • Pengalaman Mencoba Produk', q: 'Kalau ada customer lagi lihat-lihat jaket terus kelihatan tertarik, menurut Bapak/Ibu urutan idealnya RA ngapain aja?', pts: [
     [1, 'RA menawarkan pelanggan untuk mencoba produk yang diminati (inisiatif RA, bukan menunggu diminta)', ['menawarkan pelanggan untuk mencoba produk', 'inisiatif RA, bukan menunggu diminta']],
     [2, 'RA menawarkan bantuan untuk mencoba produk - berlaku untuk tas, jaket, sepatu, helm, jas hujan, tenda', ['menawarkan bantuan', 'tas, jaket, sepatu, helm, jas hujan, tenda']],
     [3, 'RA memberikan tanggapan / masukan yang relevan terhadap produk yang dicoba', ['tanggapan / masukan yang relevan']],
     [4, 'Fitting room bersih, rapi, terawat, kunci pintu berfungsi, lampu menyala warna putih terang', ['Fitting room', 'bersih, rapi, terawat', 'kunci pintu berfungsi', 'lampu menyala warna putih terang']]] },
-  { id: 'G', sec: 180, tp: 'Touchpoint 07 • Rekomendasi Untuk Membeli Produk', q: 'Kalau customer udah mantap mau beli, sebelum ke kasir idealnya RA ngapain aja?', pts: [
+  { id: 'G', sec: 120, tp: 'Touchpoint 07 • Rekomendasi Untuk Membeli Produk', q: 'Kalau customer udah mantap mau beli, sebelum ke kasir idealnya RA ngapain aja?', pts: [
     [5, 'RA meminta customer mengecek kembali produk yang akan dibeli + menginformasikan fitur yang perlu dicek', ['mengecek kembali produk', 'menginformasikan fitur']],
     [6, 'RA menjelaskan cara perawatan produk SECARA SPONTAN (tanpa ditanya / tanpa dipancing)', ['cara perawatan produk', 'SECARA SPONTAN']],
     [7, 'RA menawarkan produk tambahan sesuai kebutuhan (Cross/Up Selling / Eigerindo Voucher / EASAP)', ['produk tambahan', 'Cross/Up Selling', 'Eigerindo Voucher', 'EASAP']],

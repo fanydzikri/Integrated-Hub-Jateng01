@@ -91,7 +91,7 @@ async function init() { try { S.stores = (await get('essPubStores')).stores || [
 const noteOk = a => !!(a && a.v && (a.n || '').trim().length >= ESS_NOTE_MIN), answered = j => j.pts.filter(p => noteOk(S.ans[p[0]])).length;
 function okJ(j) { return j.pts.every(p => noteOk(S.ans[p[0]])); }
 function steps() {
-  const cur = S.step === 'slide' ? S.i + 1 : S.step === 'done' ? 99 : 0, names = ['Identitas', ...ESS_J.map(j => 'Journey ' + j.id)];
+  const cur = S.step === 'slide' ? S.i + 1 : (S.step === 'done' || S.step === 'offdone') ? 99 : 0, names = ['Identitas', ...ESS_J.map(j => 'Journey ' + j.id)];
   $('#steps').innerHTML = names.map((n, k) => `<div class="st ${k < cur ? 'ok' : k === cur ? 'on' : ''}"><i>${k < cur ? '✓' : k + 1}</i>${n}</div>`).join('');
 }
 const C = 2 * Math.PI * 24;
@@ -116,7 +116,8 @@ function draw() {
       ${!S.stores.length && !S.err ? '<div class="info">Belum ada toko yang daftar RA-nya terisi. Minta Store Head mengisi daftar RA dulu.</div>' : ''}${e}
       <div style="margin-top:20px"><button class="btn" id="go" ${S.busy ? 'disabled' : ''}>${S.busy ? 'Memeriksa…' : 'Lanjut ▶'}</button></div></div>`; return;
   }
-  if (S.step === 'confirm') { A.innerHTML = `<div class="card center"><div class="big">👋</div><h2>Halo, ${esc(S.name)}!</h2><p class="mut">Toko ${esc((S.stores.find(r => r[0] === S.code) || [])[1] || S.code)}. Benar ini kamu?</p>${e}<div class="acts"><button class="btn or" id="yes">Ya, mulai ▶</button><button class="btn sec" id="no">Bukan, ganti</button></div></div>`; return; }
+  if (S.step === 'confirm') { A.innerHTML = `<div class="card center"><div class="big">👋</div><h2>Halo, ${esc(S.name)}!</h2><p class="mut">Toko ${esc((S.stores.find(r => r[0] === S.code) || [])[1] || S.code)}. Benar ini kamu?</p>${e}<div class="acts"><button class="btn or" id="yes">Ya, mulai ▶</button><button class="btn sec" id="off">🌴 Hari ini saya OFF</button><button class="btn sec" id="no">Bukan, ganti</button></div></div>`; return; }
+  if (S.step === 'offdone') { A.innerHTML = `<div class="card center"><div class="big">🌴</div><h2>Oke, ${esc(S.name)}!</h2><p class="mut">Hari ini kamu tercatat <b>OFF</b>, jadi tidak perlu mengisi self assessment. Selamat beristirahat 🙌</p><div class="acts"><button class="btn sec" id="again">Isi untuk RA lain</button></div></div>`; return; }
   if (S.step === 'done') { A.innerHTML = `<div class="card center"><div class="big">🎉</div><h2>Terima kasih, ${esc(S.name)}!</h2><p class="mut">Self assessment kamu sudah terkirim. Kendala yang kamu tulis akan ditindaklanjuti Store Head.</p><div class="acts"><button class="btn sec" id="again">Isi untuk RA lain</button></div></div>`; return; }
   const j = ESS_J[S.i], last = S.i === ESS_J.length - 1;
   A.innerHTML = `<div class="card"><div class="head"><div class="top"><span class="badge">JOURNEY ${j.id}</span><span class="cnt">Slide ${S.i + 1}/${ESS_J.length} · ${j.pts.length} poin · ${mins(secOf(j))}</span><b>${esc(j.tp)}</b></div>
@@ -138,6 +139,7 @@ document.addEventListener('click', async e => {
   try {
     if (t.id === 'go') { S.err = ''; S.nik = $('#nk').value.trim(); S.code = $('#st').value; if (!S.code || !S.nik) { S.err = 'Pilih toko dan isi NIK dulu.'; draw(); return; } LS.s('ess_store', S.code); S.busy = true; draw();
       try { const r = await post({ a: 'essPub', op: 'start', code: S.code, nik: S.nik }); S.sid = r.sid; S.name = r.name; S.step = 'confirm'; save(); } catch (er) { S.err = er.message; } S.busy = false; draw(); }
+    else if (t.id === 'off') { if (!confirm('Hari ini kamu OFF (libur / cuti / tidak masuk)?\nKamu tidak perlu mengisi self assessment.')) return; S.busy = true; S.err = ''; t.disabled = true; try { await post({ a: 'essPub', op: 'off', sid: S.sid }); S.step = 'offdone'; LS.d(KEY); } catch (er) { S.err = er.message; } S.busy = false; draw(); scrollTo(0, 0); }
     else if (t.id === 'no') { S.step = 'id'; S.err = ''; S.sid = ''; LS.d(KEY); draw(); }
     else if (t.id === 'yes') { S.step = 'slide'; S.i = 0; S.ans = {}; S.left = ESS_J.map(secOf); S.err = ''; save(); draw(); scrollTo(0, 0); }
     else if (t.id === 'again') { S.step = 'id'; S.nik = ''; S.err = ''; S.sid = ''; LS.d(KEY); draw(); scrollTo(0, 0); }

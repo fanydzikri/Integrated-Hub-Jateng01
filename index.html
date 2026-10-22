@@ -4895,6 +4895,17 @@ init();
 <style>
 .ess-chip{display:inline-flex;gap:6px;align-items:center;background:#EEF2FB;border-radius:999px;padding:3px 6px 3px 10px;margin:3px;font-size:12.5px}.ess-chip button{border:0;background:#CBD5E1;border-radius:50%;width:18px;height:18px;line-height:16px;cursor:pointer}
 .ess-ic{border:0;background:none;cursor:pointer;font-size:15px;padding:2px 6px}
+.ess-hero{display:flex;gap:22px;align-items:center;flex-wrap:wrap;padding:18px 22px}
+.ess-ring{width:132px;height:132px;border-radius:50%;background:conic-gradient(var(--c) calc(var(--p)*1%),#E5EAF3 0);display:grid;place-items:center;position:relative;flex:none}
+.ess-ring::before{content:"";position:absolute;inset:14px;border-radius:50%;background:var(--surface,#fff)}.ess-ring .in{position:relative;text-align:center}.ess-ring b{display:block;font-size:30px;line-height:1.05;font-weight:800}.ess-ring small{font-size:11px;color:#6B7280}
+.ess-kp{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;flex:1;min-width:260px}.ess-kp>div{background:#F6F8FC;border-radius:12px;padding:10px 14px}.ess-kp span{display:block;font-size:12px;color:#6B7280;font-weight:600}.ess-kp b{font-size:26px;font-weight:800}
+.ess-ins>div{padding:8px 12px;background:#F8FAFD;border-radius:8px;margin:6px 0;line-height:1.5}
+.ess-pb{height:8px;background:#E5EAF3;border-radius:6px;overflow:hidden;margin-bottom:4px}.ess-pb i{display:block;height:100%}.ess-pill{color:#fff;border-radius:999px;padding:2px 10px;font-weight:800;font-size:12.5px}
+.ess-pr{display:grid;grid-template-columns:minmax(220px,1.4fr) minmax(220px,1fr);gap:14px;align-items:center;padding:8px 0;border-top:1px solid #EEF1F7}@media(max-width:760px){.ess-pr{grid-template-columns:1fr}}
+.ess-sb{display:flex;height:12px;border-radius:7px;overflow:hidden;background:#E5EAF3;margin-bottom:3px}.ess-sb i{display:block;height:100%}.ess-badge2{background:#4F46E5;color:#fff;border-radius:999px;padding:2px 10px;font-size:11.5px;font-weight:800}
+.ess-tr{display:flex;gap:10px;align-items:flex-end;height:190px;padding:6px 0}.ess-tr .c{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;height:100%;min-width:0}.ess-tr .v{font-size:12px;font-weight:800}
+.ess-tr .b{flex:1;width:100%;max-width:56px;background:#EEF2FB;border-radius:8px;display:flex;align-items:flex-end;overflow:hidden}.ess-tr .b i{display:block;width:100%;border-radius:8px 8px 0 0}.ess-tr .d{font-size:12px;color:#6B7280}.ess-tr .s{font-size:11.5px;font-weight:700;color:#4F46E5}.ess-tr .sel .d{font-weight:800;color:#0F3192}
+mark{background:#FFE08A;color:inherit;font-weight:700;padding:0 3px;border-radius:4px}
 </style>
 <script>
 /* ================= ESS Self Assessment — sisi admin / Store Head (RA mengisi lewat ess.html tanpa login) ================= */
@@ -4913,19 +4924,49 @@ async function essLoadRes(d) {
   try { const r = await api('essRes', { d }); App.essRes = { d, rows: r.rows || [], status: r.status || {} }; } catch (e) { toast('Gagal memuat hasil: ' + errMsg(e)); App.essRes = { d, rows: [], status: {} }; }
   essLoadRes.b = 0; if (App.page === 'ops_ess') render();
 }
+const essHl = (t, kws) => { let h = esc(t); (kws || []).slice().sort((a, b) => b.length - a.length).forEach(k => { const e = esc(k).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); h = h.replace(new RegExp('(?![^<]*>)(' + e + ')', 'i'), '<mark>$1</mark>'); }); return h; };
 function essHasil(E, me) {
   const rows = App.essRes && App.essRes.d === E.d ? App.essRes : null, canEdit = me.role === 'admin' || me.role === 'toko';
-  const bar = `<div class="card" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><label class="fl" style="margin:0">Tanggal <input class="inp" type="date" id="essD" value="${esc(E.d)}"></label><span class="small muted">Siapa yang sudah / belum mengisi, dan poin yang jadi kendala.</span></div>`;
+  const bar = `<div class="card" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button class="btn" data-ess="day:-1" title="Hari sebelumnya">◀</button><input class="inp" type="date" id="essD" value="${esc(E.d)}" style="width:auto"><button class="btn" data-ess="day:1" title="Hari berikutnya">▶</button><button class="btn ${E.d === todayISO() ? 'primary' : ''}" data-ess="day:0">Hari ini</button><span class="small muted" style="flex:1;min-width:220px">RA yang libur ditandai <b>OFF</b>: dianggap selesai dan tidak wajib mengisi.</span></div>`;
   if (!rows) { essLoadRes(E.d); return bar + '<div class="loading"><span class="spin"></span>Memuat hasil…</div>'; }
-  const st = rows.status, codes = Object.keys(st).sort(), reg = codes.reduce((a, c) => a + st[c].t, 0), miss = codes.reduce((a, c) => a + st[c].miss.length, 0), K = rows.rows.reduce((a, r) => a + r.ans.filter(x => x[1] === 'K').length, 0);
-  const per = codes.map(c => `<tr><td><b>${esc(c)}</b> ${esc(essName(c))}</td><td>${st[c].t}</td><td>${st[c].t - st[c].miss.length}</td><td class="small">${st[c].miss.length ? esc(st[c].miss.join(', ')) : '✅ semua sudah'}</td></tr>`).join('');
-  const stat = ESS_J.flatMap(j => j.pts.map(p => { let P = 0, Kn = 0; rows.rows.forEach(r => r.ans.forEach(a => { if (+a[0] === p[0]) a[1] === 'K' ? Kn++ : P++; })); return `<tr><td>${j.id} #${p[0]}</td><td>${esc(p[1])}</td><td>${P}</td><td style="color:#C0392B;font-weight:700">${Kn}</td></tr>`; })).join('');
-  const kend = rows.rows.flatMap(r => r.ans.filter(a => a[1] === 'K' || (a[2] || '').trim()).map(a => ({ r, a }))).sort((x, y) => (y.a[1] === 'K') - (x.a[1] === 'K')).map(({ r, a }) => `<tr><td>${esc(r.code)}</td><td>${esc(r.ra)}</td><td>#${+a[0]}</td><td>${a[1] === 'K' ? '<b style="color:#C0392B">Kendala</b>' : '<span style="color:#13806F">Paham</span>'}</td><td class="small">${esc(a[2])}</td></tr>`).join('');
-  return bar + `<div class="pt-tiles" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))"><div class="pt-tile"><span>RA terdaftar</span><b>${fmtN(reg)}</b></div><div class="pt-tile" style="background:#13806F"><span>Sudah mengisi</span><b>${fmtN(reg - miss)}</b></div><div class="pt-tile" style="background:#E46636"><span>Belum mengisi</span><b>${fmtN(miss)}</b></div><div class="pt-tile" style="background:#B42318"><span>Jawaban Kendala</span><b>${fmtN(K)}</b></div></div>
-    <div class="card"><h3 style="margin:0 0 8px">Per toko</h3><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Toko</th><th>RA</th><th>Sudah</th><th>Belum mengisi</th></tr></thead><tbody>${per || '<tr><td colspan="4" class="muted">Daftar RA belum diisi.</td></tr>'}</tbody></table></div></div>
-    <div class="card"><h3 style="margin:0 0 8px">Per poin</h3><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Poin</th><th>Pernyataan</th><th>Paham</th><th>Kendala</th></tr></thead><tbody>${stat}</tbody></table></div></div>
-    <div class="card"><h3 style="margin:0 0 8px">Catatan RA <span class="small muted">(Kendala di urutan atas)</span></h3><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Toko</th><th>RA</th><th>Poin</th><th>Status</th><th>Catatan</th></tr></thead><tbody>${kend || '<tr><td colspan="5" class="muted">Belum ada isian pada tanggal ini.</td></tr>'}</tbody></table></div></div>
-    ${canEdit && rows.rows.length ? `<div class="card"><h3 style="margin:0 0 8px">Hapus isian (salah isi)</h3>${rows.rows.map(r => `<span class="ess-chip">${esc(r.code)} · ${esc(r.ra)} <button title="Hapus isian ini" data-essrm="${esc(r.id)}">×</button></span>`).join('')}</div>` : ''}`;
+  const G = '#13806F', Y = '#E0A100', Rd = '#C0392B', col = v => v >= 95 ? G : v >= 80 ? Y : Rd, colP = v => v >= 90 ? G : v >= 75 ? Y : Rd;
+  const st = rows.status, codes = Object.keys(st), R = rows.rows;
+  const reg = codes.reduce((a, c) => a + st[c].t, 0), miss = codes.reduce((a, c) => a + st[c].miss.length, 0), off = codes.reduce((a, c) => a + st[c].off.length, 0), done = reg - miss - off, active = reg - off;
+  if (!reg) return bar + '<div class="card"><p class="muted">Daftar RA belum diisi. Buka tab <b>Daftar RA</b> untuk menambahkan.</p></div>';
+  const fill = active ? Math.round(done / active * 100) : 100;
+  const pts = ESS_J.flatMap(j => j.pts.map(p => ({ j: j.id, no: p[0], tx: p[1], kw: p[2] || [], P: 0, K: 0 }))), pm = {}; pts.forEach(p => { pm[p.no] = p; });
+  const ps = {}; R.forEach(r => { const o = ps[r.code] || (ps[r.code] = { P: 0, K: 0 }); r.ans.forEach(a => { const p = pm[+a[0]]; if (a[1] === 'K') { o.K++; if (p) p.K++; } else { o.P++; if (p) p.P++; } }); });
+  const P = pts.reduce((a, p) => a + p.P, 0), Kt = pts.reduce((a, p) => a + p.K, 0), paham = P + Kt ? Math.round(P / (P + Kt) * 100) : null;
+  /* ringkasan dalam bahasa sederhana */
+  const short = p => p.kw[0] || p.tx.slice(0, 40), lowStores = codes.filter(c => st[c].miss.length).sort((a, b) => st[b].miss.length - st[a].miss.length);
+  const weak = pts.filter(p => p.K).sort((a, b) => b.K / (b.P + b.K) - a.K / (a.P + a.K) || b.K - a.K).slice(0, 3), kStores = Object.keys(ps).filter(c => ps[c].K).sort((a, b) => ps[b].K - ps[a].K).slice(0, 3), ins = [];
+  ins.push(lowStores.length ? [Rd, `⏳ <b>${lowStores.length} toko belum selesai</b>: ` + lowStores.slice(0, 5).map(c => `${esc(essName(c))} (${st[c].miss.length} RA)`).join(', ') + (lowStores.length > 5 ? ` +${lowStores.length - 5} lainnya` : '')] : [G, '✅ <b>Semua RA sudah mengisi atau OFF.</b>']);
+  if (!R.length) ins.push([Y, '📭 Belum ada isian pada tanggal ini.']);
+  else if (weak.length) ins.push([Y, '⚠ <b>Poin paling banyak kendala</b>: ' + weak.map(p => `#${p.no} ${esc(short(p))} (${p.K} dari ${p.P + p.K} RA, ${Math.round(p.K / (p.P + p.K) * 100)}%)`).join('; ')]);
+  else ins.push([G, '👍 Belum ada kendala yang dilaporkan.']);
+  if (kStores.length) ins.push([Y, '🏬 <b>Toko dengan kendala terbanyak</b>: ' + kStores.map(c => `${esc(essName(c))} (${ps[c].K})`).join(', ')]);
+  const kp = [['RA wajib isi', active, '#16213D'], ['Sudah mengisi', done, G], ['Belum mengisi', miss, miss ? Rd : G], ['OFF', off, '#5B6B8C'], ['Pemahaman', paham == null ? '-' : paham + '%', paham == null ? '#5B6B8C' : colP(paham)], ['Kendala', Kt, Kt ? Rd : G]];
+  const nm = (x, c, undo) => `<span class="ess-chip">${esc(x.n)}${x.s ? ' <span title="OFF dilaporkan sendiri oleh RA">📱</span>' : ''}${canEdit && x.k ? ` <button title="${undo ? 'Batalkan OFF' : 'Tandai OFF (libur / cuti / tidak masuk)'}" data-essoff="${esc(c)}|${esc(x.k)}|${undo ? 0 : 1}" style="width:auto;border-radius:999px;padding:0 8px;font-weight:700">${undo ? '↩' : 'OFF'}</button>` : ''}</span>`;
+  const per = codes.slice().sort((a, b) => (st[b].miss.length - st[a].miss.length) || ((ps[b] ? ps[b].K : 0) - (ps[a] ? ps[a].K : 0))).map(c => {
+    const s = st[c], act = s.t - s.off.length, dn = s.t - s.miss.length - s.off.length, f = act ? Math.round(dn / act * 100) : 100, o = ps[c], pp = o && o.P + o.K ? Math.round(o.P / (o.P + o.K) * 100) : null;
+    return `<tr><td><b>${esc(essName(c))}</b><br><span class="small muted">${esc(c)}</span></td><td style="min-width:150px"><div class="ess-pb"><i style="width:${f}%;background:${col(f)}"></i></div><span class="small"><b>${dn}/${act}</b> sudah · ${f}%</span></td>
+      <td>${pp == null ? '<span class="muted">-</span>' : `<span class="ess-pill" style="background:${colP(pp)}">${pp}%</span>`}</td><td>${o && o.K ? `<b style="color:${Rd}">${o.K}</b>` : '<span class="muted">0</span>'}</td>
+      <td class="small">${s.miss.length ? s.miss.map(x => nm(x, c, 0)).join('') : `<span style="color:${G}">✅ selesai</span>`}</td><td class="small">${s.off.map(x => nm(x, c, 1)).join('') || '<span class="muted">-</span>'}</td></tr>`;
+  }).join('');
+  const perPoin = ESS_J.map(j => `<div style="margin:14px 0 4px"><span class="ess-badge2">JOURNEY ${j.id}</span> <b>${esc(j.tp)}</b></div>` + pts.filter(p => p.j === j.id).map(p => { const n = p.P + p.K, pp = n ? Math.round(p.P / n * 100) : null;
+    return `<div class="ess-pr"><div><b>#${p.no}</b> ${essHl(p.tx, p.kw)}</div><div><div class="ess-sb">${n ? `<i style="width:${pp}%;background:${G}"></i><i style="width:${100 - pp}%;background:${Rd}"></i>` : ''}</div><span class="small">${n ? `<b style="color:${colP(pp)}">${pp}% paham</b> · ${p.P} paham, ${p.K} kendala` : 'belum ada isian'}</span></div></div>`; }).join('')).join('');
+  const tr = (rows.trend || []).map(x => { const act = x.t - x.off, f = act ? Math.round(x.done / act * 100) : 0, pp = x.P + x.K ? Math.round(x.P / (x.P + x.K) * 100) : null;
+    return `<div class="c ${x.d === E.d ? 'sel' : ''}"><div class="v" style="color:${col(f)}">${f}%</div><div class="b"><i style="height:${Math.max(f, 3)}%;background:${col(f)}"></i></div><div class="d">${x.d.slice(8)}/${x.d.slice(5, 7)}</div><div class="s" title="% paham">${pp == null ? '-' : pp + '%'}</div></div>`; }).join('');
+  const notes = R.flatMap(r => r.ans.filter(a => (a[2] || '').trim()).map(a => ({ r, a }))), kn = notes.filter(n => n.a[1] === 'K'), pn = notes.filter(n => n.a[1] !== 'K');
+  const nrow = ({ r, a }) => `<tr><td>${esc(essName(r.code))}</td><td>${esc(r.ra)}</td><td>#${+a[0]}</td><td class="small">${esc(a[2])}</td></tr>`, nth = '<thead><tr><th>Toko</th><th>RA</th><th>Poin</th><th>Catatan</th></tr></thead>';
+  return bar + `<div class="card ess-hero"><div class="ess-ring" style="--p:${fill};--c:${col(fill)}"><div class="in"><b>${fill}%</b><small>sudah mengisi</small></div></div><div class="ess-kp">${kp.map(([l, v, c]) => `<div><span>${l}</span><b style="color:${c}">${v}</b></div>`).join('')}</div></div>
+    <div class="card"><h3 style="margin:0 0 6px">🧭 Perlu perhatian</h3><div class="ess-ins">${ins.map(([c, h]) => `<div style="border-left:4px solid ${c}">${h}</div>`).join('')}</div></div>
+    <div class="card"><h3 style="margin:0 0 4px">🏬 Status per toko</h3><p class="small muted" style="margin:0 0 8px">Diurutkan dari yang paling perlu ditindaklanjuti. Pemahaman = % jawaban Paham.</p><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Toko</th><th>Sudah mengisi</th><th>Pemahaman</th><th>Kendala</th><th>Belum mengisi</th><th>OFF</th></tr></thead><tbody>${per}</tbody></table></div></div>
+    <div class="card"><h3 style="margin:0 0 4px">🎯 Pemahaman per poin</h3><p class="small muted" style="margin:0">Hijau = Paham, merah = Kendala. Poin dengan bar merah terbesar perlu dibahas ulang saat briefing.</p>${perPoin}</div>
+    <div class="card"><h3 style="margin:0 0 4px">📈 Tren 7 hari</h3><p class="small muted" style="margin:0 0 6px">Batang = % RA sudah mengisi (tanpa OFF). Angka biru di bawah = % Paham.</p><div class="ess-tr">${tr}</div></div>
+    <div class="card"><h3 style="margin:0 0 8px">📝 Catatan kendala (${kn.length})</h3><div class="tbl-wrap"><table class="tbl">${nth}<tbody>${kn.map(nrow).join('') || '<tr><td colspan="4" class="muted">Tidak ada kendala dilaporkan.</td></tr>'}</tbody></table></div></div>
+    <details class="card" style="padding:14px 18px"><summary style="cursor:pointer"><b>Catatan Paham (${pn.length})</b> <span class="small muted">— penjelasan RA dengan kata-katanya sendiri</span></summary><div class="tbl-wrap" style="margin-top:8px"><table class="tbl">${nth}<tbody>${pn.map(nrow).join('') || '<tr><td colspan="4" class="muted">Belum ada.</td></tr>'}</tbody></table></div></details>
+    ${canEdit && R.length ? `<details class="card" style="padding:14px 18px"><summary style="cursor:pointer"><b>Hapus isian (salah isi)</b></summary><div style="margin-top:8px">${R.map(r => `<span class="ess-chip">${esc(essName(r.code))} · ${esc(r.ra)} <button title="Hapus isian ini" data-essrm="${esc(r.id)}">×</button></span>`).join('')}</div></details>` : ''}`;
 }
 function essRoster(E, me) {
   const R = App.essRoster || {}, admin = me.role === 'admin', stores = (App.hub && App.hub.stores) || [], code = admin ? (E.code || (stores[0] && stores[0][0]) || '') : me.store, list = R[code] || [];
@@ -4981,15 +5022,21 @@ document.addEventListener('change', e => {
   else if (t.id === 'essFile' && t.files && t.files[0]) { const f = t.files[0]; essUpload(f, E.xlMode || 'merge').catch(er => toast('Gagal: ' + errMsg(er), 6000)); }
 });
 document.addEventListener('click', async e => {
-  const t = e.target.closest && e.target.closest('[data-ess],[data-essdel],[data-redit],[data-essrm]'); if (!t || App.page !== 'ops_ess') return;
+  const t = e.target.closest && e.target.closest('[data-ess],[data-essdel],[data-redit],[data-essrm],[data-essoff]'); if (!t || App.page !== 'ops_ess') return;
   const E = essState(), d = t.dataset, me = App.user || {}, code = me.role === 'admin' ? (E.code || ((App.hub.stores[0] || [])[0]) || '') : me.store;
   const done = r => { App.essRoster = r.roster; if (r.skipped && r.skipped.length) toast('Dilewati: ' + r.skipped.slice(0, 3).join(' · '), 6000); essRender(); };
   try {
+    if (d.essoff) {
+      const [c, k, on] = d.essoff.split('|'); let to = E.d;
+      if (on === '1') { const r = prompt('Tandai OFF untuk tanggal ' + E.d + '.\nSampai tanggal berapa? (format 2026-10-25; kosongkan = hanya tanggal ini)', ''); if (r === null) return; if (r.trim() && !/^\d{4}-\d{2}-\d{2}$/.test(r.trim())) { toast('Format tanggal harus YYYY-MM-DD'); return; } to = r.trim() || E.d; }
+      await apiPost({ a: 'ess', op: 'off', code: c, k, d: E.d, to, on: on === '1' }); App.essRes = null; toast(on === '1' ? 'Ditandai OFF' : 'OFF dibatalkan'); essRender(); return;
+    }
     if (d.essdel) { const [c, k] = d.essdel.split('|'); if (!confirm('Hapus RA ini dari daftar? (resign / pindah toko)')) return; done(await apiPost({ a: 'ess', op: 'rdel', code: c, k })); return; }
     if (d.redit) { const [c, k] = d.redit.split('|'), cur = ((App.essRoster[c] || []).find(x => x.k === k) || {}).n || '', n = prompt('Nama RA untuk NIK ' + k, cur); if (!n || !n.trim()) return; done(await apiPost({ a: 'ess', op: 'radd', code: c, k, n })); return; }
     if (d.essrm) { if (!confirm('Hapus isian ini?')) return; await apiPost({ a: 'ess', op: 'del', id: d.essrm }); App.essRes = null; essRender(); return; }
     const k = d.ess || '';
     if (k === 'copy') { const u = $('#essUrl'); try { await navigator.clipboard.writeText(u.value); } catch (er) { u.select(); document.execCommand('copy'); } toast('Link disalin'); }
+    else if (k.startsWith('day:')) { const n = +k.slice(4); if (n === 0) E.d = todayISO(); else { const t0 = new Date(E.d + 'T12:00:00'); t0.setDate(t0.getDate() + n); E.d = t0.getFullYear() + '-' + String(t0.getMonth() + 1).padStart(2, '0') + '-' + String(t0.getDate()).padStart(2, '0'); } essRender(); }
     else if (k === 'tpl') essTemplate();
     else if (k.startsWith('xl:')) { E.xlMode = k.slice(3); const f = $('#essFile'); f.value = ''; f.click(); }
     else if (k.startsWith('tab:')) { E.tab = k.slice(4); App.essRes = null; essRender(); }

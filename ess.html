@@ -49,7 +49,8 @@ select:focus,input[type=text]:focus{outline:0;border-color:var(--navy);box-shado
 .sw{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:2px}
 .ab{min-height:48px;border:1.5px solid #D5DBE8;background:#F6F8FC;color:var(--mut);border-radius:13px;padding:10px 8px;font:inherit;font-size:15px;font-weight:800;cursor:pointer;transition:all .15s}
 .ab.p.on{background:#DCFCE7;border-color:#4ADE80;color:#166534;box-shadow:0 4px 12px rgba(22,101,52,.18)}.ab.k.on{background:#FEE2E2;border-color:#F87171;color:#B91C1C;box-shadow:0 4px 12px rgba(185,28,28,.18)}
-.note{margin-top:10px}.note input{min-height:46px;font-size:16px;padding:10px 13px}
+.note{margin-top:10px}.note input{min-height:46px;font-size:16px;padding:10px 13px}.note input.need{border-color:#F59E0B;background:#FFFBEB}
+mark{background:#FFE08A;color:#0B1B4A;font-weight:800;padding:1px 4px;border-radius:5px;-webkit-box-decoration-break:clone;box-decoration-break:clone}
 .foot{position:sticky;bottom:0;display:grid;gap:10px;padding:12px 16px calc(12px + env(safe-area-inset-bottom,0px));border-top:1px solid var(--line);background:rgba(255,255,255,.97);backdrop-filter:blur(8px);border-radius:0 0 13px 13px;z-index:5}
 .tm{display:flex;align-items:center;gap:12px}.ring{position:relative;width:54px;height:54px;flex:none}.ring svg{transform:rotate(-90deg)}.ring b{position:absolute;inset:0;display:grid;place-items:center;font-size:13px;font-weight:800;color:var(--navy)}
 .ttl{font-weight:800;font-size:14px}.why{font-size:12.5px;color:var(--mut);line-height:1.35}.foot .err{margin-top:8px;padding:8px 12px;font-size:13px}
@@ -71,6 +72,7 @@ select:focus,input[type=text]:focus{outline:0;border-color:var(--navy);box-shado
 <script>
 const API = "https://script.google.com/macros/s/AKfycbwJAbY6vgj6TW9fbUCkvZTF1_QwTLWt1S3BnnF7_AWoxhclR07cJOtkPMrUGrPePsbZbg/exec";
 const $ = s => document.querySelector(s), esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+function hl(t, kws) { let h = esc(t); (kws || []).slice().sort((a, b) => b.length - a.length).forEach(k => { const e = esc(k).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); h = h.replace(new RegExp('(?![^<]*>)(' + e + ')', 'i'), '<mark>$1</mark>'); }); return h; }
 const secOf = j => j.sec || ESS_SEC, mins = s => s % 60 ? Math.floor(s / 60) + ' mnt ' + (s % 60) + ' dtk' : s / 60 + ' menit';
 async function call(url, init) {
   let r; try { r = await fetch(url, init); } catch (e) { throw new Error('Tidak bisa terhubung. Cek internet lalu coba lagi.'); }
@@ -86,8 +88,8 @@ const KEY = 'ess_progress', LS = { g: k => { try { return localStorage.getItem(k
 const save = () => LS.s(KEY, JSON.stringify({ step: S.step, code: S.code, name: S.name, sid: S.sid, i: S.i, ans: S.ans, left: S.left, t: Date.now() }));
 function restore() { try { const o = JSON.parse(LS.g(KEY) || 'null'); if (o && o.sid && Date.now() - o.t < 3 * 3600e3 && (o.step === 'slide' || o.step === 'confirm') && (o.left || []).length === ESS_J.length) Object.assign(S, o, { err: '', busy: false }); else LS.d(KEY); } catch (e) { } }
 async function init() { try { S.stores = (await get('essPubStores')).stores || []; } catch (e) { S.err = e.message; } S.code = LS.g('ess_store') || ''; if (!S.stores.some(r => r[0] === S.code)) S.code = ''; restore(); S.step = S.step === 'load' ? 'id' : S.step; draw(); }
-const answered = j => j.pts.filter(p => S.ans[p[0]] && S.ans[p[0]].v).length;
-function okJ(j) { return j.pts.every(p => { const a = S.ans[p[0]]; return a && (a.v === 'P' || (a.v === 'K' && (a.n || '').trim().length >= 5)); }); }
+const noteOk = a => !!(a && a.v && (a.n || '').trim().length >= ESS_NOTE_MIN), answered = j => j.pts.filter(p => noteOk(S.ans[p[0]])).length;
+function okJ(j) { return j.pts.every(p => noteOk(S.ans[p[0]])); }
 function steps() {
   const cur = S.step === 'slide' ? S.i + 1 : S.step === 'done' ? 99 : 0, names = ['Identitas', ...ESS_J.map(j => 'Journey ' + j.id)];
   $('#steps').innerHTML = names.map((n, k) => `<div class="st ${k < cur ? 'ok' : k === cur ? 'on' : ''}"><i>${k < cur ? '✓' : k + 1}</i>${n}</div>`).join('');
@@ -97,8 +99,9 @@ function paint() {
   const j = ESS_J[S.i]; if (S.step !== 'slide' || !j) return; const tot = secOf(j), l = S.left[S.i], ok = okJ(j), b = $('#nx'); if (!b) return;
   $('#ring').style.strokeDashoffset = C * (1 - (tot - l) / tot); $('#mm').textContent = l > 0 ? String(Math.floor(l / 60)).padStart(2, '0') + ':' + String(l % 60).padStart(2, '0') : '✓';
   $('#ttl').textContent = l > 0 ? 'Baca & diskusikan dulu' : 'Waktu baca terpenuhi';
-  $('#why').textContent = l > 0 ? 'Terjawab ' + answered(j) + '/' + j.pts.length + ' · tombol aktif setelah timer selesai (berhenti kalau halaman ditinggal)' : !ok ? 'Terjawab ' + answered(j) + '/' + j.pts.length + ' · isi semua poin; Kendala wajib catatan (min. 5 huruf)' : 'Semua poin terisi 👍';
+  $('#why').textContent = l > 0 ? 'Terjawab ' + answered(j) + '/' + j.pts.length + ' · tombol aktif setelah timer selesai (berhenti kalau halaman ditinggal)' : !ok ? 'Terjawab ' + answered(j) + '/' + j.pts.length + ' · pilih Paham / Kendala dan isi catatan di setiap poin (min. ' + ESS_NOTE_MIN + ' huruf)' : 'Semua poin terisi 👍';
   b.disabled = S.busy || !(l === 0 && ok);
+  document.querySelectorAll('[data-n]').forEach(i => { const a = S.ans[i.dataset.n]; i.classList.toggle('need', !!(a && a.v) && (a.n || '').trim().length < ESS_NOTE_MIN); });
 }
 function tick() { if (S.step !== 'slide') { clearInterval(S.timer); S.timer = null; return; } if (document.visibilityState !== 'visible') return; if (S.left[S.i] > 0) { S.left[S.i]--; if (S.left[S.i] % 5 === 0) save(); } paint(); }
 function draw() {
@@ -107,7 +110,7 @@ function draw() {
   if (S.step === 'id') {
     A.innerHTML = `<div class="card pad"><h2>Mulai Self Assessment</h2><p class="mut" style="margin:0">Ada ${ESS_J.length} slide journey. Tiap slide ada waktu baca minimal supaya benar-benar dibaca & didiskusikan.</p>
       <div class="times">${ESS_J.map(j => `<span>Journey ${j.id} · ${mins(secOf(j))}</span>`).join('')}</div>
-      <div class="rule"><span>⏱</span><div>Tombol lanjut aktif setelah waktu habis dan semua poin terisi. Jawab sesuai kondisi sebenarnya, tidak ada nilai benar atau salah.</div></div>
+      <div class="rule"><span>⏱</span><div>Tombol lanjut aktif setelah waktu habis dan semua poin terisi lengkap dengan catatan. Jawab sesuai kondisi sebenarnya, tidak ada nilai benar atau salah.</div></div>
       <div class="lb"><b>1</b>Pilih toko</div><select id="st"><option value="">— pilih toko —</option>${S.stores.map(r => `<option value="${esc(r[0])}" ${r[0] === S.code ? 'selected' : ''}>${esc(r[1])} (${esc(r[0])})</option>`).join('')}</select>
       <div class="lb"><b>2</b>Masukkan NIK</div><input type="text" id="nk" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" enterkeyhint="go" placeholder="NIK karyawan" value="${esc(S.nik)}">
       ${!S.stores.length && !S.err ? '<div class="info">Belum ada toko yang daftar RA-nya terisi. Minta Store Head mengisi daftar RA dulu.</div>' : ''}${e}
@@ -117,10 +120,10 @@ function draw() {
   if (S.step === 'done') { A.innerHTML = `<div class="card center"><div class="big">🎉</div><h2>Terima kasih, ${esc(S.name)}!</h2><p class="mut">Self assessment kamu sudah terkirim. Kendala yang kamu tulis akan ditindaklanjuti Store Head.</p><div class="acts"><button class="btn sec" id="again">Isi untuk RA lain</button></div></div>`; return; }
   const j = ESS_J[S.i], last = S.i === ESS_J.length - 1;
   A.innerHTML = `<div class="card"><div class="head"><div class="top"><span class="badge">JOURNEY ${j.id}</span><span class="cnt">Slide ${S.i + 1}/${ESS_J.length} · ${j.pts.length} poin · ${mins(secOf(j))}</span><b>${esc(j.tp)}</b></div>
-    <div class="q">❝ ${esc(j.q)}</div><div class="mut"><i><b>Paham</b> = sudah mengerti & biasa menerapkan. <b>Kendala</b> = belum paham / sulit dijalankan (tulis kendalanya).</i></div></div>
-    ${j.pts.map((p, k) => { const a = S.ans[p[0]] || {}; return `<div class="pt"><div class="row"><span class="no">${String(k + 1).padStart(2, '0')}</span><span class="tx">${esc(p[1])}</span>
+    <div class="q">❝ ${esc(j.q)}</div><div class="mut"><i><b>Paham</b> = sudah mengerti & biasa menerapkan. <b>Kendala</b> = belum paham / sulit dijalankan. <b>Catatan wajib diisi di setiap poin</b>: tulis dengan kata-katamu sendiri (Paham) atau kendalanya (Kendala). Perhatikan <mark>kata kunci</mark> yang diberi highlight.</i></div></div>
+    ${j.pts.map((p, k) => { const a = S.ans[p[0]] || {}; return `<div class="pt"><div class="row"><span class="no">${String(k + 1).padStart(2, '0')}</span><span class="tx">${hl(p[1], p[2])}</span>
       <div class="sw"><button class="ab p ${a.v === 'P' ? 'on' : ''}" data-a="${p[0]}:P">✔ Paham</button><button class="ab k ${a.v === 'K' ? 'on' : ''}" data-a="${p[0]}:K">⚠ Kendala</button></div></div>
-      <div class="note"><input type="text" data-n="${p[0]}" enterkeyhint="done" value="${esc(a.n || '')}" placeholder="${a.v === 'K' ? 'Wajib: apa yang belum paham / jadi kendala…' : 'Catatan (opsional)…'}"></div></div>`; }).join('')}
+      <div class="note"><input type="text" data-n="${p[0]}" enterkeyhint="done" value="${esc(a.n || '')}" placeholder="${a.v === 'K' ? 'Wajib: apa yang belum paham / jadi kendala…' : a.v === 'P' ? 'Wajib: jelaskan dengan kata-katamu / contoh penerapan…' : 'Pilih Paham / Kendala, lalu isi catatan (wajib)…'}"></div></div>`; }).join('')}
     <div class="foot"><div class="tm"><div class="ring"><svg width="54" height="54"><circle cx="27" cy="27" r="24" fill="none" stroke="#E5EAF3" stroke-width="6"/><circle id="ring" cx="27" cy="27" r="24" fill="none" stroke="#E46636" stroke-width="6" stroke-linecap="round" stroke-dasharray="${C}" stroke-dashoffset="${C}" style="transition:stroke-dashoffset 1s linear"/></svg><b id="mm"></b></div><div><div class="ttl" id="ttl"></div><div class="why" id="why"></div></div></div>${e}
       <button class="btn or" id="nx" disabled>${last ? 'Kirim Self Assessment ✔' : 'Lanjut ke Journey ' + ESS_J[S.i + 1].id + ' →'}</button></div></div>`;
   paint(); if (!S.timer) S.timer = setInterval(tick, 1000);

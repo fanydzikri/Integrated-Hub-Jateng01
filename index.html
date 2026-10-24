@@ -2258,55 +2258,68 @@ function pageRA(view) {
   const st = U.raStore && codes.includes(U.raStore) ? U.raStore : '';
   const minT = U.raMin != null ? U.raMin : 10;
   setHead('RA Performance' + (st ? ' · ' + sName(st) : ''), R.label + ' · per sales person · ' + VLL().toLowerCase());
+  /* ===== perhitungan sama dengan HO =====
+     1) Total sales tagging seluruh RA = total sales bruto toko (semua transaksi & item).
+     2) Sales yang bukan milik RA terdaftar (4 komponen omni, transaksi tanpa nama, nama di luar daftar target, item lain)
+        dikumpulkan jadi satu "pool" per toko per bulan, lalu dibagi RATA ke semua RA di daftar target toko itu
+        (termasuk RA tanpa penjualan sendiri). Bila target bulan itu belum ada, dibagi rata ke RA yang punya penjualan. */
   const isOmni = l => OMNI.some(o => o[2](l));
+  const inScope = c => st ? c === st : typeOk(c);
+  const storeTot = new Map(); let grand = 0;
+  for (const l of App.lines) { if (l.d < R.from || l.d > R.to || !inScope(l.s) || !lineOk(l)) continue; const v = VAL(l), k = l.s + '|' + l.d.slice(0, 7); storeTot.set(k, (storeTot.get(k) || 0) + v); grand += v; }
   const lines = linesIn(R.from, R.to, st || null).filter(l => !isOmni(l));
-  /* pool omni: Eigerindo Voucher tetap ikut walau dikecualikan dari sales umum */
-  const pool = App.lines.filter(l => l.d >= R.from && l.d <= R.to && (st ? l.s === st : typeOk(l.s)) && lineOk(l) && isOmni(l) && (salesOk(l) || OMNI[1][2](l)));
-  const P = new Map(), byDay = new Map(), days = new Set(), dayRA = new Map(), stRA = new Map();
+  const P = new Map(), byDay = new Map(), days = new Set(), ownM = new Map();
   for (const l of lines) {
     const sp = spName(l.sp), key = sp + '|' + l.s;
-    let x = P.get(key); if (!x) P.set(key, x = { sp, s: l.s, trx: new Set(), q: 0, v: 0, o: 0 });
-    const ok = l.d + '|' + l.o; x.v += VAL(l); if (!isPB(l.sku)) x.q += l.q; if (l.q > 0) x.trx.add(ok);
-    days.add(l.d);
-    if (sp !== '(TANPA NAMA)') {
-      const dk = l.s + '|' + l.d; (dayRA.get(dk) || dayRA.set(dk, new Set()).get(dk)).add(sp);
-      (stRA.get(l.s) || stRA.set(l.s, new Set()).get(l.s)).add(sp);
-    }
+    let x = P.get(key); if (!x) P.set(key, x = { sp, s: l.s, trx: new Set(), q: 0, v: 0 });
+    const ok = l.d + '|' + l.o, v = VAL(l); x.v += v; if (!isPB(l.sku)) x.q += l.q; if (l.q > 0) x.trx.add(ok);
+    days.add(l.d); const mk = key + '|' + l.d.slice(0, 7); ownM.set(mk, (ownM.get(mk) || 0) + v);
     const dk2 = key + '|' + l.d; let y = byDay.get(dk2); if (!y) byDay.set(dk2, y = { trx: new Set(), q: 0 }); if (!isPB(l.sku)) y.q += l.q; if (l.q > 0) y.trx.add(ok);
   }
-  /* lebur sales omni: dibagi rata ke semua RA bernama toko tsb pada hari itu (cadangan: RA aktif toko di periode) */
-  let omPool = 0, omLost = 0;
-  for (const l of pool) {
-    const v = VAL(l); omPool += v;
-    let set = dayRA.get(l.s + '|' + l.d); if (!set || !set.size) set = stRA.get(l.s);
-    if (!set || !set.size) { omLost += v; continue; }
-    const share = v / set.size;
-    for (const sp of set) { const x = P.get(sp + '|' + l.s); if (x) x.o += share; }
-  }
-  const rows = [...P.entries()].map(([k, x]) => ({ k, sp: x.sp, s: x.s, loc: x.s + ' - ' + ((App.stores[x.s] && (App.stores[x.s].alias || App.stores[x.s].name)) || x.s), trx: x.trx.size, q: x.q, own: x.v, om: x.o, v: x.v + x.o, upt: x.trx.size ? x.q / x.trx.size : null, bs: x.trx.size ? x.v / x.trx.size : null })).filter(r => r.trx > 0 || r.v);
-  const tot = rows.reduce((a, r) => { a.trx += r.trx; a.q += r.q; a.v += r.v; return a; }, { trx: 0, q: 0, v: 0 });
-  tot.v += omLost;
+  const locOf = c => c + ' - ' + ((App.stores[c] && (App.stores[c].alias || App.stores[c].name)) || c);
+  const mkRow = (k, x) => ({ k, sp: x.sp, s: x.s, loc: locOf(x.s), trx: x.trx.size, q: x.q, raw: x.v, own: x.v, ownE: 0, om: 0, v: x.v, upt: x.trx.size ? x.q / x.trx.size : null, bs: x.trx.size ? x.v / x.trx.size : null, vh: {} });
+  const rows = [...P.entries()].map(([k, x]) => mkRow(k, x)).filter(r => r.trx > 0 || r.raw);
   /* target tagging per head (Breakdown Target), prorata sesuai bobot harian pada periode terpilih */
   const tmons = [], frac = {};
   for (let d = R.from; d <= R.to; d = addDays(d, 1)) { const m = d.slice(0, 7); if (App.raTgt && App.raTgt[m]) { if (!tmons.includes(m)) tmons.push(m); frac[m] = Math.min(1, (frac[m] || 0) + dayWeight(d)); } }
   const raM = raAssign(rows.filter(r => r.sp !== '(TANPA NAMA)'), tmons);
-  for (const r of rows) { let t = 0, any = false; for (const m of tmons) { const h = raM.get(m).map.get(r.k); if (h) { t += h.t * frac[m]; any = true; } } r.tgt = any ? t : null; r.ach = r.tgt ? r.v / r.tgt : null; }
+  /* RA di daftar target yang tidak punya penjualan sendiri tetap ikut menerima bagian pool (sama seperti HO) */
+  const rowByK = new Map(rows.map(r => [r.k, r]));
+  for (const m of tmons) { const { used } = raM.get(m); for (const [c, L] of raHeads(m)) { if (!inScope(c)) continue; for (const h of L) if (!used.has(h.id)) { const k = 'H|' + h.id; let r = rowByK.get(k); if (!r) { r = mkRow(k, { sp: nmKey(h.n) || h.n, s: c, trx: new Set(), q: 0, v: 0 }); r.virt = 1; rows.push(r); rowByK.set(k, r); } r.vh[m] = h; } } }
+  /* bagi pool per toko per bulan */
+  const eligSet = new Set(); let poolAll = 0, poolLost = 0;
+  for (const [sm, tot0] of storeTot) {
+    const [c, m] = sm.split('|'), H = tmons.includes(m) ? (raHeads(m).get(c) || []) : [];
+    const E = H.length ? rows.filter(r => r.s === c && (raM.get(m).map.has(r.k) || r.vh[m]))
+      : rows.filter(r => r.s === c && r.sp !== '(TANPA NAMA)' && !r.virt && ownM.has(r.k + '|' + m));
+    const own = E.reduce((a, r) => a + (ownM.get(r.k + '|' + m) || 0), 0), pool = tot0 - own;
+    poolAll += pool;
+    if (!E.length) { poolLost += pool; continue; }
+    const share = pool / E.length;
+    for (const r of E) { eligSet.add(r.k); r.ownE += ownM.get(r.k + '|' + m) || 0; r.om += share; }
+  }
+  for (const r of rows) {
+    r.out = r.sp !== '(TANPA NAMA)' && !eligSet.has(r.k);
+    if (eligSet.has(r.k)) { r.own = r.ownE; r.v = r.ownE + r.om; } else { r.om = 0; r.v = r.raw; }
+    let t = 0, any = false; for (const m of tmons) { const h = raM.get(m).map.get(r.k) || r.vh[m]; if (h) { t += h.t * frac[m]; any = true; } }
+    r.tgt = any ? t : null; r.ach = r.tgt ? r.v / r.tgt : null;
+  }
+  const tot = rows.reduce((a, r) => { a.trx += r.trx; a.q += r.q; return a; }, { trx: 0, q: 0 }); tot.v = grand;
   const tg = rows.filter(r => r.tgt != null), tgT = tg.reduce((a, r) => a + r.tgt, 0), tgV = tg.reduce((a, r) => a + r.v, 0);
   const achCol = a => a >= SET().achGreen / 100 ? 'var(--ok)' : a >= SET().achYellow / 100 ? 'var(--orange-deep)' : 'var(--bad)';
   const raNote = tmons.length ? `<div class="more">Target tagging per head (${tmons.map(fmtMonth).join(', ')}): ${tg.length} RA terhubung · target dihitung prorata sesuai bobot harian pada periode ini · % Ach = Total sales tagging ÷ Target.</div>` : `<div class="more">Target tagging per head belum diupload untuk periode ini (baru ada: ${Object.keys(App.raTgt || {}).sort().map(fmtMonth).join(', ') || 'belum ada'}).</div>`;
   let raReport = '';
   if (App.admin && tmons.length) {
-    const scope = c => (!st || c === st) && typeOk(c);
-    const named0 = rows.filter(r => r.sp !== '(TANPA NAMA)');
-    const noT = named0.filter(r => r.tgt == null).sort((a, b) => b.v - a.v);
-    const unHeads = []; for (const m of tmons) { const { used } = raM.get(m); for (const [c, L] of raHeads(m)) if (scope(c)) for (const h of L) if (!used.has(h.id)) unHeads.push(Object.assign({ m }, h)); }
-    raReport = `<details class="card shot-skip"><summary class="hub-sum">🔎 Pencocokan target tagging (NIK & nama) · ${tg.length} cocok · ${noT.length} RA tanpa target · ${unHeads.length} target tanpa penjualan</summary>
-      <p class="small muted" style="margin:8px 0">Pencocokan per toko: nama RA di Item DSR dicocokkan dengan nama di file target (persis, lalu mirip ≥ 80%). Perbaiki penulisan nama di file target bila ada yang tidak cocok.</p>
-      <div class="grid g2"><div><b class="small">RA ada penjualan, tidak ketemu di target</b><div class="tbl-wrap" style="max-height:300px;margin-top:6px"><table class="tbl"><thead><tr><th>Nama di DSR</th><th>Toko</th><th class="r">Sales</th></tr></thead><tbody>${noT.map(r => `<tr><td>${esc(r.sp)}</td><td class="small">${esc(sName(r.s))}</td><td class="r">${fmtN(r.v)}</td></tr>`).join('') || '<tr><td colspan="3" class="empty">Semua RA bernama sudah punya target ✓</td></tr>'}</tbody></table></div></div>
-      <div><b class="small">Ada di file target, tidak ada penjualan / tidak cocok</b><div class="tbl-wrap" style="max-height:300px;margin-top:6px"><table class="tbl"><thead><tr><th>Nama di target</th><th>NIK</th><th>Toko</th><th class="r">Target bulan</th></tr></thead><tbody>${unHeads.map(h => `<tr><td>${esc(h.n)}</td><td class="tn small">${esc(h.nik)}</td><td class="small">${esc(sName(h.c))}</td><td class="r">${fmtN(h.t)}</td></tr>`).join('') || '<tr><td colspan="4" class="empty">Semua target sudah terhubung ✓</td></tr>'}</tbody></table></div></div></div></details>`;
+    const noT = rows.filter(r => r.out).sort((a, b) => b.raw - a.raw);
+    const unHeads = rows.filter(r => r.virt);
+    raReport = `<details class="card shot-skip"><summary class="hub-sum">🔎 Pencocokan target tagging (NIK & nama) · ${tg.length - unHeads.length} cocok · ${noT.length} nama di luar daftar target · ${unHeads.length} RA target tanpa penjualan</summary>
+      <p class="small muted" style="margin:8px 0">Pencocokan per toko: nama RA di Item DSR dicocokkan dengan nama di file target (persis, lalu mirip ≥ 80%). Sales nama di luar daftar target ikut dilebur ke pool & dibagi rata ke RA terdaftar. Bila ada RA terdaftar yang seharusnya cocok, perbaiki penulisan namanya di file target lalu upload ulang.</p>
+      <div class="grid g2"><div><b class="small">Nama di DSR, tidak ada di daftar target (sales dilebur)</b><div class="tbl-wrap" style="max-height:300px;margin-top:6px"><table class="tbl"><thead><tr><th>Nama di DSR</th><th>Toko</th><th class="r">Sales</th></tr></thead><tbody>${noT.map(r => `<tr><td>${esc(r.sp)}</td><td class="small">${esc(sName(r.s))}</td><td class="r">${fmtN(r.raw)}</td></tr>`).join('') || '<tr><td colspan="3" class="empty">Semua nama sudah cocok ✓</td></tr>'}</tbody></table></div></div>
+      <div><b class="small">RA di daftar target tanpa penjualan sendiri (tetap dapat bagian pool)</b><div class="tbl-wrap" style="max-height:300px;margin-top:6px"><table class="tbl"><thead><tr><th>Nama di target</th><th>Toko</th><th class="r">Bagian pool</th></tr></thead><tbody>${unHeads.map(r => `<tr><td>${esc(r.sp)}</td><td class="small">${esc(sName(r.s))}</td><td class="r">${fmtN(r.om)}</td></tr>`).join('') || '<tr><td colspan="3" class="empty">Semua RA terdaftar punya penjualan ✓</td></tr>'}</tbody></table></div></div></div></details>`;
   }
-  const noName = rows.filter(r => r.sp === '(TANPA NAMA)'); const nn = noName.reduce((a, r) => { a.trx += r.trx; a.v += r.v; return a; }, { trx: 0, v: 0 });
-  const named = rows.filter(r => r.sp !== '(TANPA NAMA)');
+  const noName = rows.filter(r => r.sp === '(TANPA NAMA)'); const nn = noName.reduce((a, r) => { a.trx += r.trx; a.v += r.raw; return a; }, { trx: 0, v: 0 });
+  const outR = rows.filter(r => r.out), outV = outR.reduce((a, r) => a + r.raw, 0);
+  const named = rows.filter(r => r.sp !== '(TANPA NAMA)' && !r.out);
   const elig = named.filter(r => r.trx >= minT);
   const pick = (f, dir) => elig.slice().sort((a, b) => dir * (f(a) - f(b)))[0];
   const tiles = [['UPT terendah', pick(r => r.upt, 1), r => fmtX(r.upt, 2)], ['Sales terendah', pick(r => r.v, 1), r => fmtRpS(r.v)], ['Basket size terendah', pick(r => r.bs, 1), r => fmtRpS(r.bs)]];
@@ -2323,8 +2336,7 @@ function pageRA(view) {
     <div class="ra-tiles">${tileHtml(tilesHi, 'hi')}</div>
     <p class="small muted" style="margin:-6px 0 0">Peringkat terendah/tertinggi hanya menghitung sales person dengan minimal ${minT} transaksi di periode ini, supaya yang baru masuk atau jarang bertugas tidak ikut terhitung.</p>
     <section class="card"><div class="card-h"><h3>Performa sales person</h3><p class="small muted">${fmtN(named.length)} sales person · klik judul kolom untuk mengurutkan</p></div><div id="raT"></div>
-      ${nn.trx || nn.v ? `<div class="more">Tanpa nama sales person (biasanya transaksi B2B / wholesale): ${fmtN(nn.trx)} transaksi · ${fmtRp(nn.v)} — tidak dimasukkan ke tabel, tetap dihitung di total.</div>` : ''}
-      ${omPool ? `<div class="more">Sales omni (Endless Aisle, Eigerindo Voucher, Tax Invoice, EASAP) ${fmtRp(omPool)} dibagi rata ke semua RA tiap toko per hari${omLost ? `; ${fmtRp(omLost)} tidak bisa dibagi karena tidak ada RA bernama` : ''}. UPT, qty & basket hanya dari transaksi RA sendiri.</div>` : ''}
+      ${poolAll ? `<div class="more">Sales dilebur ${fmtRp(poolAll)} = Endless Aisle, Eigerindo Voucher, Tax Invoice, EASAP${nn.v ? `, transaksi tanpa nama sales person (${fmtRp(nn.v)})` : ''}${outR.length ? `, ${outR.length} nama di luar daftar target (${fmtRp(outV)})` : ''} & item lain — dibagi rata ke semua RA terdaftar tiap toko per bulan, sama dengan perhitungan HO.${poolLost ? ` ${fmtRp(poolLost)} tidak bisa dibagi karena toko tidak punya RA terdaftar.` : ''} UPT, qty & basket hanya dari transaksi RA sendiri.</div>` : ''}
       ${raNote}
       <div class="more" style="font-weight:700;color:var(--ink)">Total keseluruhan: ${fmtN(tot.trx)} transaksi · ${fmtN(tot.q)} qty · UPT ${tot.trx ? fmtX(tot.q / tot.trx, 2) : '–'} · basket ${tot.trx ? fmtRp(tot.v / tot.trx) : '–'} · ${fmtRp(tot.v)}${tgT ? ` · target tagging ${fmtRp(tgT)} · ach ${fmtPct(tgV / tgT, 1)}` : ''}</div></section>
     ${raReport}
@@ -2336,13 +2348,13 @@ function pageRA(view) {
   $('#raT').innerHTML = tbl('raT', { rows: named, sort: { k: 'upt', dir: 'desc' }, limit: 30, cols: [
     { k: 'sp', label: 'Sales person', h: r => `<span class="nm">${esc(r.sp)}</span>` }, { k: 'loc', label: 'Location', h: r => `<span class="small">${esc(r.loc)}</span>` },
     { k: 'trx', label: 'Transaction', r: 1, h: r => fmtN(r.trx) }, { k: 'q', label: 'Quantity', r: 1, h: r => fmtN(r.q) },
-    { k: 'upt', label: 'UPT', r: 1, h: r => `<b>${fmtX(r.upt, 2)}</b>` }, { k: 'bs', label: 'Basket size', r: 1, h: r => r.bs == null ? '–' : fmtN(r.bs) }, { k: 'own', label: 'Sales', r: 1, h: r => fmtN(r.own) }, { k: 'om', label: 'Sales omni (dibagi)', r: 1, h: r => r.om ? fmtN(r.om) : '–' }, { k: 'v', label: 'Total sales tagging', r: 1, h: r => `<b>${fmtN(r.v)}</b>` },
+    { k: 'upt', label: 'UPT', r: 1, h: r => `<b>${fmtX(r.upt, 2)}</b>` }, { k: 'bs', label: 'Basket size', r: 1, h: r => r.bs == null ? '–' : fmtN(r.bs) }, { k: 'own', label: 'Sales', r: 1, h: r => fmtN(r.own) }, { k: 'om', label: 'Sales dilebur (dibagi)', r: 1, h: r => r.om ? fmtN(r.om) : '–' }, { k: 'v', label: 'Total sales tagging', r: 1, h: r => `<b>${fmtN(r.v)}</b>` },
     { k: 'tgt', label: 'Target', r: 1, h: r => r.tgt == null ? '–' : fmtN(r.tgt) }, { k: 'ach', label: '% Ach', r: 1, h: r => r.ach == null ? '–' : `<b style="color:${achCol(r.ach)}">${fmtPct(r.ach, 1)}</b>` }] });
-  App.ui.raLast = { rows, dl, byDay, R };
+  App.ui.raLast = { rows: named, dl, byDay, R };
 }
 async function exportRA() {
   const X = App.ui.raLast; if (!X || typeof XLSX === 'undefined') return;
-  const a1 = [['RA Performance ' + X.R.label], [], ['Sales Person', 'Location', 'Transaction', 'Quantity', 'UPT', 'Basket Size', 'Sales', 'Sales Omni (dibagi)', 'Total Sales Tagging', 'Target', '% Ach'], ...X.rows.slice().sort((a, b) => (b.upt ?? -1) - (a.upt ?? -1)).map(r => [r.sp, r.loc, r.trx, r.q, r.upt == null ? null : Math.round(r.upt * 100) / 100, r.bs == null ? null : Math.round(r.bs), Math.round(r.own || 0), Math.round(r.om || 0), Math.round(r.v), r.tgt == null ? null : Math.round(r.tgt), r.ach == null ? null : Math.round(r.ach * 10000) / 10000])];
+  const a1 = [['RA Performance ' + X.R.label], [], ['Sales Person', 'Location', 'Transaction', 'Quantity', 'UPT', 'Basket Size', 'Sales', 'Sales Dilebur (dibagi)', 'Total Sales Tagging', 'Target', '% Ach'], ...X.rows.slice().sort((a, b) => (b.upt ?? -1) - (a.upt ?? -1)).map(r => [r.sp, r.loc, r.trx, r.q, r.upt == null ? null : Math.round(r.upt * 100) / 100, r.bs == null ? null : Math.round(r.bs), Math.round(r.own || 0), Math.round(r.om || 0), Math.round(r.v), r.tgt == null ? null : Math.round(r.tgt), r.ach == null ? null : Math.round(r.ach * 10000) / 10000])];
   const a2 = [['Sales Person', 'Location', ...X.dl]]; for (const r of X.rows) a2.push([r.sp, r.loc, ...X.dl.map(d => { const y = X.byDay.get(r.k + '|' + d); return y && y.trx.size ? Math.round(y.q / y.trx.size * 100) / 100 : null; })]);
   const wb = XLSX.utils.book_new(); const w1 = XLSX.utils.aoa_to_sheet(a1); w1['!cols'] = [{ wch: 34 }, { wch: 42 }, { wch: 12 }, { wch: 10 }, { wch: 8 }, { wch: 12 }, { wch: 14 }, { wch: 18 }, { wch: 20 }, { wch: 16 }, { wch: 9 }];
   for (let i = 3; i < a1.length; i++) { const a = XLSX.utils.encode_cell({ r: i, c: 10 }); if (w1[a] && typeof w1[a].v === 'number') w1[a].z = '0.0%'; }

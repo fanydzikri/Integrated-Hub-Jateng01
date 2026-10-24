@@ -680,6 +680,7 @@ function detectSheet(rows, fileName) {
     if (h.includes('createdat') && h.includes('reason') && h.includes('locationcode')) return parseLost(rows, i, h, fileName);
     if ((h.includes('siteid') || h.includes('kodesite') || h.includes('sitecode')) && h.includes('branch') && !h.includes('offline')) { const r = parseDaily(rows, i, h, fileName); if (r) return r; }
     if (h.includes('locationcode') && h.includes('bruto')) throw new Error('Ini Sales Report CARE untuk Share Omset — upload di menu Sales Performance › Share Omset Harian.');
+    if (h.includes('nikkaryawan') && h.includes('adjustmentstore') && h.includes('namakaryawan')) return parseRaTarget(rows, i, h, fileName);
     if (h.includes('dailyratio') || (h.some(x => x === 'date' || x === 'tanggal') && h.some(x => /ratio|bobot|weight/.test(x)) && !h.includes('orderno'))) return parseWeights(rows, i, h, fileName);
     if ((h.includes('kodesite') || h.includes('sitecode') || h.includes('kodetoko')) && h.filter(x => MON_KEY[x.slice(0, 3)] && /^[a-z]{3,9}\d{0,4}$/.test(x) && !/^(offline|eiger|total)$/.test(x)).length >= 1 && !h.includes('offline')) return parseEac(rows, i, h, fileName);
     if (h.some(x => x.includes('endlessaisle')) && h.some(x => x.includes('taxinvoice') || x.includes('easap') || x.includes('eigerindovoucher'))) return parseOmni(rows, i, h, fileName);
@@ -696,10 +697,18 @@ function parseWorkbookAll(buf, fileName) {
   for (const sn of wb.SheetNames) {
     const rows = XLSX.utils.sheet_to_json(wb.Sheets[sn], { header: 1, raw: true, defval: null, blankrows: false });
     const label = wb.SheetNames.length > 1 ? fileName + ' › ' + sn : fileName;
-    try { const r = detectSheet(rows, label); if (r && !(r.kind === 'DLY' && /kumulatif|cumulative|akumulasi/i.test(sn))) out.push(r); }
+    try { const r = detectSheet(rows, label); if (r && !(r.kind === 'DLY' && /kumulatif|cumulative|akumulasi/i.test(sn))) { r.sheet = sn; out.push(r); } }
     catch (e) { errs.push({ file: label, err: e.message || String(e) }); }
   }
   if (!out.length) { if (errs.length) return errs; throw new Error('Bukan file Item DSR, Export by Bin, target, target OmniChannel, atau bobot harian.'); }
+  /* file Breakdown Target: hanya ambil target per head (sheet RECAP bila ada); bulan diambil dari sheet TARGET V.1 */
+  const rats = out.filter(p => p.kind === 'RAT');
+  if (rats.length) {
+    const tg = out.find(p => p.kind === 'TGT' && Object.keys(p.data).some(k => k !== '?'));
+    const pick = rats.find(p => /^recap$/i.test(p.sheet)) || rats.slice().sort((a, b) => b.rows - a.rows)[0];
+    if (tg) { pick.month = Object.keys(tg.data).filter(k => k !== '?').sort()[0]; pick.needMonth = false; }
+    return [pick];
+  }
   /* bulan bersama: dari bobot harian (paling pasti) atau target lain di file yang sama */
   const wm = (out.find(p => p.kind === 'WGT') || {}).month || (out.find(p => (p.kind === 'TGT' || p.kind === 'OMT') && p.month && !p.needMonth) || {}).month;
   for (const p of out) {
@@ -817,6 +826,26 @@ function parseTarget(rows, hi, h, fileName) {
   /* kolom Eiger/Total berisi rumus yang belum terhitung: hitung sendiri */
   for (const m in data) for (const c in data[m]) { const o = data[m][c]; if (!o.eiger) o.eiger = (o.offline || 0) + (o.ea || 0) + (o.wab || 0); if (!o.total) o.total = o.eiger + (o.outlive || 0); }
   return { kind: 'TGT', file: fileName, data, names, rows: n, needMonth: !!data['?'] };
+}
+/* target tagging per head (file Breakdown Target: sheet RECAP / sheet per toko) -> total target per NIK per toko (semua brand & channel) */
+function parseRaTarget(rows, hi, h, fileName) {
+  const C = { code: colIdx(h, 'codesite', 'siteid'), nik: colIdx(h, 'nikkaryawan'), nm: colIdx(h, 'namakaryawan'), adj: colIdx(h, 'adjustmentstore'), pr: colIdx(h, 'proratetarget'), br: colIdx(h, 'brand'), ch: colIdx(h, 'targetchannel') };
+  const items = [];
+  for (let i = hi + 1; i < rows.length; i++) {
+    const r = rows[i] || [];
+    let code = String(r[C.code] ?? '').trim().replace(/\.0+$/, ''), nik = String(r[C.nik] ?? '').trim().replace(/\.0+$/, '');
+    if (!/^\d{3,6}$/.test(code) || !/^\d{4,10}$/.test(nik)) continue;
+    const v = r[C.adj] != null && r[C.adj] !== '' ? numV(r[C.adj]) : (C.pr >= 0 ? numV(r[C.pr]) : 0);
+    items.push([code, nik, String(r[C.nm] ?? '').replace(/\s+/g, ' ').trim(), String(r[C.br] ?? '').trim(), String(r[C.ch] ?? '').trim(), v]);
+  }
+  if (!items.length) throw new Error('Tidak ada baris target per head (kolom Code Site, NIK Karyawan, Adjustment Store).');
+  return { kind: 'RAT', file: fileName, items, rows: items.length, month: null, needMonth: true };
+}
+/* gabung baris target per head menjadi 1 baris per toko+NIK: [nik, kodeToko, nama, totalTarget] */
+function raTargetRows(p) {
+  const A = new Map();
+  for (const [c, nik, nm, , , v] of p.items) { const k = c + '|' + nik; let x = A.get(k); if (!x) A.set(k, x = { c, nik, n: nm, t: 0 }); x.t += v; if (!x.n && nm) x.n = nm; }
+  return [...A.values()].map(x => [x.nik, x.c, x.n, Math.round(x.t)]);
 }
 function parseWeights(rows, hi, h, fileName) {
   const cD = h.findIndex(x => x === 'date' || x === 'tanggal');
@@ -1117,7 +1146,7 @@ async function loadAll() {
   App.tgtDetail = M.targets || {}; App.tgtBasis = M.tgtBasis || 'total'; App.targets = targetsFromDetail();
   App.pendingUsers = M.pendingUsers || 0;
   App.omni = M.omni || {}; App.eac = M.eac || {}; App.hoInfo = M.hoInfo || null; App.juknis = M.juknis || {}; App.bc = M.bc || []; App.aiReady = !!M.aiReady;
-  App.log = M.log || []; App.books = M.books || []; App.cells = M.cells || 0;
+  App.log = M.log || []; App.books = M.books || []; App.cells = M.cells || 0; App.raTgt = M.raTarget || {};
   App.lines = []; App.loaded = new Set(); App.sku = {}; App.dsrSku = {}; App.stock = {}; App.cache = {}; App.sr = {};
   computeLastDate();
   App.loadWarn = [];
@@ -2132,6 +2161,41 @@ function pageEac(view) {
 
 /* ================= halaman: RA Performance (Sales Person) ================= */
 const spName = v => String(v || '').replace(/\s+/g, ' ').trim().toUpperCase() || '(TANPA NAMA)';
+/* ---- target tagging per head: pencocokan nama RA di Item DSR dengan daftar target (per toko, NIK + nama) ---- */
+const nmKey = v => String(v || '').toUpperCase().replace(/[^A-Z ]/g, ' ').replace(/\s+/g, ' ').trim();
+function levD(a, b) { const m = a.length, n = b.length; if (!m) return n; if (!n) return m; let p = Array.from({ length: n + 1 }, (_, j) => j); for (let i = 1; i <= m; i++) { const c = [i]; for (let j = 1; j <= n; j++) c[j] = Math.min(p[j] + 1, c[j - 1] + 1, p[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)); p = c; } return p[n]; }
+function nmScore(a, b) {
+  if (!a || !b) return 0; if (a === b) return 1;
+  const ta = a.split(' '), tb = b.split(' '), sh = ta.length <= tb.length ? ta : tb, lg = ta.length <= tb.length ? tb : ta;
+  const sub = sh.length >= 2 && sh.every(t => lg.includes(t)) ? .92 : 0;
+  const tok = ta.filter(t => tb.includes(t)).length / Math.max(ta.length, tb.length);
+  const lev = 1 - levD(a, b) / Math.max(a.length, b.length);
+  return Math.max(sub, tok, lev);
+}
+function raHeads(m) {
+  const k = 'raH' + m; if (App.cache[k]) return App.cache[k];
+  const by = new Map(), M = (App.raTgt || {})[m] || {};
+  for (const id in M) { const x = M[id], nik = id.split('|')[1] || ''; (by.get(x.c) || by.set(x.c, []).get(x.c)).push({ id, nik, c: x.c, n: x.n, key: nmKey(x.n), t: x.t }); }
+  return (App.cache[k] = by);
+}
+/* rows: [{k, sp, s}] -> Map(bulan -> { map: Map(row.k -> head), used: Set(head.id), heads }) */
+function raAssign(rows, months) {
+  const out = new Map();
+  for (const m of months) {
+    const H = raHeads(m), map = new Map(), used = new Set(); const rest = [];
+    for (const r of rows) {
+      const L = H.get(r.s) || [], key = nmKey(r.sp), nik = (String(r.sp).match(/\d{5,8}/) || [])[0];
+      let h = (nik && L.find(x => x.nik === nik && !used.has(x.id))) || L.find(x => x.key === key && !used.has(x.id));
+      if (h) { map.set(r.k, h); used.add(h.id); } else rest.push(r);
+    }
+    const pairs = [];
+    for (const r of rest) { const key = nmKey(r.sp); for (const h of (H.get(r.s) || [])) if (!used.has(h.id)) { const sc = nmScore(key, h.key); if (sc >= .8) pairs.push([sc, r, h]); } }
+    pairs.sort((a, b) => b[0] - a[0]);
+    for (const [, r, h] of pairs) if (!map.has(r.k) && !used.has(h.id)) { map.set(r.k, h); used.add(h.id); }
+    out.set(m, { map, used });
+  }
+  return out;
+}
 function pageRA(view) {
   const R = periodRange(), U = App.ui, codes = activeStores();
   const st = U.raStore && codes.includes(U.raStore) ? U.raStore : '';
@@ -2165,6 +2229,25 @@ function pageRA(view) {
   const rows = [...P.entries()].map(([k, x]) => ({ k, sp: x.sp, s: x.s, loc: x.s + ' - ' + ((App.stores[x.s] && (App.stores[x.s].alias || App.stores[x.s].name)) || x.s), trx: x.trx.size, q: x.q, own: x.v, om: x.o, v: x.v + x.o, upt: x.trx.size ? x.q / x.trx.size : null, bs: x.trx.size ? x.v / x.trx.size : null })).filter(r => r.trx > 0 || r.v);
   const tot = rows.reduce((a, r) => { a.trx += r.trx; a.q += r.q; a.v += r.v; return a; }, { trx: 0, q: 0, v: 0 });
   tot.v += omLost;
+  /* target tagging per head (Breakdown Target), prorata sesuai bobot harian pada periode terpilih */
+  const tmons = [], frac = {};
+  for (let d = R.from; d <= R.to; d = addDays(d, 1)) { const m = d.slice(0, 7); if (App.raTgt && App.raTgt[m]) { if (!tmons.includes(m)) tmons.push(m); frac[m] = Math.min(1, (frac[m] || 0) + dayWeight(d)); } }
+  const raM = raAssign(rows.filter(r => r.sp !== '(TANPA NAMA)'), tmons);
+  for (const r of rows) { let t = 0, any = false; for (const m of tmons) { const h = raM.get(m).map.get(r.k); if (h) { t += h.t * frac[m]; any = true; } } r.tgt = any ? t : null; r.ach = r.tgt ? r.v / r.tgt : null; }
+  const tg = rows.filter(r => r.tgt != null), tgT = tg.reduce((a, r) => a + r.tgt, 0), tgV = tg.reduce((a, r) => a + r.v, 0);
+  const achCol = a => a >= SET().achGreen / 100 ? 'var(--ok)' : a >= SET().achYellow / 100 ? 'var(--orange-deep)' : 'var(--bad)';
+  const raNote = tmons.length ? `<div class="more">Target tagging per head (${tmons.map(fmtMonth).join(', ')}): ${tg.length} RA terhubung · target dihitung prorata sesuai bobot harian pada periode ini · % Ach = Total sales tagging ÷ Target.</div>` : `<div class="more">Target tagging per head belum diupload untuk periode ini (baru ada: ${Object.keys(App.raTgt || {}).sort().map(fmtMonth).join(', ') || 'belum ada'}).</div>`;
+  let raReport = '';
+  if (App.admin && tmons.length) {
+    const scope = c => (!st || c === st) && typeOk(c);
+    const named0 = rows.filter(r => r.sp !== '(TANPA NAMA)');
+    const noT = named0.filter(r => r.tgt == null).sort((a, b) => b.v - a.v);
+    const unHeads = []; for (const m of tmons) { const { used } = raM.get(m); for (const [c, L] of raHeads(m)) if (scope(c)) for (const h of L) if (!used.has(h.id)) unHeads.push(Object.assign({ m }, h)); }
+    raReport = `<details class="card shot-skip"><summary class="hub-sum">🔎 Pencocokan target tagging (NIK & nama) · ${tg.length} cocok · ${noT.length} RA tanpa target · ${unHeads.length} target tanpa penjualan</summary>
+      <p class="small muted" style="margin:8px 0">Pencocokan per toko: nama RA di Item DSR dicocokkan dengan nama di file target (persis, lalu mirip ≥ 80%). Perbaiki penulisan nama di file target bila ada yang tidak cocok.</p>
+      <div class="grid g2"><div><b class="small">RA ada penjualan, tidak ketemu di target</b><div class="tbl-wrap" style="max-height:300px;margin-top:6px"><table class="tbl"><thead><tr><th>Nama di DSR</th><th>Toko</th><th class="r">Sales</th></tr></thead><tbody>${noT.map(r => `<tr><td>${esc(r.sp)}</td><td class="small">${esc(sName(r.s))}</td><td class="r">${fmtN(r.v)}</td></tr>`).join('') || '<tr><td colspan="3" class="empty">Semua RA bernama sudah punya target ✓</td></tr>'}</tbody></table></div></div>
+      <div><b class="small">Ada di file target, tidak ada penjualan / tidak cocok</b><div class="tbl-wrap" style="max-height:300px;margin-top:6px"><table class="tbl"><thead><tr><th>Nama di target</th><th>NIK</th><th>Toko</th><th class="r">Target bulan</th></tr></thead><tbody>${unHeads.map(h => `<tr><td>${esc(h.n)}</td><td class="tn small">${esc(h.nik)}</td><td class="small">${esc(sName(h.c))}</td><td class="r">${fmtN(h.t)}</td></tr>`).join('') || '<tr><td colspan="4" class="empty">Semua target sudah terhubung ✓</td></tr>'}</tbody></table></div></div></div></details>`;
+  }
   const noName = rows.filter(r => r.sp === '(TANPA NAMA)'); const nn = noName.reduce((a, r) => { a.trx += r.trx; a.v += r.v; return a; }, { trx: 0, v: 0 });
   const named = rows.filter(r => r.sp !== '(TANPA NAMA)');
   const elig = named.filter(r => r.trx >= minT);
@@ -2185,7 +2268,9 @@ function pageRA(view) {
     <section class="card"><div class="card-h"><h3>Performa sales person</h3><p class="small muted">${fmtN(named.length)} sales person · klik judul kolom untuk mengurutkan</p></div><div id="raT"></div>
       ${nn.trx || nn.v ? `<div class="more">Tanpa nama sales person (biasanya transaksi B2B / wholesale): ${fmtN(nn.trx)} transaksi · ${fmtRp(nn.v)} — tidak dimasukkan ke tabel, tetap dihitung di total.</div>` : ''}
       ${omPool ? `<div class="more">Sales omni (Endless Aisle, Eigerindo Voucher, Tax Invoice, EASAP) ${fmtRp(omPool)} dibagi rata ke semua RA tiap toko per hari${omLost ? `; ${fmtRp(omLost)} tidak bisa dibagi karena tidak ada RA bernama` : ''}. UPT, qty & basket hanya dari transaksi RA sendiri.</div>` : ''}
-      <div class="more" style="font-weight:700;color:var(--ink)">Total keseluruhan: ${fmtN(tot.trx)} transaksi · ${fmtN(tot.q)} qty · UPT ${tot.trx ? fmtX(tot.q / tot.trx, 2) : '–'} · basket ${tot.trx ? fmtRp(tot.v / tot.trx) : '–'} · ${fmtRp(tot.v)}</div></section>
+      ${raNote}
+      <div class="more" style="font-weight:700;color:var(--ink)">Total keseluruhan: ${fmtN(tot.trx)} transaksi · ${fmtN(tot.q)} qty · UPT ${tot.trx ? fmtX(tot.q / tot.trx, 2) : '–'} · basket ${tot.trx ? fmtRp(tot.v / tot.trx) : '–'} · ${fmtRp(tot.v)}${tgT ? ` · target tagging ${fmtRp(tgT)} · ach ${fmtPct(tgV / tgT, 1)}` : ''}</div></section>
+    ${raReport}
     <section class="card shot-skip"><div class="card-h"><h3>UPT by date</h3><p class="small muted">makin gelap makin tinggi · "–" = tidak ada transaksi</p></div>
       <div class="rp-wrap" style="max-height:60vh"><table class="mx"><thead><tr><th class="nm">Sales person</th>${dl.map(d => `<th>${fmtDateS(d)}</th>`).join('')}</tr></thead><tbody>
       ${mxRows.map(r => `<tr><td class="nm">${esc(r.sp)}<small>${esc(sName(r.s))}</small></td>${dl.map(d => { const y = byDay.get(r.k + '|' + d); if (!y || !y.trx.size) return '<td class="muted">–</td>'; const u = y.q / y.trx.size, a = Math.min(1, u / maxU); return `<td style="background:rgba(15,49,146,${(a * .75).toFixed(2)});color:${a > .55 ? '#fff' : 'var(--ink)'}" title="${esc(r.sp)} ${fmtDate(d)}: ${y.trx.size} trx, ${fmtN(y.q)} qty">${fmtX(u, 2)}</td>`; }).join('')}</tr>`).join('') || `<tr><td class="nm">Belum ada data</td></tr>`}
@@ -2194,14 +2279,16 @@ function pageRA(view) {
   $('#raT').innerHTML = tbl('raT', { rows: named, sort: { k: 'upt', dir: 'desc' }, limit: 30, cols: [
     { k: 'sp', label: 'Sales person', h: r => `<span class="nm">${esc(r.sp)}</span>` }, { k: 'loc', label: 'Location', h: r => `<span class="small">${esc(r.loc)}</span>` },
     { k: 'trx', label: 'Transaction', r: 1, h: r => fmtN(r.trx) }, { k: 'q', label: 'Quantity', r: 1, h: r => fmtN(r.q) },
-    { k: 'upt', label: 'UPT', r: 1, h: r => `<b>${fmtX(r.upt, 2)}</b>` }, { k: 'bs', label: 'Basket size', r: 1, h: r => r.bs == null ? '–' : fmtN(r.bs) }, { k: 'own', label: 'Sales', r: 1, h: r => fmtN(r.own) }, { k: 'om', label: 'Sales omni (dibagi)', r: 1, h: r => r.om ? fmtN(r.om) : '–' }, { k: 'v', label: 'Total sales tagging', r: 1, h: r => `<b>${fmtN(r.v)}</b>` }] });
+    { k: 'upt', label: 'UPT', r: 1, h: r => `<b>${fmtX(r.upt, 2)}</b>` }, { k: 'bs', label: 'Basket size', r: 1, h: r => r.bs == null ? '–' : fmtN(r.bs) }, { k: 'own', label: 'Sales', r: 1, h: r => fmtN(r.own) }, { k: 'om', label: 'Sales omni (dibagi)', r: 1, h: r => r.om ? fmtN(r.om) : '–' }, { k: 'v', label: 'Total sales tagging', r: 1, h: r => `<b>${fmtN(r.v)}</b>` },
+    { k: 'tgt', label: 'Target', r: 1, h: r => r.tgt == null ? '–' : fmtN(r.tgt) }, { k: 'ach', label: '% Ach', r: 1, h: r => r.ach == null ? '–' : `<b style="color:${achCol(r.ach)}">${fmtPct(r.ach, 1)}</b>` }] });
   App.ui.raLast = { rows, dl, byDay, R };
 }
 async function exportRA() {
   const X = App.ui.raLast; if (!X || typeof XLSX === 'undefined') return;
-  const a1 = [['RA Performance ' + X.R.label], [], ['Sales Person', 'Location', 'Transaction', 'Quantity', 'UPT', 'Basket Size', 'Sales', 'Sales Omni (dibagi)', 'Total Sales Tagging'], ...X.rows.slice().sort((a, b) => (b.upt ?? -1) - (a.upt ?? -1)).map(r => [r.sp, r.loc, r.trx, r.q, r.upt == null ? null : Math.round(r.upt * 100) / 100, r.bs == null ? null : Math.round(r.bs), Math.round(r.own || 0), Math.round(r.om || 0), Math.round(r.v)])];
+  const a1 = [['RA Performance ' + X.R.label], [], ['Sales Person', 'Location', 'Transaction', 'Quantity', 'UPT', 'Basket Size', 'Sales', 'Sales Omni (dibagi)', 'Total Sales Tagging', 'Target', '% Ach'], ...X.rows.slice().sort((a, b) => (b.upt ?? -1) - (a.upt ?? -1)).map(r => [r.sp, r.loc, r.trx, r.q, r.upt == null ? null : Math.round(r.upt * 100) / 100, r.bs == null ? null : Math.round(r.bs), Math.round(r.own || 0), Math.round(r.om || 0), Math.round(r.v), r.tgt == null ? null : Math.round(r.tgt), r.ach == null ? null : Math.round(r.ach * 10000) / 10000])];
   const a2 = [['Sales Person', 'Location', ...X.dl]]; for (const r of X.rows) a2.push([r.sp, r.loc, ...X.dl.map(d => { const y = X.byDay.get(r.k + '|' + d); return y && y.trx.size ? Math.round(y.q / y.trx.size * 100) / 100 : null; })]);
-  const wb = XLSX.utils.book_new(); const w1 = XLSX.utils.aoa_to_sheet(a1); w1['!cols'] = [{ wch: 34 }, { wch: 42 }, { wch: 12 }, { wch: 10 }, { wch: 8 }, { wch: 12 }, { wch: 14 }, { wch: 18 }, { wch: 20 }];
+  const wb = XLSX.utils.book_new(); const w1 = XLSX.utils.aoa_to_sheet(a1); w1['!cols'] = [{ wch: 34 }, { wch: 42 }, { wch: 12 }, { wch: 10 }, { wch: 8 }, { wch: 12 }, { wch: 14 }, { wch: 18 }, { wch: 20 }, { wch: 16 }, { wch: 9 }];
+  for (let i = 3; i < a1.length; i++) { const a = XLSX.utils.encode_cell({ r: i, c: 10 }); if (w1[a] && typeof w1[a].v === 'number') w1[a].z = '0.0%'; }
   XLSX.utils.book_append_sheet(wb, w1, 'RA Performance'); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(a2), 'UPT by Date');
   (await getDownloads()).save({ filename: `RA_Performance_${X.R.from}_${X.R.to}.xlsx`, data: new Blob([XLSX.write(wb, { bookType: 'xlsx', type: 'array' })]) });
 }
@@ -4232,14 +4319,14 @@ function pageAdmin(view) {
   renderPending(); renderCoverage(cm);
   $('#logT').innerHTML = tbl('log', { rows: App.log.slice().reverse(), limit: 15, empty: 'Belum ada upload.', cols: [
     { k: 'at', label: 'Waktu', h: r => esc(new Date(r.at).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })) },
-    { k: 'kind', label: 'Jenis', h: r => ({ DSR: 'Penjualan', INV: 'Stok', TGT: 'Target', OMT: 'Target Omni', EAC: 'Target EAC', LST: 'Lost Sales', DLY: 'Sales harian', HO: 'Stok gudang HO', JUK: 'Juknis promo', BC: 'Blind counting', WGT: 'Bobot harian', SR: 'Sales Report', DEL: 'Hapus' }[r.kind] || r.kind) }, { k: 'file', label: 'File', h: r => `<span class="small">${esc(r.file)}</span>` },
+    { k: 'kind', label: 'Jenis', h: r => ({ DSR: 'Penjualan', INV: 'Stok', TGT: 'Target', OMT: 'Target Omni', EAC: 'Target EAC', LST: 'Lost Sales', DLY: 'Sales harian', HO: 'Stok gudang HO', JUK: 'Juknis promo', BC: 'Blind counting', WGT: 'Bobot harian', SR: 'Sales Report', RAT: 'Target per head', DEL: 'Hapus' }[r.kind] || r.kind) }, { k: 'file', label: 'File', h: r => `<span class="small">${esc(r.file)}</span>` },
     { k: 'stores', label: 'Toko', r: 1 }, { k: 'info', label: 'Isi', h: r => esc(r.info) + (r.removed ? ' <span class="badge b-DS">sudah dihapus</span>' : '') },
     { k: 'x', label: '', ns: 1, h: r => r.id && r.scope && !r.removed ? `<button class="btn sm danger" data-dellog="${esc(r.id)}">Hapus data file ini</button>` : '' }] });
 }
 /* hapus semua data yang dimasukkan oleh satu file (dikerjakan di spreadsheet) */
 async function deleteByLog(id) {
   const e = App.log.find(x => x.id === id); if (!e || !e.scope) return;
-  const what = { DSR: 'penjualan (Item DSR)', INV: 'stok', TGT: 'target', OMT: 'target OmniChannel', EAC: 'target Member EAC', LST: 'lost sales', DLY: 'sales harian ringkas', WGT: 'bobot harian' }[e.kind] || 'data';
+  const what = { DSR: 'penjualan (Item DSR)', INV: 'stok', TGT: 'target', OMT: 'target OmniChannel', EAC: 'target Member EAC', LST: 'lost sales', DLY: 'sales harian ringkas', WGT: 'bobot harian', RAT: 'target tagging per head' }[e.kind] || 'data';
   if (!confirm(`Hapus data ${what} dari file "${e.file}"?\n${e.info}\n\nCatatan: kalau toko & tanggal yang sama pernah diupload ulang dari file lain, data itu ikut terhapus. Tidak bisa dibatalkan.`)) return;
   try { toast('Menghapus data di spreadsheet…', 15000); await apiPost({ a: 'deleteLog', id }); await loadAll(); toast('Data dari file itu sudah dihapus'); render(); }
   catch (er) { console.error(er); toast('Gagal menghapus: ' + errMsg(er)); }
@@ -4252,6 +4339,10 @@ function renderPending() {
     if (p.kind === 'SR') {
       const st = Object.values(p.stores); const b = st.reduce((a, x) => a + x.v[1], 0);
       return `<div class="pend-i"><span class="k dsr">Sales Report</span><div><div class="f">${esc(p.file)}</div><div class="d">${p.daily ? 'Harian ' + fmtDate(p.from) : 'Kumulatif ' + fmtDateS(p.from) + ' – ' + fmtDate(p.to)} · ${p.rows} site ${esc(p.region)} · bruto ${fmtRp(b)}</div></div><button class="btn sm" data-rmp="${i}">Hapus</button></div>`;
+    }
+    if (p.kind === 'RAT') {
+      const R0 = raTargetRows(p), stN = new Set(R0.map(r => r[1])).size, tt = R0.reduce((a, r) => a + r[3], 0);
+      return `<div class="pend-i"><span class="k" style="background:#13806F;color:#fff">Target per head</span><div><div class="f">${esc(p.file)}</div><div class="d">${R0.length} RA di ${stN} toko · total ${fmtRpS(tt)} · bulan <input type="month" class="inp sm" data-pmonth="${i}" value="${esc(p.month || '')}">${p.needMonth ? ' <b style="color:var(--warn)">pilih bulan</b>' : ''} · menggantikan target per head bulan yang sama</div></div><button class="btn sm" data-rmp="${i}">Hapus</button></div>`;
     }
     if (p.kind === 'WGT') {
       const warn = p.days !== dim(p.month) ? ` <b style="color:var(--warn)">hanya ${p.days} dari ${dim(p.month)} hari</b>` : '';
@@ -4328,7 +4419,7 @@ const hhmm = t => pad(Math.floor((t || 0) / 100)) + ':' + pad((t || 0) % 100);
 async function saveAll() {
   const items = App.pending.filter(p => !p.err); if (!items.length) return;
   const btn = $('#saveBtn'), msg = $('#saveMsg');
-  const noMonth = items.find(p => (p.kind === 'TGT' || p.kind === 'OMT') && p.needMonth && !p.month);
+  const noMonth = items.find(p => (p.kind === 'TGT' || p.kind === 'OMT' || p.kind === 'RAT') && p.needMonth && !p.month);
   if (noMonth) { msg.textContent = 'Pilih bulan untuk file target ' + noMonth.file + ' dulu.'; return; }
   btn.disabled = true;
   const say = t => { msg.textContent = t; };
@@ -4389,6 +4480,12 @@ async function saveAll() {
         await withRetry(() => apiPost({ a: 'target', month: m, rows }));
       }
       logs.push({ id: uid(), scope: { months: ms, codes: Object.keys(p.names) }, at: now, kind: 'TGT', file: p.file, stores: p.rows, info: 'target ' + ms.map(fmtMonth).join(', ') });
+    }
+    /* --- target tagging per head --- */
+    for (const p of items.filter(p => p.kind === 'RAT')) {
+      say('Menyimpan target tagging per head…'); const rows = raTargetRows(p);
+      await withRetry(() => apiPost({ a: 'raTarget', month: p.month, rows }));
+      logs.push({ id: uid(), scope: { month: p.month }, at: now, kind: 'RAT', file: p.file, stores: new Set(rows.map(r => r[1])).size, info: 'target tagging per head ' + fmtMonth(p.month) + ', ' + rows.length + ' RA' });
     }
     /* --- target OmniChannel --- */
     for (const p of items.filter(p => p.kind === 'OMT')) {

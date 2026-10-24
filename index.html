@@ -1165,15 +1165,22 @@ const LS = { get: k => { try { return localStorage.getItem(k) || ''; } catch (e)
 async function api(a, params = {}, tries = 3) {
   for (let i = 1; ; i++) {
     try { return await api1(a, params); }
-    catch (e) { if (i >= tries || !['network', 'server', 'busy'].includes(e && e.code)) throw e; await sleep(1200 * i); }
+    catch (e) { if (i >= tries || !['network', 'server', 'busy', 'timeout'].includes(e && e.code) || (e.code === 'timeout' && i >= 2)) throw e; await sleep(1200 * i); }
   }
+}
+/* fetch dengan batas waktu: bila server Google tidak menjawab, tampilkan pesan & tombol coba lagi (bukan loading tanpa akhir) */
+async function fetchT(url, init, ms) {
+  const ctl = typeof AbortController !== 'undefined' ? new AbortController() : null, tm = ctl ? setTimeout(() => ctl.abort(), ms) : 0;
+  try { return await fetch(url, Object.assign({}, init, ctl ? { signal: ctl.signal } : {})); }
+  catch (e) { if (e && e.name === 'AbortError') throw Object.assign(new Error('Server Google terlalu lama merespons (lebih dari ' + Math.round(ms / 1000) + ' detik). Tekan Muat ulang beberapa saat lagi.'), { code: 'timeout' }); throw e; }
+  finally { if (tm) clearTimeout(tm); }
 }
 async function api1(a, params) {
   const u = new URL(SHEET_API_URL); u.searchParams.set('a', a);
   for (const k in params) u.searchParams.set(k, params[k]);
   const key = App.adminPw || LS.get('dash_view'); if (key) u.searchParams.set('k', key);
   let r;
-  try { r = await fetch(u.toString(), { redirect: 'follow' }); } catch (e) { throw Object.assign(new Error('Server Google sedang sibuk atau koneksi terputus. Coba Muat ulang beberapa saat lagi.'), { code: 'network' }); }
+  try { r = await fetchT(u.toString(), { redirect: 'follow' }, 75000); } catch (e) { if (e && e.code === 'timeout') throw e; throw Object.assign(new Error('Server Google sedang sibuk atau koneksi terputus. Coba Muat ulang beberapa saat lagi.'), { code: 'network' }); }
   const j = await r.json().catch(() => ({ error: 'server', message: 'Jawaban server tidak terbaca. Pastikan Web App sudah di-deploy dengan akses "Anyone".' }));
   if (j && j.error) throw Object.assign(new Error(j.message || j.error), { code: j.error });
   return j;
@@ -1184,8 +1191,8 @@ async function apiPost(body, pw) {
 }
 async function apiPost1(body, pw) {
   let r;
-  try { r = await fetch(SHEET_API_URL, { method: 'POST', redirect: 'follow', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(Object.assign({}, body, { pw: pw || App.adminPw })) }); }
-  catch (e) { throw Object.assign(new Error('Tidak bisa terhubung ke spreadsheet. Cek internet.'), { code: 'network' }); }
+  try { r = await fetchT(SHEET_API_URL, { method: 'POST', redirect: 'follow', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(Object.assign({}, body, { pw: pw || App.adminPw })) }, ['login', 'register', 'logout', 'hub', 'omset', 'ess', 'check'].includes(body.a) ? 60000 : 330000); }
+  catch (e) { if (e && e.code === 'timeout') throw e; throw Object.assign(new Error('Tidak bisa terhubung ke spreadsheet. Cek internet.'), { code: 'network' }); }
   const j = await r.json().catch(() => ({ error: 'server', message: 'Jawaban server tidak terbaca.' }));
   if (j && j.error) throw Object.assign(new Error(j.message || j.error), { code: j.error });
   return j;
@@ -1618,10 +1625,14 @@ async function onPeriodChange() {
 async function refreshForPeriod() {
   const R = periodRange();
   $('#view').innerHTML = '<div class="loading"><span class="spin"></span>Mengambil data periode…</div>';
-  try { await ensureMonths(R.cfrom, R.to); } catch (e) { toast('Gagal memuat sebagian data: ' + (e.message || e.code)); }
+  try { await ensureMonths(R.cfrom, R.to); } catch (e) { loadFail(e); return; }
   render();
 }
 
+function loadFail(e) {
+  const v = $('#view'); if (!v) return;
+  v.innerHTML = `<div class="empty-state"><h2>Data belum berhasil dimuat</h2><p class="muted">${esc((e && e.message) || 'Server Google tidak merespons.')}</p><button class="btn primary" id="reloadBtn">⟳ Coba lagi</button></div>`;
+}
 function destroyCharts() { App.charts.forEach(c => { try { c.destroy(); } catch (e) { } }); App.charts = []; }
 /* mode toko: semua pilihan toko di halaman dikunci ke toko terpilih supaya tidak membingungkan */
 const SCOPED_SELECTS = ['pcStore', 'roStore', 'tfStore', 'tdStore', 'prStore', 'raStore', 'ptStore', 'psStore', 'dtStore', 'lsStore', 'pst', 'hst', 'trs', 'stSel'];
@@ -1868,7 +1879,7 @@ function pageReport(view) {
   const U = App.ui; const maxD = repLast();
   let D = U.rpDate && U.rpDate <= maxD ? U.rpDate : maxD; U.rpDate = D;
   const val = U.rpVal || SET().defaultValue || 'g';
-  if (!App.loaded.has(D.slice(0, 7)) && App.index.sales[D.slice(0, 7)]) { view.innerHTML = '<div class="loading"><span class="spin"></span>Mengambil data…</div>'; ensureMonths(D, D).then(render); return; }
+  if (!App.loaded.has(D.slice(0, 7)) && App.index.sales[D.slice(0, 7)]) { view.innerHTML = '<div class="loading"><span class="spin"></span>Mengambil data…</div>'; ensureMonths(D, D).then(render, loadFail); return; }
   const R = reportData(D, val);
   setHead('Monitoring Sales' + (App.ui.typeF ? ' · ' + TYPE_LABEL[App.ui.typeF] : ''), R.rows.length + ' site · tanggal ' + fmtDate(D) + ' · kumulatif 1–' + (+D.slice(8)) + ' ' + fmtMonth(R.m) + (R.hasW ? ' · bobot harian ' + fmtPct(R.cw, 1) : ' · bobot harian belum diupload, target dibagi rata'));
   const st = U.rpSort || { k: 'mAch', dir: 'desc' };
@@ -2024,7 +2035,7 @@ function pagePromo(view) {
   const D = U.prDate && U.prDate <= maxD ? U.prDate : maxD; U.prDate = D;
   const st = U.prStore && codes.includes(U.prStore) ? U.prStore : '';
   const from = D.slice(0, 7) + '-01';
-  if (!App.loaded.has(D.slice(0, 7)) && App.index.sales[D.slice(0, 7)]) { view.innerHTML = '<div class="loading"><span class="spin"></span>Mengambil data…</div>'; ensureMonths(D, D).then(render); return; }
+  if (!App.loaded.has(D.slice(0, 7)) && App.index.sales[D.slice(0, 7)]) { view.innerHTML = '<div class="loading"><span class="spin"></span>Mengambil data…</div>'; ensureMonths(D, D).then(render, loadFail); return; }
   setHead('Kontribusi Promo' + (st ? ' · ' + sName(st) : ''), 'Harian ' + fmtDate(D) + ' · kumulatif 1–' + (+D.slice(8)) + ' ' + fmtMonth(D.slice(0, 7)) + ' · ' + VLL().toLowerCase());
   const lines = linesIn(from, D, st || null);
   const P = new Map(); const tot = { d: 0, c: 0 };
@@ -2111,7 +2122,7 @@ function pageOmni(view) {
   const U = App.ui, months = Object.keys(App.index.sales).sort().reverse();
   const allM = [...new Set([...months, ...Object.keys(App.omni)])].sort().reverse();
   const m = U.omM && allM.includes(U.omM) ? U.omM : (allM[0] || (App.lastDate || todayISO()).slice(0, 7)); U.omM = m;
-  if (!App.loaded.has(m) && App.index.sales[m]) { view.innerHTML = '<div class="loading"><span class="spin"></span>Mengambil data…</div>'; ensureMonths(m + '-01', m + '-01').then(render); return; }
+  if (!App.loaded.has(m) && App.index.sales[m]) { view.innerHTML = '<div class="loading"><span class="spin"></span>Mengambil data…</div>'; ensureMonths(m + '-01', m + '-01').then(render, loadFail); return; }
   const O = omniData(m);
   setHead('Monitoring OmniChannel' + (U.typeF ? ' · ' + TYPE_LABEL[U.typeF] : ''), fmtMonth(m) + (O.last ? ' · actual s/d ' + fmtDate(O.last) : '') + ' · ' + O.rows.length + ' site');
   const st = U.omSort || { k: 'totP', dir: 'desc' };
@@ -2180,7 +2191,7 @@ function pageEac(view) {
   const U = App.ui, maxD = App.lastDate;
   const D = U.eaDate && U.eaDate <= maxD ? U.eaDate : maxD; U.eaDate = D;
   const m = D.slice(0, 7), day = +D.slice(8), from = m + '-01';
-  if (!App.loaded.has(m) && App.index.sales[m]) { view.innerHTML = '<div class="loading"><span class="spin"></span>Mengambil data…</div>'; ensureMonths(D, D).then(render); return; }
+  if (!App.loaded.has(m) && App.index.sales[m]) { view.innerHTML = '<div class="loading"><span class="spin"></span>Mengambil data…</div>'; ensureMonths(D, D).then(render, loadFail); return; }
   const cw = cumWeight(m, day), T = App.eac[m] || {};
   const S = new Map(); const mk = () => ({ v: 0, mv: 0, dv: 0, dmv: 0, mtrx: new Set(), ntrx: new Set(), nv: 0, mem: new Set() });
   const daily = new Map(); const CU = new Map();
@@ -3545,7 +3556,7 @@ document.addEventListener('visibilitychange', () => { if (document.visibilitySta
 async function routeAfterLogin() {
   presStart();
   const had = applyHash();
-  if (had && isOps(App.page)) { const pg = App.page; App.mode = 'ops'; $('#view').innerHTML = '<div class="loading"><span class="spin"></span>Memuat Operational Hub…</div>'; renderNav(); try { await loadHub(); } catch (e) { } App.page = pg; render(); return; }
+  if (had && isOps(App.page)) { const pg = App.page; App.mode = 'ops'; $('#view').innerHTML = '<div class="loading"><span class="spin"></span>Memuat Operational Hub…</div>'; renderNav(); try { await loadHub(); } catch (e) { loadFail(e); return; } App.page = pg; render(); return; }
   if (had && App.page !== 'home') { App.mode = 'store'; App.storeLoaded = true; await boot(); return; }
   App.page = 'home'; App.mode = null; render(); loadHub().then(() => { if (App.page === 'home') render(); }).catch(() => { });
 }
@@ -3681,7 +3692,7 @@ async function openMenu(k) {
   closeMenuPal(); pushRecent(k); App.ui.navOpen = null;
   if (isOps(k)) {
     App.mode = 'ops';
-    if (!App.hub) { App.page = k; syncHash(true); renderNav(); $('#view').innerHTML = '<div class="loading"><span class="spin"></span>Memuat…</div>'; try { await loadHub(); } catch (e) { } }
+    if (!App.hub) { App.page = k; syncHash(true); renderNav(); $('#view').innerHTML = '<div class="loading"><span class="spin"></span>Memuat…</div>'; try { await loadHub(); } catch (e) { loadFail(e); return; } }
     go(k); return;
   }
   App.mode = 'store';
@@ -5001,7 +5012,7 @@ document.addEventListener('click', async e => {
   if (t.id === 'clrBtn') { App.pending = []; renderPending(); return; }
   if (t.id === 'tgtSave') { saveTargets(); return; }
   if (t.id === 'delBtn') { deleteStoreMonth(); return; }
-  if (t.id === 'reloadBtn') { t.disabled = true; t.textContent = 'Memuat…'; try { await loadAll(); toast('Data terbaru dimuat'); } catch (er) { toast('Gagal memuat: ' + (er.message || er.code)); } render(); return; }
+  if (t.id === 'reloadBtn') { t.disabled = true; t.textContent = 'Memuat…'; try { if (isOps(App.page) || App.page === 'home') await loadHub(true); else await loadAll(); toast('Data terbaru dimuat'); } catch (er) { loadFail(er); return; } render(); return; }
 });
 let qTimer;
 document.addEventListener('input', e => {

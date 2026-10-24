@@ -575,6 +575,63 @@ table.rp{border-collapse:separate;border-spacing:0;font-size:12px;width:100%;min
 .rp tr.subt td{font-weight:800;background:var(--orange-tint);border-bottom:2px solid var(--line-strong)}
 .rp tr.subt td.nm{background:var(--orange-tint)}
 .rp tr.subt td.dneg{background:var(--bad-bg)}.rp tr.subt td.dpos{background:var(--ok-bg)}
+
+/* ===== menu sederhana (palet menu & beranda) ===== */
+.mp-ov{position:fixed;inset:0;z-index:150;background:rgba(11,27,74,.55);display:flex;justify-content:center;align-items:flex-start;padding:calc(10px + env(safe-area-inset-top,0px)) 10px 10px;overflow:auto}
+.mp{width:min(760px,100%);background:var(--surface);border-radius:16px;box-shadow:0 24px 60px rgba(0,0,0,.35);padding:16px;border-top:5px solid var(--orange)}
+.mp-top{display:flex;gap:8px;align-items:center}.mp-top .inp{flex:1;min-height:46px;font-size:16px}
+.mp-sec{margin-top:16px}.mp-sec h4{margin:0 0 8px;font-size:12px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+.mtiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.mtile{all:unset;box-sizing:border-box;cursor:pointer;display:flex;flex-direction:column;gap:4px;position:relative;background:var(--navy-tint);border:1px solid var(--line);border-radius:14px;padding:12px;min-height:92px}
+.mtile:hover,.mtile:focus-visible{border-color:var(--navy);box-shadow:0 6px 16px rgba(11,27,74,.12)}
+.mtile .ic{font-size:24px;line-height:1}.mtile b{font-size:14px;color:var(--ink);line-height:1.25}.mtile small{font-size:11.5px;color:var(--muted);line-height:1.3}
+.mtile .bd{position:absolute;top:8px;right:8px;background:var(--bad);color:#fff;font-size:11px;font-weight:800;border-radius:999px;padding:1px 7px}
+.mlist{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:6px}
+.mitem{all:unset;box-sizing:border-box;cursor:pointer;display:flex;gap:10px;align-items:center;padding:9px 10px;border-radius:10px;border:1px solid transparent}
+.mitem:hover,.mitem:focus-visible{background:var(--navy-tint);border-color:var(--line)}
+.mitem .ic{font-size:19px;width:26px;text-align:center;flex:none}.mitem b{display:block;font-size:13.5px;color:var(--ink)}.mitem small{display:block;font-size:11.5px;color:var(--muted);line-height:1.3}
+.mitem .bd{margin-left:auto;background:var(--bad);color:#fff;font-size:11px;font-weight:800;border-radius:999px;padding:1px 7px;flex:none}
+.mrec{display:flex;flex-wrap:wrap;gap:6px}.mrec button{border:1px solid var(--line-strong);background:var(--surface);border-radius:999px;padding:6px 12px;font-weight:700;font-size:12.5px;color:var(--navy);cursor:pointer}
+.home-hero{background:linear-gradient(150deg,#0B1B4A,#0F3192 60%,#1B47C2);color:#fff;border-radius:16px;padding:18px;display:flex;flex-direction:column;gap:12px}
+.home-hero h2{margin:0;font-size:20px}.home-hero p{margin:0;opacity:.85;font-size:13.5px}
+.home-search{display:flex;align-items:center;gap:10px;background:#fff;color:var(--muted);border-radius:12px;padding:12px 14px;border:0;font-size:15px;font-weight:600;cursor:pointer;text-align:left;width:100%}
+.nav button.menu-btn{color:#fff;background:var(--orange);border-radius:999px;border-bottom:0;padding:6px 14px;margin:4px 6px 4px 0}
+.nav button.menu-btn:hover{color:#fff;filter:brightness(1.05)}
+/* ===== tampilan HP: semua menu pas di layar ===== */
+@media (max-width:640px){
+  html,body{overflow-x:hidden;max-width:100%}
+  input,select,textarea,.inp,.inp.sm{font-size:16px!important}
+  .brandbar .row1{gap:6px;min-width:0}
+  .brandbar .row1>svg{display:none}
+  .brandbar .row1 img{height:22px;flex:none}
+  .onl-chip{padding:4px 8px;font-size:12px;flex:none}.onl-chip .t{display:none}
+  .data-chip{margin-left:6px!important;min-width:0;flex:0 1 auto;overflow:hidden}
+  .data-chip button{padding:5px 8px;font-size:12px;min-height:32px}
+  .data-chip button.sc{max-width:84px;overflow:hidden;text-overflow:ellipsis}
+  .phead h1{overflow-wrap:anywhere}.phead p{font-size:12.5px}
+  main.wrap{overflow-x:hidden}
+  .grid>*,.stack>*,.card,.kpi,.pt-tile,.ra-tile,.rp-tile{min-width:0}
+  .pt-tiles{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+  .pt-tile b,.kpi b,.ra-tile b{overflow-wrap:anywhere}.pt-tile b{font-size:18px}
+  .rp-top{grid-template-columns:1fr}
+  .filters{gap:8px}.filters>.seg,.filters>button,.filters>a{max-width:100%}
+  .filters input[type=date],.filters input[type=month],.filters select{flex:1 1 140px;min-width:0}
+  .filters span[style*="flex:1"]{display:none}
+  .card-h{flex-wrap:wrap}.card-h>*{min-width:0}
+  .tbl-wrap,.rp-wrap{max-width:100%}
+  .hub-home,.g2,.g4,.chat-grid,.dt-row{grid-template-columns:1fr!important}
+  .hub-form{grid-template-columns:1fr}
+  .hub-item{padding:10px}.hi-act .btn{flex:1 1 auto}
+  .drawer{padding-left:14px;padding-right:14px}
+  .modal,.auth-card{padding:18px}
+  .mtiles{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .mlist{grid-template-columns:1fr}
+  .mp{padding:12px;border-radius:14px}
+  .home-hero{padding:14px}.home-hero h2{font-size:18px}
+  .ess-hero{padding:14px}.ess-kp{min-width:0}
+  #onlinePop{top:56px}
+  .toast{max-width:calc(100vw - 24px)}
+}
 </style>
 </head>
 <body>
@@ -1500,7 +1557,7 @@ const pageGroup = pg => (NAV.find(g => g.items && g.items.some(i => i[0] === pg)
 function renderNav() {
   const cur = pageGroup(App.page), open = App.ui.navOpen;
   const navList = App.page === 'home' ? [] : (isOps(App.page) ? OPS_NAV : [{ k: 'home', label: 'Beranda', icon: 'home' }, ...NAV]);
-  $('#nav').innerHTML = navList.filter(g => !g.admin || App.admin).map(g => g.items
+  $('#nav').innerHTML = (App.page === 'home' || !App.user ? '' : '<button class="menu-btn" data-menupal="1" title="Cari & buka semua menu">☰ Semua menu</button>') + navList.filter(g => !g.admin || App.admin).map(g => g.items
     ? `<div class="nav-g ${open === g.k ? 'open' : ''}"><button data-navg="${g.k}" class="${cur === g.k ? 'on' : ''}" aria-haspopup="true" aria-expanded="${open === g.k}"><svg viewBox="0 0 24 24" aria-hidden="true">${ICON[g.icon]}</svg>${g.label}<span class="car">▼</span></button>
       <div class="nav-m" role="menu">${g.items.map(([k, l, d]) => `<button role="menuitem" data-go="${k}" class="${App.page === k ? 'on' : ''}">${l}<small>${d}</small></button>`).join('')}</div></div>`
     : `<button data-go="${g.k}" class="${App.page === g.k ? 'on' : ''}"><svg viewBox="0 0 24 24" aria-hidden="true">${ICON[g.icon]}</svg>${g.label}</button>`).join('');
@@ -3414,7 +3471,7 @@ const PRES = { last: Date.now(), timer: null, dv: null, mine: 0, pingAt: 0, busy
 function renderOnline() {
   const ch = $('#onlineChip'); if (!ch) return;
   const L = (App.online || []).filter(o => o.ago < 180);
-  ch.hidden = !App.user; ch.textContent = '🟢 ' + L.length + ' online';
+  ch.hidden = !App.user; ch.innerHTML = '🟢 ' + L.length + '<span class="t"> online</span>';
   const pop = $('#onlinePop'); if (pop) pop.innerHTML = onlinePopHtml();
 }
 function onlinePopHtml() {
@@ -3536,18 +3593,76 @@ function taskState(t, today) {
 const PRIO = { Tinggi: '🔥', Sedang: '⚡', Rendah: '🌿' };
 const APST = { Menunggu: ['⏳', 'or'], 'Proses Review': ['🔍', 'or'], Revisi: ['🔄', 'red'], Disetujui: ['✅', 'ok'], Ditolak: ['❌', 'red'] };
 /* ---------- beranda: pilih hub ---------- */
+/* ===== katalog menu: satu pintu untuk Store Management & Operational Hub ===== */
+const MENU_IC = { omset: '💬', report: '🎯', trend: '📈', promo: '🏷️', omni: '🛒', eac: '👥', ra: '🧑‍💼', pareto: '📊', growth: '📅', produk: '👕', transfer: '🔁', ro: '📦', promostock: '💸', detention: '🗄️', bc: '🔢', lost: '⚠️', pica: '💡', juknis: '🎁', admin: '⬆️', settings: '⚙️', ops_approval: '✅', ops_task: '📋', ops_info: '📢', ops_ess: '📝' };
+const MENU_EXTRA = { lost: ['Lost Sales', 'Barang dicari customer tapi tidak tersedia'], pica: ['Analisa PICA', 'Cari masalah & tindakan perbaikan toko'], juknis: ['Info Promo (Juknis)', 'Promo yang sedang & akan berjalan'], admin: ['Kelola data', 'Upload data, akun & daftar toko'], settings: ['Pengaturan', 'Pengaturan dashboard'],
+  ops_approval: ['Approval', 'Ajukan & pantau persetujuan BM'], ops_task: ['Task', 'Checklist tugas tiap toko'], ops_info: ['Informasi', 'Info & materi terbaru dari HO'], ops_ess: ['ESS Self Assessment', 'Self assessment RA saat briefing siang'] };
+const MENU_KW = { omset: 'piket share omset per 2 jam sales report care', report: 'achievement target daily report pencapaian', ra: 'sales person karyawan upt basket tagging target per head', transfer: 'pindah stok antar toko', ro: 'order gudang ho repeat', detention: 'display gudang pajang', bc: 'stock opname so', ops_ess: 'briefing journey', ops_task: 'tugas checklist', ops_approval: 'pengajuan memo lembur', juknis: 'promo diskon', lost: 'kosong tidak ada stok' };
+const QUICK_MENU = { toko: ['omset', 'report', 'ra', 'ops_task', 'ops_approval', 'ops_ess', 'juknis', 'lost'], other: ['report', 'omset', 'ra', 'pica', 'ops_approval', 'ops_task', 'transfer', 'omni'] };
+function menuCatalog() {
+  const sales = NAV.find(x => x.k === 'sales'), inv = NAV.find(x => x.k === 'inv'), it = k => ({ k, l: MENU_EXTRA[k][0], d: MENU_EXTRA[k][1] });
+  const g = [
+    { t: 'Penjualan', items: sales.items.map(([k, l, d]) => ({ k, l, d })) },
+    { t: 'Operasional toko', items: ['ops_task', 'ops_approval', 'ops_ess', 'ops_info'].map(it) },
+    { t: 'Stok & produk', items: inv.items.map(([k, l, d]) => ({ k, l, d })) },
+    { t: 'Analisa & promo', items: ['lost', 'pica', 'juknis'].map(it) }
+  ];
+  if (App.admin) g.push({ t: 'Admin', items: ['admin', 'settings'].map(it) });
+  return g;
+}
+const menuAll = () => menuCatalog().flatMap(g => g.items.map(x => Object.assign({ g: g.t }, x)));
+const menuFind = k => menuAll().find(x => x.k === k);
+function menuBadge(k) {
+  const H = App.hub; if (!H) return 0; const today = todayISO(), me = App.user || {}, ls = me.role === 'toko' ? me.store : '';
+  if (k === 'ops_approval') return H.approval.filter(a => (!ls || a.store === ls) && (App.admin ? ['Menunggu', 'Proses Review'].includes(a.status) : a.status === 'Revisi')).length;
+  if (k === 'ops_task') return H.task.filter(t => { const S = taskState(t, today); return S.st !== 'Selesai' && (ls ? S.targets.includes(ls) && !(t.done && t.done[ls]) : S.st === 'Overdue'); }).length;
+  if (k === 'ops_info') return H.info.filter(i => i.date && dayDiff(i.date, today) <= 3).length;
+  return 0;
+}
+const recentMenus = () => { try { return JSON.parse(LS.get('hub_recent') || '[]').filter(k => menuFind(k)); } catch (e) { return []; } };
+function pushRecent(k) { const r = recentMenus().filter(x => x !== k); r.unshift(k); LS.set('hub_recent', JSON.stringify(r.slice(0, 5))); }
+const mTile = x => { const b = menuBadge(x.k); return `<button class="mtile" data-menu="${x.k}"><span class="ic">${MENU_IC[x.k] || '•'}</span><b>${esc(x.l)}</b><small>${esc(x.d || '')}</small>${b ? `<span class="bd">${b}</span>` : ''}</button>`; };
+const mRow = x => { const b = menuBadge(x.k); return `<button class="mitem" data-menu="${x.k}"><span class="ic">${MENU_IC[x.k] || '•'}</span><span><b>${esc(x.l)}</b><small>${esc(x.d || '')}</small></span>${b ? `<span class="bd">${b}</span>` : ''}</button>`; };
+function menuBody(q) {
+  q = String(q || '').trim().toLowerCase();
+  if (q) {
+    const L = menuAll().filter(x => (x.l + ' ' + x.d + ' ' + x.g + ' ' + (MENU_KW[x.k] || '')).toLowerCase().includes(q));
+    return `<div class="mp-sec"><h4>Hasil pencarian</h4>${L.length ? `<div class="mlist">${L.map(mRow).join('')}</div>` : '<p class="muted small">Menu tidak ditemukan. Coba kata lain, misalnya "stok", "target", atau "task".</p>'}</div>`;
+  }
+  const quick = QUICK_MENU[(App.user || {}).role === 'toko' ? 'toko' : 'other'].map(menuFind).filter(Boolean), rec = recentMenus();
+  return `<div class="mp-sec"><h4>⭐ Paling sering dipakai</h4><div class="mtiles">${quick.map(mTile).join('')}</div></div>
+    ${rec.length ? `<div class="mp-sec"><h4>🕘 Terakhir dibuka</h4><div class="mrec">${rec.map(k => `<button data-menu="${k}">${MENU_IC[k] || ''} ${esc(menuFind(k).l)}</button>`).join('')}</div></div>` : ''}
+    ${menuCatalog().map(g => `<div class="mp-sec"><h4>${esc(g.t)}</h4><div class="mlist">${g.items.map(mRow).join('')}</div></div>`).join('')}`;
+}
+function openMenuPal() {
+  closeMenuPal(); App.ui.navOpen = null; const f = $('#navFloat'); if (f) f.remove();
+  const ov = document.createElement('div'); ov.className = 'mp-ov'; ov.id = 'menuPal';
+  ov.innerHTML = `<div class="mp" role="dialog" aria-modal="true" aria-label="Semua menu"><div class="mp-top"><input class="inp" id="mpQ" type="search" placeholder="🔍 Cari menu… (mis. omset, stok, task)" autocomplete="off"><button class="btn" data-mpclose="1">Tutup</button></div><div id="mpBody">${menuBody('')}</div></div>`;
+  document.body.appendChild(ov);
+  if (window.innerWidth > 640) setTimeout(() => { const q = $('#mpQ'); if (q) q.focus(); }, 30);
+  if (!App.hub) loadHub().then(() => { const b = $('#mpBody'), q = $('#mpQ'); if (b) b.innerHTML = menuBody(q ? q.value : ''); }).catch(() => { });
+}
+function closeMenuPal() { const o = $('#menuPal'); if (o) o.remove(); }
+async function openMenu(k) {
+  closeMenuPal(); pushRecent(k); App.ui.navOpen = null;
+  if (isOps(k)) {
+    App.mode = 'ops';
+    if (!App.hub) { App.page = k; syncHash(true); renderNav(); $('#view').innerHTML = '<div class="loading"><span class="spin"></span>Memuat…</div>'; try { await loadHub(); } catch (e) { } }
+    go(k); return;
+  }
+  App.mode = 'store';
+  if (!App.storeLoaded) { App.page = k; App.storeLoaded = true; syncHash(true); renderNav(); window.scrollTo(0, 0); await boot(); return; }
+  go(k);
+}
 function pageHome(view) {
-  setHead('Integrated Hub Jateng 01', 'Selamat datang' + (App.user ? ', ' + App.user.name.split(' ')[0] : '') + ' — pilih area kerja');
-  const H = App.hub || { approval: [], task: [], info: [] }, today = todayISO();
-  const pend = H.approval.filter(a => a.status === 'Menunggu' || a.status === 'Proses Review').length;
-  const od = H.task.filter(t => taskState(t, today).st === 'Overdue').length, act = H.task.filter(t => ['On Progress', 'Belum Mulai'].includes(taskState(t, today).st)).length;
-  const newInfo = H.info.filter(i => i.date && dayDiff(i.date, today) <= 7).length;
-  view.innerHTML = `<div class="hub-home">
-    <button class="hub-tile" data-hub="store"><span class="hub-ic">📊</span><b>Store Management</b><span>Monitoring sales, OmniChannel, EAC, RA, growth, inventory, lost sales, analisa PICA & promo</span><em>Masuk →</em></button>
-    <button class="hub-tile ops" data-hub="ops"><span class="hub-ic">🗂️</span><b>Operational Hub</b><span>Approval pengajuan, task & checklist toko, informasi terbaru dari HO, ESS self assessment</span>
-      <span class="hub-badges">${pend ? `<i class="red">${pend} approval menunggu</i>` : ''}${od ? `<i class="red">${od} task overdue</i>` : ''}${act ? `<i>${act} task berjalan</i>` : ''}${newInfo ? `<i class="ok">${newInfo} info baru</i>` : ''}</span><em>Masuk →</em></button>
+  const me = App.user || {}, nm = (me.name || '').split(' ')[0];
+  setHead('Integrated Hub Jateng 01', 'Pilih menu yang ingin dibuka');
+  view.innerHTML = `<div class="stack">
+    <section class="home-hero"><div><h2>Halo${nm ? ', ' + esc(nm) : ''} 👋</h2><p>${me.role === 'toko' && me.store ? 'Toko ' + esc(me.store) + ' · ' : ''}Semua menu Store Management & Operational Hub ada di satu tempat.</p></div>
+      <button class="home-search" data-menupal="1">🔍 <span>Cari menu… (mis. omset, stok, task)</span></button></section>
+    <div id="homeBody">${menuBody('')}</div>
   </div>`;
-  if (!App.hub) loadHub().then(() => { if (App.page === 'home') render(); }).catch(() => { });
+  if (!App.hub) loadHub().then(() => { if (App.page === 'home') { const b = $('#homeBody'); if (b) b.innerHTML = menuBody(''); } }).catch(() => { });
 }
 async function enterHub(which) {
   if (which === 'store') { App.mode = 'store'; App.page = 'report'; if (!App.storeLoaded) { syncHash(true); renderNav(); App.storeLoaded = true; await boot(); } else { go('report'); } return; }
@@ -4712,10 +4827,13 @@ function applyHash() {
 function syncHash(push) { const h = hashFor(); if (location.hash === h) return; try { history[push ? 'pushState' : 'replaceState'](null, '', h); } catch (e) { location.hash = h; } }
 window.addEventListener('popstate', () => { if (applyHash()) { App.ui.navOpen = null; closeDrawer(); render(); } });
 window.addEventListener('hashchange', () => { const before = App.page; if (applyHash() && (App.page !== before || App.page === 'toko')) render(); });
-function go(page) { App.page = page; App.ui.navOpen = null; const f = $('#navFloat'); if (f) f.remove(); closeDrawer(); syncHash(true); render(); window.scrollTo(0, 0); }
+function go(page) { if (typeof menuFind === 'function' && menuFind(page)) pushRecent(page); App.page = page; App.ui.navOpen = null; const f = $('#navFloat'); if (f) f.remove(); closeDrawer(); syncHash(true); render(); window.scrollTo(0, 0); }
 window.addEventListener('resize', () => { if (App.ui.navOpen) renderNav(); });
 document.addEventListener('click', async e => {
   const t = e.target;
+  if (t.closest && t.closest('[data-menupal]')) { openMenuPal(); return; }
+  { const mm = t.closest && t.closest('[data-menu]'); if (mm) { openMenu(mm.dataset.menu); return; } }
+  if ((t.closest && t.closest('[data-mpclose]')) || t.id === 'menuPal') { closeMenuPal(); return; }
   { const pop = $('#onlinePop'); if (t.id === 'onlineChip') { if (pop) pop.remove(); else { const d = document.createElement('div'); d.id = 'onlinePop'; d.innerHTML = onlinePopHtml(); document.body.appendChild(d); } return; } if (pop && !pop.contains(t)) pop.remove(); }
   if (App.page === 'settings' && settingsClick(t)) return;
   const dl = t.closest && t.closest('[data-dellog]'); if (dl) { deleteByLog(dl.dataset.dellog); return; }
@@ -4851,6 +4969,7 @@ document.addEventListener('click', async e => {
 let qTimer;
 document.addEventListener('input', e => {
   const t = e.target;
+  if (t.id === 'mpQ') { const b = $('#mpBody'); if (b) b.innerHTML = menuBody(t.value); return; }
   const deb = (key) => { App.ui[key] = t.value; App.ui.more = {}; clearTimeout(qTimer); qTimer = setTimeout(() => { const pos = t.selectionStart; const id = t.id; render(); const n = document.getElementById(id); if (n) { n.focus(); try { n.setSelectionRange(pos, pos); } catch (er) { } } }, 300); };
   if (t.id === 'pq') deb('prodQ'); else if (t.id === 'hq') deb('stQ'); else if (t.id === 'trq') deb('trQ'); else if (t.id === 'tfQ') deb('tfQ'); else if (t.id === 'chatGreet') { const R = App.ui.rpLast; if (R) { App.settings = Object.assign({}, SET(), { chatGreet: t.value }); const pre = $('#chatPre'); if (pre) pre.textContent = reportChatText(R); } } else if (t.id === 'apQ') deb('apQ'); else if (t.id === 'tkQ') deb('tkQ'); else if (t.id === 'ifQ') deb('ifQ');
   else if (t.dataset && t.dataset.tgt !== undefined) { const sum = $$('[data-tgt]').reduce((s, i) => s + (Number(String(i.value).replace(/[^0-9]/g, '')) || 0), 0); const el = $('#tgtSum'); if (el) el.textContent = fmtRp(sum); }
@@ -4915,7 +5034,7 @@ document.addEventListener('change', async e => {
   if (t.dataset && t.dataset.pxadd !== undefined) { const p = App.pending[+t.dataset.pxadd]; if (p && t.value && t.value !== p.date) { p.extra = [...new Set([...(p.extra || []), t.value])].sort(); renderPending(); } return; }
   if (t.dataset && t.dataset.pdate !== undefined) { const p = App.pending[+t.dataset.pdate]; if (p && t.value) { p.date = t.value; p.dateFromName = true; } return; }
 });
-document.addEventListener('keydown', e => { if ((e.key === 'ArrowRight' || e.key === 'ArrowLeft') && $('#ov') && App.ui.pd && $('.pd-nav')) { const P = App.ui.pd, n = photosOf(P.art, P.col).length; if (n > 1) openProduct(P.art, P.store, P.col, (P.i + (e.key === 'ArrowRight' ? 1 : -1) + n) % n, P.all); return; } if (e.key === 'Escape') { closeDrawer(); closeLogin(); if (App.ui.navOpen) { App.ui.navOpen = null; renderNav(); } } });
+document.addEventListener('keydown', e => { if ((e.key === 'ArrowRight' || e.key === 'ArrowLeft') && $('#ov') && App.ui.pd && $('.pd-nav')) { const P = App.ui.pd, n = photosOf(P.art, P.col).length; if (n > 1) openProduct(P.art, P.store, P.col, (P.i + (e.key === 'ArrowRight' ? 1 : -1) + n) % n, P.all); return; } if (e.key === 'Escape') { closeMenuPal(); closeDrawer(); closeLogin(); if (App.ui.navOpen) { App.ui.navOpen = null; renderNav(); } } });
 window.addEventListener('scroll', () => { const b = document.getElementById('brandbar'); if (b) b.classList.toggle('scrolled', window.scrollY > 8); }, { passive: true });
 document.addEventListener('dragover', e => { const d = e.target.closest && e.target.closest('#drop'); if (d) { e.preventDefault(); d.classList.add('over'); } });
 document.addEventListener('dragleave', e => { const d = e.target.closest && e.target.closest('#drop'); if (d) d.classList.remove('over'); });

@@ -2137,17 +2137,34 @@ function pageRA(view) {
   const st = U.raStore && codes.includes(U.raStore) ? U.raStore : '';
   const minT = U.raMin != null ? U.raMin : 10;
   setHead('RA Performance' + (st ? ' · ' + sName(st) : ''), R.label + ' · per sales person · ' + VLL().toLowerCase());
-  const lines = linesIn(R.from, R.to, st || null);
-  const P = new Map(), byDay = new Map(), days = new Set();
+  const isOmni = l => OMNI.some(o => o[2](l));
+  const lines = linesIn(R.from, R.to, st || null).filter(l => !isOmni(l));
+  /* pool omni: Eigerindo Voucher tetap ikut walau dikecualikan dari sales umum */
+  const pool = App.lines.filter(l => l.d >= R.from && l.d <= R.to && (st ? l.s === st : typeOk(l.s)) && lineOk(l) && isOmni(l) && (salesOk(l) || OMNI[1][2](l)));
+  const P = new Map(), byDay = new Map(), days = new Set(), dayRA = new Map(), stRA = new Map();
   for (const l of lines) {
     const sp = spName(l.sp), key = sp + '|' + l.s;
-    let x = P.get(key); if (!x) P.set(key, x = { sp, s: l.s, trx: new Set(), q: 0, v: 0 });
+    let x = P.get(key); if (!x) P.set(key, x = { sp, s: l.s, trx: new Set(), q: 0, v: 0, o: 0 });
     const ok = l.d + '|' + l.o; x.v += VAL(l); if (!isPB(l.sku)) x.q += l.q; if (l.q > 0) x.trx.add(ok);
     days.add(l.d);
-    const dk = key + '|' + l.d; let y = byDay.get(dk); if (!y) byDay.set(dk, y = { trx: new Set(), q: 0 }); if (!isPB(l.sku)) y.q += l.q; if (l.q > 0) y.trx.add(ok);
+    if (sp !== '(TANPA NAMA)') {
+      const dk = l.s + '|' + l.d; (dayRA.get(dk) || dayRA.set(dk, new Set()).get(dk)).add(sp);
+      (stRA.get(l.s) || stRA.set(l.s, new Set()).get(l.s)).add(sp);
+    }
+    const dk2 = key + '|' + l.d; let y = byDay.get(dk2); if (!y) byDay.set(dk2, y = { trx: new Set(), q: 0 }); if (!isPB(l.sku)) y.q += l.q; if (l.q > 0) y.trx.add(ok);
   }
-  const rows = [...P.entries()].map(([k, x]) => ({ k, sp: x.sp, s: x.s, loc: x.s + ' - ' + ((App.stores[x.s] && (App.stores[x.s].alias || App.stores[x.s].name)) || x.s), trx: x.trx.size, q: x.q, v: x.v, upt: x.trx.size ? x.q / x.trx.size : null, bs: x.trx.size ? x.v / x.trx.size : null })).filter(r => r.trx > 0 || r.v);
+  /* lebur sales omni: dibagi rata ke semua RA bernama toko tsb pada hari itu (cadangan: RA aktif toko di periode) */
+  let omPool = 0, omLost = 0;
+  for (const l of pool) {
+    const v = VAL(l); omPool += v;
+    let set = dayRA.get(l.s + '|' + l.d); if (!set || !set.size) set = stRA.get(l.s);
+    if (!set || !set.size) { omLost += v; continue; }
+    const share = v / set.size;
+    for (const sp of set) { const x = P.get(sp + '|' + l.s); if (x) x.o += share; }
+  }
+  const rows = [...P.entries()].map(([k, x]) => ({ k, sp: x.sp, s: x.s, loc: x.s + ' - ' + ((App.stores[x.s] && (App.stores[x.s].alias || App.stores[x.s].name)) || x.s), trx: x.trx.size, q: x.q, own: x.v, om: x.o, v: x.v + x.o, upt: x.trx.size ? x.q / x.trx.size : null, bs: x.trx.size ? x.v / x.trx.size : null })).filter(r => r.trx > 0 || r.v);
   const tot = rows.reduce((a, r) => { a.trx += r.trx; a.q += r.q; a.v += r.v; return a; }, { trx: 0, q: 0, v: 0 });
+  tot.v += omLost;
   const noName = rows.filter(r => r.sp === '(TANPA NAMA)'); const nn = noName.reduce((a, r) => { a.trx += r.trx; a.v += r.v; return a; }, { trx: 0, v: 0 });
   const named = rows.filter(r => r.sp !== '(TANPA NAMA)');
   const elig = named.filter(r => r.trx >= minT);
@@ -2167,6 +2184,7 @@ function pageRA(view) {
     <p class="small muted" style="margin:-6px 0 0">Peringkat terendah/tertinggi hanya menghitung sales person dengan minimal ${minT} transaksi di periode ini, supaya yang baru masuk atau jarang bertugas tidak ikut terhitung.</p>
     <section class="card"><div class="card-h"><h3>Performa sales person</h3><p class="small muted">${fmtN(named.length)} sales person · klik judul kolom untuk mengurutkan</p></div><div id="raT"></div>
       ${nn.trx || nn.v ? `<div class="more">Tanpa nama sales person (biasanya transaksi B2B / wholesale): ${fmtN(nn.trx)} transaksi · ${fmtRp(nn.v)} — tidak dimasukkan ke tabel, tetap dihitung di total.</div>` : ''}
+      ${omPool ? `<div class="more">Sales omni (Endless Aisle, Eigerindo Voucher, Tax Invoice, EASAP) ${fmtRp(omPool)} dibagi rata ke semua RA tiap toko per hari${omLost ? `; ${fmtRp(omLost)} tidak bisa dibagi karena tidak ada RA bernama` : ''}. UPT, qty & basket hanya dari transaksi RA sendiri.</div>` : ''}
       <div class="more" style="font-weight:700;color:var(--ink)">Total keseluruhan: ${fmtN(tot.trx)} transaksi · ${fmtN(tot.q)} qty · UPT ${tot.trx ? fmtX(tot.q / tot.trx, 2) : '–'} · basket ${tot.trx ? fmtRp(tot.v / tot.trx) : '–'} · ${fmtRp(tot.v)}</div></section>
     <section class="card shot-skip"><div class="card-h"><h3>UPT by date</h3><p class="small muted">makin gelap makin tinggi · "–" = tidak ada transaksi</p></div>
       <div class="rp-wrap" style="max-height:60vh"><table class="mx"><thead><tr><th class="nm">Sales person</th>${dl.map(d => `<th>${fmtDateS(d)}</th>`).join('')}</tr></thead><tbody>
@@ -2176,14 +2194,14 @@ function pageRA(view) {
   $('#raT').innerHTML = tbl('raT', { rows: named, sort: { k: 'upt', dir: 'desc' }, limit: 30, cols: [
     { k: 'sp', label: 'Sales person', h: r => `<span class="nm">${esc(r.sp)}</span>` }, { k: 'loc', label: 'Location', h: r => `<span class="small">${esc(r.loc)}</span>` },
     { k: 'trx', label: 'Transaction', r: 1, h: r => fmtN(r.trx) }, { k: 'q', label: 'Quantity', r: 1, h: r => fmtN(r.q) },
-    { k: 'upt', label: 'UPT', r: 1, h: r => `<b>${fmtX(r.upt, 2)}</b>` }, { k: 'bs', label: 'Basket size', r: 1, h: r => r.bs == null ? '–' : fmtN(r.bs) }, { k: 'v', label: 'Sales', r: 1, h: r => fmtN(r.v) }] });
+    { k: 'upt', label: 'UPT', r: 1, h: r => `<b>${fmtX(r.upt, 2)}</b>` }, { k: 'bs', label: 'Basket size', r: 1, h: r => r.bs == null ? '–' : fmtN(r.bs) }, { k: 'om', label: 'Sales omni (dibagi)', r: 1, h: r => r.om ? fmtN(r.om) : '–' }, { k: 'v', label: 'Sales', r: 1, h: r => fmtN(r.v) }] });
   App.ui.raLast = { rows, dl, byDay, R };
 }
 async function exportRA() {
   const X = App.ui.raLast; if (!X || typeof XLSX === 'undefined') return;
-  const a1 = [['RA Performance ' + X.R.label], [], ['Sales Person', 'Location', 'Transaction', 'Quantity', 'UPT', 'Basket Size', 'Sales'], ...X.rows.slice().sort((a, b) => (b.upt ?? -1) - (a.upt ?? -1)).map(r => [r.sp, r.loc, r.trx, r.q, r.upt == null ? null : Math.round(r.upt * 100) / 100, r.bs == null ? null : Math.round(r.bs), Math.round(r.v)])];
+  const a1 = [['RA Performance ' + X.R.label], [], ['Sales Person', 'Location', 'Transaction', 'Quantity', 'UPT', 'Basket Size', 'Sales Omni (dibagi)', 'Sales'], ...X.rows.slice().sort((a, b) => (b.upt ?? -1) - (a.upt ?? -1)).map(r => [r.sp, r.loc, r.trx, r.q, r.upt == null ? null : Math.round(r.upt * 100) / 100, r.bs == null ? null : Math.round(r.bs), Math.round(r.om || 0), Math.round(r.v)])];
   const a2 = [['Sales Person', 'Location', ...X.dl]]; for (const r of X.rows) a2.push([r.sp, r.loc, ...X.dl.map(d => { const y = X.byDay.get(r.k + '|' + d); return y && y.trx.size ? Math.round(y.q / y.trx.size * 100) / 100 : null; })]);
-  const wb = XLSX.utils.book_new(); const w1 = XLSX.utils.aoa_to_sheet(a1); w1['!cols'] = [{ wch: 34 }, { wch: 42 }, { wch: 12 }, { wch: 10 }, { wch: 8 }, { wch: 12 }, { wch: 14 }];
+  const wb = XLSX.utils.book_new(); const w1 = XLSX.utils.aoa_to_sheet(a1); w1['!cols'] = [{ wch: 34 }, { wch: 42 }, { wch: 12 }, { wch: 10 }, { wch: 8 }, { wch: 12 }, { wch: 18 }, { wch: 14 }];
   XLSX.utils.book_append_sheet(wb, w1, 'RA Performance'); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(a2), 'UPT by Date');
   (await getDownloads()).save({ filename: `RA_Performance_${X.R.from}_${X.R.to}.xlsx`, data: new Blob([XLSX.write(wb, { bookType: 'xlsx', type: 'array' })]) });
 }

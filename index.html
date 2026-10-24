@@ -2194,14 +2194,14 @@ function pageRA(view) {
   $('#raT').innerHTML = tbl('raT', { rows: named, sort: { k: 'upt', dir: 'desc' }, limit: 30, cols: [
     { k: 'sp', label: 'Sales person', h: r => `<span class="nm">${esc(r.sp)}</span>` }, { k: 'loc', label: 'Location', h: r => `<span class="small">${esc(r.loc)}</span>` },
     { k: 'trx', label: 'Transaction', r: 1, h: r => fmtN(r.trx) }, { k: 'q', label: 'Quantity', r: 1, h: r => fmtN(r.q) },
-    { k: 'upt', label: 'UPT', r: 1, h: r => `<b>${fmtX(r.upt, 2)}</b>` }, { k: 'bs', label: 'Basket size', r: 1, h: r => r.bs == null ? '–' : fmtN(r.bs) }, { k: 'om', label: 'Sales omni (dibagi)', r: 1, h: r => r.om ? fmtN(r.om) : '–' }, { k: 'v', label: 'Sales', r: 1, h: r => fmtN(r.v) }] });
+    { k: 'upt', label: 'UPT', r: 1, h: r => `<b>${fmtX(r.upt, 2)}</b>` }, { k: 'bs', label: 'Basket size', r: 1, h: r => r.bs == null ? '–' : fmtN(r.bs) }, { k: 'own', label: 'Sales', r: 1, h: r => fmtN(r.own) }, { k: 'om', label: 'Sales omni (dibagi)', r: 1, h: r => r.om ? fmtN(r.om) : '–' }, { k: 'v', label: 'Total sales tagging', r: 1, h: r => `<b>${fmtN(r.v)}</b>` }] });
   App.ui.raLast = { rows, dl, byDay, R };
 }
 async function exportRA() {
   const X = App.ui.raLast; if (!X || typeof XLSX === 'undefined') return;
-  const a1 = [['RA Performance ' + X.R.label], [], ['Sales Person', 'Location', 'Transaction', 'Quantity', 'UPT', 'Basket Size', 'Sales Omni (dibagi)', 'Sales'], ...X.rows.slice().sort((a, b) => (b.upt ?? -1) - (a.upt ?? -1)).map(r => [r.sp, r.loc, r.trx, r.q, r.upt == null ? null : Math.round(r.upt * 100) / 100, r.bs == null ? null : Math.round(r.bs), Math.round(r.om || 0), Math.round(r.v)])];
+  const a1 = [['RA Performance ' + X.R.label], [], ['Sales Person', 'Location', 'Transaction', 'Quantity', 'UPT', 'Basket Size', 'Sales', 'Sales Omni (dibagi)', 'Total Sales Tagging'], ...X.rows.slice().sort((a, b) => (b.upt ?? -1) - (a.upt ?? -1)).map(r => [r.sp, r.loc, r.trx, r.q, r.upt == null ? null : Math.round(r.upt * 100) / 100, r.bs == null ? null : Math.round(r.bs), Math.round(r.own || 0), Math.round(r.om || 0), Math.round(r.v)])];
   const a2 = [['Sales Person', 'Location', ...X.dl]]; for (const r of X.rows) a2.push([r.sp, r.loc, ...X.dl.map(d => { const y = X.byDay.get(r.k + '|' + d); return y && y.trx.size ? Math.round(y.q / y.trx.size * 100) / 100 : null; })]);
-  const wb = XLSX.utils.book_new(); const w1 = XLSX.utils.aoa_to_sheet(a1); w1['!cols'] = [{ wch: 34 }, { wch: 42 }, { wch: 12 }, { wch: 10 }, { wch: 8 }, { wch: 12 }, { wch: 18 }, { wch: 14 }];
+  const wb = XLSX.utils.book_new(); const w1 = XLSX.utils.aoa_to_sheet(a1); w1['!cols'] = [{ wch: 34 }, { wch: 42 }, { wch: 12 }, { wch: 10 }, { wch: 8 }, { wch: 12 }, { wch: 14 }, { wch: 18 }, { wch: 20 }];
   XLSX.utils.book_append_sheet(wb, w1, 'RA Performance'); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(a2), 'UPT by Date');
   (await getDownloads()).save({ filename: `RA_Performance_${X.R.from}_${X.R.to}.xlsx`, data: new Blob([XLSX.write(wb, { bookType: 'xlsx', type: 'array' })]) });
 }

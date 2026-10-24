@@ -657,11 +657,16 @@ table.rp{border-collapse:separate;border-spacing:0;font-size:12px;width:100%;min
 <footer><div class="wrap"><span><strong>Integrated Hub Jateng 01</strong> &middot; PT. Eigerindo MPI &middot; dibuat oleh <strong>Fany Dzikri Hakim</strong></span><span>Data dari spreadsheet master, diperbarui setiap admin mengunggah Item DSR &middot; <a href="#" id="admLink" style="color:var(--navy);font-weight:700">Kelola data (admin)</a></span></div></footer>
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script>
 'use strict';
 /* ================= utilitas ================= */
+/* pembaca/penulis Excel (SheetJS ~900 KB) baru diunduh saat dibutuhkan supaya halaman cepat terbuka */
+let _xlsxP = null;
+function needXLSX() {
+  if (typeof XLSX !== 'undefined') return Promise.resolve(true);
+  return _xlsxP || (_xlsxP = new Promise(res => { const sc = document.createElement('script'); sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'; sc.onload = () => res(true); sc.onerror = () => { _xlsxP = null; res(false); }; document.head.appendChild(sc); }));
+}
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -1191,8 +1196,13 @@ async function withRetry(fn) {
     catch (e) { if (i >= 2 || !['busy', 'network'].includes(e && e.code)) throw e; await sleep(2500 * (i + 1)); }
   }
 }
-async function loadAll() {
-  const M = await api('meta');
+async function loadAll(opt) {
+  opt = opt || {};
+  const mk = 'meta:' + (App.admin ? 'a' : 'u'), who = (App.user || {}).u || '';
+  let M = opt.meta || null; App.fromCache = false;
+  if (!M && opt.cached) { const hit = await IDB.get(mk); if (hit && hit.d && hit.u === who && Date.now() - (hit.t || 0) < 3 * 864e5) { M = hit.d; App.fromCache = true; } }
+  if (!M) { M = await api('meta'); IDB.put(mk, { d: M, u: who, t: Date.now() }); }
+  App.metaVer = verOf(M);
   const SG = M.settings || {};
   App.settings = Object.assign({}, DEFAULT_SETTINGS, SG); App.settings.manual = Object.assign({}, DEFAULT_SETTINGS.manual, SG.manual || {});
   App.settings.billStatuses = App.settings.billStatuses || {}; App.settings.txTypes = App.settings.txTypes || {};
@@ -1204,7 +1214,7 @@ async function loadAll() {
   App.pendingUsers = M.pendingUsers || 0;
   App.omni = M.omni || {}; App.eac = M.eac || {}; App.hoInfo = M.hoInfo || null; App.juknis = M.juknis || {}; App.bc = M.bc || []; App.aiReady = !!M.aiReady;
   App.log = M.log || []; App.books = M.books || []; App.cells = M.cells || 0; App.raTgt = M.raTarget || {};
-  App.lines = []; App.loaded = new Set(); App.sku = {}; App.dsrSku = {}; App.stock = {}; App.cache = {}; App.sr = {};
+  App.lines = []; App.loaded = new Set(); App.sku = {}; App.dsrSku = {}; App.stock = {}; App.stockLoaded = false; App.cache = {}; App.sr = {};
   computeLastDate();
   App.loadWarn = [];
   /* ringkasan detention & lost sales sudah ikut di meta (server versi 12); server lama: ambil terpisah */
@@ -1213,7 +1223,8 @@ async function loadAll() {
   const months = Object.keys(App.index.sales).sort();
   /* awal hanya bulan terakhir + bulan sebelumnya (untuk pembanding); bulan lain dimuat saat dibutuhkan */
   const want = months.length ? months.filter(m => m >= addMonths(months[months.length - 1], -1)) : [];
-  const jobs = [['stok', loadStock], ...want.map(m => ['penjualan ' + fmtMonth(m), () => loadMonth(m)])];
+  /* data stok tidak dimuat di awal: baru diambil saat membuka menu yang memakainya */
+  const jobs = want.map(m => ['penjualan ' + fmtMonth(m), () => loadMonth(m)]);
   if (!Array.isArray(M.lost)) jobs.push(['lost sales', loadLost]);
   if (!Array.isArray(M.det)) jobs.push(['riwayat detention', loadDetHist]);
   /* maksimal 2 permintaan bersamaan supaya server Google tidak kewalahan; yang gagal tidak menggagalkan seluruh halaman */
@@ -1242,7 +1253,7 @@ async function loadStock() {
   if (!Object.keys(App.index.stock).length) return;
   const C = await apiCached('stock', verOf([App.index.stock, (App.log || []).filter(l => l.kind === 'INV').map(l => l.at)]), 'stock');
   for (const c in C.stores || {}) App.stock[c] = C.stores[c];
-  mergeSku(C.sku || {}); App.cache = {};
+  mergeSku(C.sku || {}); App.cache = {}; App.stockLoaded = true;
 }
 async function loadDetHist() {
   App.detMc = {};
@@ -1333,7 +1344,11 @@ function srLast() { let L = null; for (const m in App.sr) { const M = App.sr[m];
 const repLast = () => { const a = App.lastDate, b = srLast(); return !a ? b : !b ? a : (a > b ? a : b); };
 /* produk yang dikecualikan (paper bag, voucher, artikel disembunyikan, dll.) tidak ikut total penjualan di semua menu, kecuali Monitoring OmniChannel */
 const salesOk = l => !(SET().excludeSales !== false && isPB(l.sku));
-const linesIn = (from, to, store) => App.lines.filter(l => l.d >= from && l.d <= to && (store ? l.s === store : typeOk(l.s)) && lineOk(l) && salesOk(l));
+const linesIn = (from, to, store) => {
+  const k = 'li|' + from + '|' + to + '|' + (store || '') + '|' + (store ? '' : (App.ui.typeF || '') + '|' + (scopeOn() ? App.ui.scope : ''));
+  const c = App.cache[k]; if (c) return c;
+  return (App.cache[k] = App.lines.filter(l => l.d >= from && l.d <= to && (store ? l.s === store : typeOk(l.s)) && lineOk(l) && salesOk(l)));
+};
 function agg(lines) {
   const mk = () => ({ n: 0, g: 0, nn: 0, q: 0, trx: new Set() });
   const by = new Map(), tot = mk();
@@ -1630,6 +1645,12 @@ function render() {
   }
   if (App.page === 'stok') App.page = 'transfer';
   if (!isOps(App.page) && App.page !== 'home' && !App.lastDate && !['admin', 'report', 'settings', 'lost', 'detention', 'juknis', 'bc', 'omset'].includes(App.page)) { App.page = srLast() ? 'report' : 'detention'; }
+  const NEED_STOCK = ['produk', 'transfer', 'ro', 'promostock', 'detention', 'pica', 'toko', 'stok', 'area', 'lost', 'settings'];
+  if (NEED_STOCK.includes(App.page) && !App.stockLoaded && Object.keys(App.index.stock || {}).length) {
+    view.innerHTML = '<div class="loading"><span class="spin"></span>Memuat data stok…</div>';
+    const pg = App.page; loadStock().catch(e => { App.stockLoaded = true; toast('Data stok gagal dimuat: ' + (e.message || e.code)); }).then(() => { App.stockLoaded = true; if (App.page === pg) render(); });
+    return;
+  }
   const fn = { area: pageArea, report: pageReport, trend: pageTrend, promo: pagePromo, omni: pageOmni, eac: pageEac, ra: pageRA, pareto: pagePareto, lost: pageLost, promostock: pagePromoStock, detention: pageDetention, growth: pageGrowth, transfer: pageTransfer, ro: pageRO, pica: pagePica, juknis: pageJuknis, home: pageHome, bc: pageBC, omset: pageOmset, ops_approval: pageApproval, ops_task: pageTask, ops_info: pageInfo, ops_ess: pageEss, toko: pageStore, produk: pageProduct, stok: pageStock, admin: pageAdmin, settings: pageSettings }[App.page] || pageReport;
   try { fn(view); lockScopedSelects(view); if (App.page === 'admin') renderUsers(); if ((App.loadWarn || []).length) view.insertAdjacentHTML('afterbegin', `<div class="note" style="margin-bottom:14px">Sebagian data belum termuat (${esc(App.loadWarn.join(', '))}). Tekan <b>Muat ulang</b> di kanan atas untuk mencoba lagi.</div>`); } catch (e) { console.error(e); view.innerHTML = `<div class="empty-state"><h2>Halaman gagal ditampilkan</h2><p class="muted">${esc(e.message)}</p></div>`; }
 }
@@ -1880,12 +1901,13 @@ function pageReport(view) {
     ${App.admin ? reportChatCard(R) : ''}
   </div>`;
   App.ui.rpLast = R;
-  getDownloads().then(dl => { const b = $('#rpXls'); if (b && dl && typeof XLSX !== 'undefined') b.hidden = false; });
+  getDownloads().then(dl => { const b = $('#rpXls'); if (b && dl) b.hidden = false; });
 }
 function getDownloads() {
   return Promise.resolve({ save: async ({ filename, data }) => { const url = URL.createObjectURL(data instanceof Blob ? data : new Blob([data])); const a = document.createElement('a'); a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 3000); } });
 }
 async function exportReport() {
+  if (!(await needXLSX())) return;
   const R = App.ui.rpLast; if (!R) return; const dl = await getDownloads(); if (!dl) { toast('Download tidak tersedia di tampilan ini'); return; }
   const r4 = x => x == null ? null : Math.round(x * 10000) / 10000;
   const u2 = x => x == null ? null : Math.round(x * 100) / 100, rb = x => x == null ? null : Math.round(x);
@@ -2118,7 +2140,7 @@ function pageOmni(view) {
   App.ui.omLast = O;
 }
 async function exportEac() {
-  const X = App.ui.eaLast; if (!X || typeof XLSX === 'undefined') return;
+  const X = App.ui.eaLast; if (!X || !(await needXLSX())) return;
   const r4 = x => x == null ? null : Math.round(x * 10000) / 10000;
   const a1 = [['Sales Member EAC ' + fmtMonth(X.m) + ' s/d ' + fmtDate(X.D)], [], ['Kode', 'Toko', 'Target bulan', 'Target s/d tgl', 'Actual (gross)', 'Diff', '%Ach bulan', '%Ach s/d tgl', 'Porsi member', 'Member', 'Trx member'],
     ...X.rows.map(r => [r.c, r.name, Math.round(r.t), Math.round(r.ct), Math.round(r.a), Math.round(r.d), r4(r.pM), r4(r.pC), r4(r.share), r.mem, r.mtrx])];
@@ -2128,7 +2150,7 @@ async function exportEac() {
   (await getDownloads()).save({ filename: `Sales_Member_EAC_${X.D}.xlsx`, data: new Blob([XLSX.write(wb, { bookType: 'xlsx', type: 'array' })]) });
 }
 async function exportOmni() {
-  const O = App.ui.omLast; if (!O || typeof XLSX === 'undefined') return;
+  const O = App.ui.omLast; if (!O || !(await needXLSX())) return;
   const from = O.m + '-01', to = O.m + '-' + pad(dim(O.m));
   const r4 = x => x == null ? null : Math.round(x * 10000) / 10000, ks = [...OMNI.map(o => o[0]), 'tot'];
   const line = r => [r.c ? r.c + ' - ' + r.name : r.name, ...ks.flatMap(k => [Math.round(r[k + 'T']), Math.round(r[k + 'A']), Math.round(r[k + 'D']), r4(r[k + 'P'])])];
@@ -2353,7 +2375,7 @@ function pageRA(view) {
   App.ui.raLast = { rows: named, dl, byDay, R };
 }
 async function exportRA() {
-  const X = App.ui.raLast; if (!X || typeof XLSX === 'undefined') return;
+  const X = App.ui.raLast; if (!X || !(await needXLSX())) return;
   const a1 = [['RA Performance ' + X.R.label], [], ['Sales Person', 'Location', 'Transaction', 'Quantity', 'UPT', 'Basket Size', 'Sales', 'Sales Dilebur (dibagi)', 'Total Sales Tagging', 'Target', '% Ach'], ...X.rows.slice().sort((a, b) => (b.upt ?? -1) - (a.upt ?? -1)).map(r => [r.sp, r.loc, r.trx, r.q, r.upt == null ? null : Math.round(r.upt * 100) / 100, r.bs == null ? null : Math.round(r.bs), Math.round(r.own || 0), Math.round(r.om || 0), Math.round(r.v), r.tgt == null ? null : Math.round(r.tgt), r.ach == null ? null : Math.round(r.ach * 10000) / 10000])];
   const a2 = [['Sales Person', 'Location', ...X.dl]]; for (const r of X.rows) a2.push([r.sp, r.loc, ...X.dl.map(d => { const y = X.byDay.get(r.k + '|' + d); return y && y.trx.size ? Math.round(y.q / y.trx.size * 100) / 100 : null; })]);
   const wb = XLSX.utils.book_new(); const w1 = XLSX.utils.aoa_to_sheet(a1); w1['!cols'] = [{ wch: 34 }, { wch: 42 }, { wch: 12 }, { wch: 10 }, { wch: 8 }, { wch: 12 }, { wch: 14 }, { wch: 18 }, { wch: 20 }, { wch: 16 }, { wch: 9 }];
@@ -2523,7 +2545,7 @@ function pageLost(view) {
   App.ui.lsLast = { cur, m };
 }
 async function exportLost() {
-  const X = App.ui.lsLast; if (!X || typeof XLSX === 'undefined') return;
+  const X = App.ui.lsLast; if (!X || !(await needXLSX())) return;
   const aoa = [['Tanggal', 'Jam', 'Kode Toko', 'Nama Toko', 'SKU', 'Nama SKU', 'Qty', 'Nilai', 'Reason', 'Kelompok alasan', 'Type'], ...X.cur.map(x => [x.d, x.t, x.s, sName(x.s), x.sku, x.name, x.q, lostAmt(x).v, x.reason, lostReason(x.reason), x.type])];
   const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), 'Lost Sales');
   (await getDownloads()).save({ filename: `Lost_Sales_${X.m}.xlsx`, data: new Blob([XLSX.write(wb, { bookType: 'xlsx', type: 'array' })]) });
@@ -2728,7 +2750,7 @@ function pageDetention(view) {
   }
 }
 async function exportDetention() {
-  const X = App.ui.dtLast; if (!X || typeof XLSX === 'undefined') return;
+  const X = App.ui.dtLast; if (!X || !(await needXLSX())) return;
   const a1 = [['Toko', 'Kode', 'Stok per', 'Generic gudang', 'Generic terdisplay', '% generic', 'Varian gudang', 'Varian terdisplay', '% varian'], ...X.ok.map(d => [sName(d.c), d.c, d.date, d.gW, d.gS, Math.round(d.gP * 10000) / 10000, d.vW, d.vS, Math.round(d.vP * 10000) / 10000])];
   const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(a1), 'Per toko');
   const miss = [['Toko', 'Generic', 'Nama', 'Warna', 'Qty gudang', 'MC Lv3', 'MC Lv4']];
@@ -2898,7 +2920,7 @@ function pageTransfer(view) {
   App.ui.tfLast = { rows, why };
 }
 async function exportTransfer() {
-  const X = App.ui.tfLast; if (!X || typeof XLSX === 'undefined') return;
+  const X = App.ui.tfLast; if (!X || !(await needXLSX())) return;
   const aoa = [['Kode Artikel', 'Nama Artikel', 'Kategori Lv3', 'Kategori Lv4', 'Dari Kode', 'Dari Toko', 'Stok Pengirim', 'Jual/bln Pengirim', 'Keterangan Pengirim', 'Ke Kode', 'Ke Toko', 'Stok Penerima', 'Jual/bln Penerima', 'Keterangan Penerima', 'Saran Qty'],
     ...X.rows.map(r => [r.art, r.name, r.c3, r.c4 || '', r.from, sName(r.from), r.fromStock, Math.round(r.fromRate * 10) / 10, X.why(r.fromK, r.fromCover), r.to, sName(r.to), r.toStock, Math.round(r.toRate * 10) / 10, X.why(r.toK, r.toCover), r.qty])];
   const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), 'Saran Transfer');
@@ -3015,7 +3037,7 @@ function openRO(art, st) {
     </tbody></table></div>`);
 }
 async function exportRO() {
-  const X = App.ui.roLast; if (!X || typeof XLSX === 'undefined') return;
+  const X = App.ui.roLast; if (!X || !(await needXLSX())) return;
   const aoa = [['Kode Toko', 'Toko', 'MC Lv2', 'MC Lv3', 'MC Lv4', 'Kode Artikel', 'SKU', 'Nama', 'Stok Toko', 'Jual/bln', 'Lost 30 hari', 'Transfer masuk', 'Kebutuhan', 'Stok Gudang HO', 'Saran RO', 'Harga', 'Nilai RO'],
     ...X.all.map(x => [x.c, sName(x.c), x.l2, x.l3, x.l4, x.art, x.sku, x.name, x.stock, Math.round(x.rate * 10) / 10, x.ls, x.tr || 0, x.need, x.ho, x.ro, x.price, x.ro * x.price])];
   const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), 'Saran RO');
@@ -3850,6 +3872,7 @@ async function saveHubEdit(col, id) {
 }
 /* ---------- import dari Excel Operational Hub (admin, sekali migrasi) ---------- */
 async function importHubExcel(file) {
+  if (!(await needXLSX())) { toast('Pembaca Excel gagal dimuat.'); return; }
   const buf = await file.arrayBuffer(); const wb = XLSX.read(buf, { type: 'array', cellDates: true });
   const cellV = (ws, r, c) => { const x = ws[XLSX.utils.encode_cell({ r, c })]; return x ? x.v : null; }, cellL = (ws, r, c) => { const x = ws[XLSX.utils.encode_cell({ r, c })]; return x && x.l && x.l.Target ? x.l.Target : (x && typeof x.v === 'string' && /^https?:/.test(x.v) ? x.v : ''); };
   const iso = v => v instanceof Date ? isoOf(new Date(v.getTime() + 12 * 3600e3)) : (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}/.test(v) ? v.slice(0, 10) : '');
@@ -3885,6 +3908,7 @@ async function importHubExcel(file) {
     await loadHub(true); toast('Import selesai'); render(); } catch (e) { toast('Gagal import: ' + errMsg(e)); }
 }
 async function exportHub(col) {
+  if (!(await needXLSX())) return;
   const H = App.hub, today = todayISO(); let aoa;
   if (col === 'approval') aoa = [['Toko', 'Nama toko', 'Jenis pengajuan', 'Link', 'Prioritas', 'Next approval', 'Status', 'Remarks', 'Diajukan', 'Oleh'], ...H.approval.map(a => [a.store, hubName(a.store), a.jenis, a.link, a.prio, a.next, a.status, a.remarks || '', (a.created || '').slice(0, 10), a.byName || a.by])];
   else { const regs = hubReg(); aoa = [['Task', 'PIC', 'Tanggal instruksi', 'Deadline', 'Prioritas', 'Status', '% selesai', ...regs.map(c => c + ' ' + hubName(c))], ...H.task.map(t => { const S = taskState(t, today); return [t.title, t.pic, t.date, t.deadline, t.prio, S.st, Math.round(S.pct * 100) / 100, ...regs.map(c => !S.targets.includes(c) ? '' : t.done && t.done[c] ? '✅' : '🟡')]; })]; }
@@ -4060,6 +4084,7 @@ function parseCareRows(rows, fileName) {
   return { from, to: to || from, rows: out, at };
 }
 async function parseCareFile(file) {
+  if (!(await needXLSX())) throw new Error('Pembaca Excel gagal dimuat. Cek internet.');
   const wb = XLSX.read(await file.arrayBuffer(), { type: 'array', cellDates: true }); const res = [];
   for (const sn of wb.SheetNames) { const rows = XLSX.utils.sheet_to_json(wb.Sheets[sn], { header: 1, raw: true, defval: null, blankrows: false }); const r = parseCareRows(rows, file.name); if (r) res.push(Object.assign(r, { sheet: sn })); }
   return res;
@@ -4525,7 +4550,7 @@ function renderCoverage(m) {
   </tbody></table><div class="legend"><span><i style="background:var(--pine-2)"></i>Ada data penjualan</span><span><i style="background:var(--surface-2);border:1px solid var(--line)"></i>Belum ada / tidak ada transaksi</span></div>`;
 }
 async function addFiles(files) {
-  if (typeof XLSX === 'undefined') { toast('Pembaca Excel belum termuat. Muat ulang halaman.'); return; }
+  if (!(await needXLSX())) { toast('Pembaca Excel gagal dimuat. Cek internet lalu coba lagi.'); return; }
   $('#saveMsg').textContent = 'Membaca file…';
   for (const f of files) {
     try {
@@ -4707,7 +4732,7 @@ async function deleteStoreMonth() {
 }
 /* template target bulanan: Target Sales + Target OmniChannel + Bobot Harian dalam satu file */
 async function downloadTemplate(m) {
-  if (!m || typeof XLSX === 'undefined') return;
+  if (!m || !(await needXLSX())) return;
   const codes = storeCodes().filter(c => sType(c) !== 'bz' || (App.tgtDetail[m] || {})[c] || (App.omni[m] || {})[c]);
   const fullName = c => (App.stores[c] && App.stores[c].name) || c;
   const T = App.tgtDetail[m] || {}, O = App.omni[m] || {}, W = App.weights[m] || {};
@@ -5106,9 +5131,21 @@ function showLoginWall(wrong) {
   $('#view').innerHTML = `<div class="login-card"><h2>Masuk dulu</h2><p class="small muted" style="margin:0">Dashboard ini dilindungi password.</p>${loginForm('2')}<div class="row-act"><button class="btn primary" id="lgGo2">Masuk</button></div></div>`;
   if (wrong) $('#lgErr2').textContent = 'Password salah.';
 }
+/* setelah halaman tampil dari data tersimpan: cek data terbaru di server, muat ulang hanya bila ada perubahan */
+async function bgRefresh() {
+  try {
+    const M = await api('meta'); IDB.put('meta:' + (App.admin ? 'a' : 'u'), { d: M, u: (App.user || {}).u || '', t: Date.now() });
+    if (verOf(M) === App.metaVer) return;
+    const pg = App.page, hadStock = App.stockLoaded; await loadAll({ meta: M });
+    if (hadStock) { try { await loadStock(); } catch (e) { } }
+    const ae = document.activeElement, typing = ae && /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName) && ae.closest('#view');
+    if (App.page === pg && !$('#ov') && !$('.modal-ov') && !$('#menuPal') && !typing) { const y = window.scrollY; render(); window.scrollTo(0, y); }
+    toast('🔄 Data terbaru sudah dimuat', 2500);
+  } catch (e) { }
+}
 async function boot() {
   $('#view').innerHTML = '<div class="loading"><span class="spin"></span>Mengambil data dari spreadsheet…</div>';
-  try { await loadAll(); }
+  try { await loadAll({ cached: true }); }
   catch (e) {
     console.error(e); renderNav();
     if (e && e.code === 'auth') { sessionExpired(); return; }
@@ -5120,6 +5157,7 @@ async function boot() {
   const sv = LS.get('dash_scope');
   if (!App.ui.scopeLocked && sv && sv.startsWith('store:')) { const c = sv.slice(6); if (App.stores[c] || storeCodes().includes(c)) { App.ui.scope = c; ['lsStore', 'raStore', 'ptStore', 'tdStore', 'prStore', 'psStore', 'dtStore', 'prodStore', 'stStore', 'trStore'].forEach(k => { App.ui[k] = c; }); App.ui.store = c; } }
   render();
+  if (App.fromCache) setTimeout(bgRefresh, 400);
   /* popup pilihan tampilan selalu muncul setiap halaman dibuka / direfresh (sekali per pemuatan halaman) */
   if (!App.ui.scopeAsked && !App.ui.scopeLocked && storeCodes().length) { App.ui.scopeAsked = true; openScope(true); }
   loadMaster();
@@ -5240,6 +5278,7 @@ function essTemplate() {
   XLSX.writeFile(wb, 'Template_Daftar_RA.xlsx');
 }
 async function essUpload(file, mode) {
+  if (!(await needXLSX())) throw new Error('Pembaca Excel gagal dimuat.');
   const me = App.user || {}, norm = x => String(x).toLowerCase().replace(/[^a-z]/g, '');
   const wb = XLSX.read(await file.arrayBuffer(), { type: 'array' }), data = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: false, defval: '' });
   const hi = data.findIndex(r => r.some(c => norm(c) === 'nik')); if (hi < 0) throw new Error('Kolom "NIK" tidak ditemukan. Gunakan template yang disediakan.');
@@ -5283,7 +5322,7 @@ document.addEventListener('click', async e => {
     const k = d.ess || '';
     if (k === 'copy') { const u = $('#essUrl'); try { await navigator.clipboard.writeText(u.value); } catch (er) { u.select(); document.execCommand('copy'); } toast('Link disalin'); }
     else if (k.startsWith('day:')) { const n = +k.slice(4); if (n === 0) E.d = todayISO(); else { const t0 = new Date(E.d + 'T12:00:00'); t0.setDate(t0.getDate() + n); E.d = t0.getFullYear() + '-' + String(t0.getMonth() + 1).padStart(2, '0') + '-' + String(t0.getDate()).padStart(2, '0'); } essRender(); }
-    else if (k === 'tpl') essTemplate();
+    else if (k === 'tpl') needXLSX().then(ok => ok ? essTemplate() : toast('Pembaca Excel gagal dimuat.'));
     else if (k.startsWith('xl:')) { E.xlMode = k.slice(3); const f = $('#essFile'); f.value = ''; f.click(); }
     else if (k.startsWith('tab:')) { E.tab = k.slice(4); App.essRes = null; essRender(); }
     else if (k === 'radd') { const nk = ($('#essRk').value || '').trim(), n = ($('#essRn').value || '').trim(); if (!nk || !n) { toast('Isi NIK dan nama.'); return; } const r = await apiPost({ a: 'ess', op: 'radd', code, k: nk, n }); done(r); if (!(r.skipped || []).length) toast('Tersimpan'); }

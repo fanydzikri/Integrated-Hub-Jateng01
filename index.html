@@ -2302,7 +2302,9 @@ function pageRA(view) {
   /* tidak dihitung, sama seperti HO: item non-produk (paper bag, brand SERVICE, dll. sesuai daftar pengecualian di Pengaturan) dan penjualan Eigerindo Voucher (agar tidak ganda saat voucher dipakai belanja) */
   const isVch = OMNI[1][2], notCounted = l => isVch(l) || (!salesOk(l) && !isOmni(l));
   for (const l of App.lines) { if (l.d < R.from || l.d > R.to || !inScope(l.s) || !lineOk(l) || notCounted(l)) continue; const v = VAL(l), k = l.s + '|' + l.d.slice(0, 7); storeTot.set(k, (storeTot.get(k) || 0) + v); grand += v; }
-  const lines = linesIn(R.from, R.to, st || null).filter(l => !isOmni(l));
+  /* transaksi Wholesale Offline (grosir) tidak dihitung sebagai sales sendiri RA walau atas nama RA: masuk pool & dibagi rata (sama seperti HO) */
+  const isWs = l => tyIs(l, 'wholesale offline');
+  const lines = linesIn(R.from, R.to, st || null).filter(l => !isOmni(l) && !isWs(l));
   /* retur customer dikembalikan ke RA penjual awal (sama seperti HO): cari penjualan awal barang yang sama di toko yang sama
      (prioritas: customer sama, harga satuan sama, tanggal paling dekat sebelum retur, maks. 120 hari) */
   const retOn = App.ui.raRet !== false, spOver = new Map(), retMoves = [];
@@ -2385,9 +2387,9 @@ function pageRA(view) {
     for (const l of App.lines) {
       if (l.s !== st || l.d < R.from || l.d > R.to || !lineOk(l)) continue;
       const om = OMNI.find(o => o[2](l)), ok = salesOk(l), key = spName(l.sp) + '|' + l.s;
-      if (!om && ok && eligSet.has(key)) continue;
+      if (!om && ok && !isWs(l) && eligSet.has(key)) continue;
       const v = VAL(l), nm = spName(l.sp);
-      const c = om && om[0] === 'ev' ? 'Tidak dihitung (sama seperti HO) · Eigerindo Voucher' : om ? om[1] : !ok ? 'Tidak dihitung (sama seperti HO) · ' + exWhy(l) : nm === '(TANPA NAMA)' ? 'Tanpa nama sales person' : 'Nama di luar daftar target · ' + nm;
+      const c = om && om[0] === 'ev' ? 'Tidak dihitung (sama seperti HO) · Eigerindo Voucher' : om ? om[1] : !ok ? 'Tidak dihitung (sama seperti HO) · ' + exWhy(l) : nm === '(TANPA NAMA)' ? 'Tanpa nama sales person' : isWs(l) && eligSet.has(key) ? 'Wholesale atas nama RA · ' + nm : 'Nama di luar daftar target · ' + nm;
       const ck = c + '|' + (l.ty || '–') + '|' + (l.st || '–'); let x = comp.get(ck); if (!x) comp.set(ck, x = { c, ty: l.ty || '–', bs: l.st || '–', n: new Set(), v: 0 }); x.n.add(l.d + l.o); x.v += v;
       const ok2 = l.d + '|' + l.o; let y = ord.get(ok2); if (!y) ord.set(ok2, y = { d: l.d, o: l.o, ty: l.ty || '–', bs: l.st || '–', sp: nm, c, v: 0, q: 0, items: [] }); y.v += v; y.q += l.q; if (y.items.length < 3) y.items.push(artName((App.sku[l.sku] || [])[0]) || l.sku);
     }
@@ -2438,7 +2440,7 @@ function pageRA(view) {
     <div class="ra-tiles">${tileHtml(tilesHi, 'hi')}</div>
     <p class="small muted" style="margin:-6px 0 0">Peringkat terendah/tertinggi hanya menghitung sales person dengan minimal ${minT} transaksi di periode ini, supaya yang baru masuk atau jarang bertugas tidak ikut terhitung.</p>
     <section class="card"><div class="card-h"><h3>Performa sales person</h3><p class="small muted">${fmtN(named.length)} sales person · klik judul kolom untuk mengurutkan</p></div><div id="raT"></div>
-      ${poolAll ? `<div class="more">Sales dilebur ${fmtRp(poolAll)} = Endless Aisle, Tax Invoice, EASAP${nn.v ? `, transaksi tanpa nama sales person (${fmtRp(nn.v)})` : ''}${outR.length ? `, ${outR.length} nama di luar daftar target (${fmtRp(outV)})` : ''} & item lain — dibagi rata ke semua RA terdaftar tiap toko per bulan, sama dengan perhitungan HO. Paper bag, item non-produk & penjualan Eigerindo Voucher tidak dihitung.${poolLost ? ` ${fmtRp(poolLost)} tidak bisa dibagi karena toko tidak punya RA terdaftar.` : ''} UPT, qty & basket hanya dari transaksi RA sendiri.</div>` : ''}
+      ${poolAll ? `<div class="more">Sales dilebur ${fmtRp(poolAll)} = Endless Aisle, Tax Invoice, EASAP, Wholesale Offline (termasuk yang atas nama RA)${nn.v ? `, transaksi tanpa nama sales person (${fmtRp(nn.v)})` : ''}${outR.length ? `, ${outR.length} nama di luar daftar target (${fmtRp(outV)})` : ''} & item lain — dibagi rata ke semua RA terdaftar tiap toko per bulan, sama dengan perhitungan HO. Paper bag, item non-produk & penjualan Eigerindo Voucher tidak dihitung.${poolLost ? ` ${fmtRp(poolLost)} tidak bisa dibagi karena toko tidak punya RA terdaftar.` : ''} UPT, qty & basket hanya dari transaksi RA sendiri.</div>` : ''}
       ${raNote}
       <div class="more" style="font-weight:700;color:var(--ink)">Total keseluruhan: ${fmtN(tot.trx)} transaksi · ${fmtN(tot.q)} qty · UPT ${tot.trx ? fmtX(tot.q / tot.trx, 2) : '–'} · basket ${tot.trx ? fmtRp(tot.v / tot.trx) : '–'} · ${fmtRp(tot.v)}${tgT ? ` · target tagging ${fmtRp(tgT)} · ach ${fmtPct(tgV / tgT, 1)}` : ''}</div></section>
     ${raReport}

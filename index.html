@@ -2403,6 +2403,23 @@ function pageRA(view) {
       ${O.sort((a, b) => b.v - a.v).map(y => `<tr data-pq="${esc((y.o + ' ' + y.sp + ' ' + y.c + ' ' + y.ty + ' ' + y.bs + ' ' + Math.round(y.v) + ' ' + fmtN(y.v)).toLowerCase())}"><td class="small tn">${esc(y.d)}</td><td class="small tn">${esc(y.o)}</td><td class="small">${esc(y.c)}</td><td class="small">${esc(y.ty)}</td><td class="small">${esc(y.bs)}</td><td class="small">${esc(y.sp)}</td><td class="small">${esc(y.items.join(', '))}</td><td class="r">${fmtN(y.q)}</td><td class="r"><b>${fmtN(y.v)}</b></td></tr>`).join('')}</tbody></table></div>
       <div class="row-act"><button class="btn sm" id="poolXls">Download rincian (Excel)</button></div></details>`;
     App.ui.poolLast = { st, R, O };
+    /* sales sendiri RA per bill status & tipe transaksi + transaksi khusus (retur / qty minus / status bukan delivered) */
+    const SB = new Map(), SX = [];
+    for (const l of lines) {
+      if (l.s !== st) continue; const sp = spName(spOf(l)); if (!eligSet.has(sp + '|' + l.s)) continue;
+      const k = sp + '|' + (l.st || '–') + '|' + (l.ty || '–'); let x = SB.get(k); if (!x) SB.set(k, x = { sp, bs: l.st || '–', ty: l.ty || '–', n: new Set(), q: 0, v: 0 }); x.n.add(l.d + l.o); x.q += l.q; x.v += VAL(l);
+      if (l.q < 0 || VAL(l) < 0 || !/^delivered$/i.test(l.st || '')) SX.push(l);
+    }
+    const SBL = [...SB.values()].sort((a, b) => a.sp.localeCompare(b.sp) || b.v - a.v);
+    poolDiag += `<details class="card shot-skip"><summary class="hub-sum">🔍 Rincian sales sendiri RA per bill status · ${esc(sName(st))} · ${SX.length} baris khusus</summary>
+      <p class="small muted" style="margin:8px 0">Untuk mencari penyebab selisih sales sendiri dengan HO: lihat baris dengan bill status selain "delivered" (mis. part returned, returned, cancelled) atau qty minus, dan bandingkan nilainya dengan selisih tiap RA.</p>
+      <div class="tbl-wrap" style="max-height:320px"><table class="tbl"><thead><tr><th>RA</th><th>Bill status</th><th>Tipe transaksi</th><th class="r">Trx</th><th class="r">Qty</th><th class="r">Nilai</th></tr></thead><tbody>
+      ${SBL.map(x => `<tr style="${/^delivered$/i.test(x.bs) ? '' : 'background:var(--orange-tint)'}"><td class="small"><b>${esc(x.sp)}</b></td><td class="small">${esc(x.bs)}</td><td class="small">${esc(x.ty)}</td><td class="r">${fmtN(x.n.size)}</td><td class="r">${fmtN(x.q)}</td><td class="r">${fmtN(x.v)}</td></tr>`).join('')}</tbody></table></div>
+      <b class="small" style="display:block;margin:12px 0 6px">Baris khusus (status bukan delivered / qty minus)</b>
+      <div class="tbl-wrap" style="max-height:340px"><table class="tbl"><thead><tr><th>Tanggal</th><th>Jam</th><th>Order No</th><th>RA</th><th>Status</th><th>Tipe</th><th>Item</th><th>Customer</th><th class="r">Qty</th><th class="r">Nilai</th></tr></thead><tbody>
+      ${SX.sort((a, b) => (a.d + a.o).localeCompare(b.d + b.o)).map(l => `<tr><td class="small tn">${esc(l.d)}</td><td class="small tn">${esc(hhmm(l.t))}</td><td class="small tn">${esc(l.o)}</td><td class="small">${esc(spName(l.sp))}</td><td class="small">${esc(l.st || '–')}</td><td class="small">${esc(l.ty || '–')}</td><td class="small">${esc(artName((App.sku[l.sku] || [])[0]) || l.sku)}</td><td class="small">${esc(l.cn || '')}</td><td class="r">${fmtN(l.q)}</td><td class="r">${fmtN(VAL(l))}</td></tr>`).join('') || '<tr><td colspan="10" class="empty">Tidak ada baris khusus.</td></tr>'}</tbody></table></div>
+      <div class="row-act"><button class="btn sm" id="spXls">Download semua transaksi RA toko ini (Excel)</button></div></details>`;
+    App.ui.spLast = { st, R, L: lines.filter(l => l.s === st) };
   } else if (App.admin) poolDiag = '<p class="small muted">Pilih satu toko di filter atas untuk melihat rincian transaksi yang dilebur (untuk dicocokkan dengan HO).</p>';
   const elig = named.filter(r => r.trx >= minT);
   const pick = (f, dir) => elig.slice().sort((a, b) => dir * (f(a) - f(b)))[0];
@@ -5019,6 +5036,7 @@ document.addEventListener('click', async e => {
   const gws = t.closest('[data-gws]'); if (gws) { const k = gws.dataset.gws; const s0 = App.ui.gwSort || { k: 'yG', dir: 'asc' }; App.ui.gwSort = s0.k === k ? { k, dir: s0.dir === 'asc' ? 'desc' : 'asc' } : { k, dir: k === 'name' ? 'asc' : 'desc' }; render(); return; }
   const gwb = t.closest('[data-gwb]'); if (gwb) { App.ui.gwBasis = gwb.dataset.gwb; render(); return; }
   if (t.id === 'raXls') { exportRA(); return; }
+  if (t.id === 'spXls') { (async () => { const X = App.ui.spLast; if (!X || !(await needXLSX())) return; const aoa = [['Tanggal', 'Jam', 'Order No', 'Sales Person', 'Bill Status', 'Tipe Transaksi', 'SKU', 'Item', 'Customer', 'Qty', 'Nilai']].concat(X.L.slice().sort((a, b) => (a.d + a.o).localeCompare(b.d + b.o)).map(l => [l.d, hhmm(l.t), l.o, spName(l.sp), l.st || '', l.ty || '', l.sku, (App.sku[l.sku] || [])[0] || '', l.cn || '', l.q, Math.round(VAL(l))])); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), 'Transaksi RA'); (await getDownloads()).save({ filename: `Transaksi_RA_${X.st}_${X.R.from}_${X.R.to}.xlsx`, data: new Blob([XLSX.write(wb, { bookType: 'xlsx', type: 'array' })]) }); })(); return; }
   if (t.id === 'poolXls') { (async () => { const X = App.ui.poolLast; if (!X || !(await needXLSX())) return; const aoa = [['Tanggal', 'Order No', 'Komponen', 'Tipe Transaksi', 'Bill Status', 'Sales Person', 'Item', 'Qty', 'Nilai'], ...X.O.map(y => [y.d, y.o, y.c, y.ty, y.bs, y.sp, y.items.join(', '), y.q, Math.round(y.v)])]; const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), 'Sales dilebur'); (await getDownloads()).save({ filename: `Rincian_Sales_Dilebur_${X.st}_${X.R.from}_${X.R.to}.xlsx`, data: new Blob([XLSX.write(wb, { bookType: 'xlsx', type: 'array' })]) }); })(); return; }
   if (t.id === 'lsXls') { exportLost(); return; }
   if (t.id === 'dtXls') { exportDetention(); return; }

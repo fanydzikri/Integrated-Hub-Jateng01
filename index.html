@@ -2299,7 +2299,8 @@ function pageRA(view) {
   const isOmni = l => OMNI.some(o => o[2](l));
   const inScope = c => st ? c === st : typeOk(c);
   const storeTot = new Map(); let grand = 0;
-  for (const l of App.lines) { if (l.d < R.from || l.d > R.to || !inScope(l.s) || !lineOk(l)) continue; const v = VAL(l), k = l.s + '|' + l.d.slice(0, 7); storeTot.set(k, (storeTot.get(k) || 0) + v); grand += v; }
+  /* item non-produk (paper bag, dll. sesuai daftar pengecualian di Pengaturan) tidak dihitung, sama seperti HO; komponen omni (termasuk Eigerindo Voucher) tetap dihitung */
+  for (const l of App.lines) { if (l.d < R.from || l.d > R.to || !inScope(l.s) || !lineOk(l) || (!salesOk(l) && !isOmni(l))) continue; const v = VAL(l), k = l.s + '|' + l.d.slice(0, 7); storeTot.set(k, (storeTot.get(k) || 0) + v); grand += v; }
   const lines = linesIn(R.from, R.to, st || null).filter(l => !isOmni(l));
   const P = new Map(), byDay = new Map(), days = new Set(), ownM = new Map();
   for (const l of lines) {
@@ -2364,16 +2365,17 @@ function pageRA(view) {
       const om = OMNI.find(o => o[2](l)), ok = salesOk(l), key = spName(l.sp) + '|' + l.s;
       if (!om && ok && eligSet.has(key)) continue;
       const v = VAL(l), nm = spName(l.sp);
-      const c = om ? om[1] : !ok ? 'Item dikecualikan · ' + exWhy(l) : nm === '(TANPA NAMA)' ? 'Tanpa nama sales person' : 'Nama di luar daftar target · ' + nm;
+      const c = om ? om[1] : !ok ? 'Tidak dihitung (sama seperti HO) · ' + exWhy(l) : nm === '(TANPA NAMA)' ? 'Tanpa nama sales person' : 'Nama di luar daftar target · ' + nm;
       const ck = c + '|' + (l.ty || '–') + '|' + (l.st || '–'); let x = comp.get(ck); if (!x) comp.set(ck, x = { c, ty: l.ty || '–', bs: l.st || '–', n: new Set(), v: 0 }); x.n.add(l.d + l.o); x.v += v;
       const ok2 = l.d + '|' + l.o; let y = ord.get(ok2); if (!y) ord.set(ok2, y = { d: l.d, o: l.o, ty: l.ty || '–', bs: l.st || '–', sp: nm, c, v: 0, q: 0, items: [] }); y.v += v; y.q += l.q; if (y.items.length < 3) y.items.push(artName((App.sku[l.sku] || [])[0]) || l.sku);
     }
     const C = [...comp.values()].sort((a, b) => b.v - a.v), O = [...ord.values()];
     App.tables.poolOrd = null;
-    poolDiag = `<details class="card shot-skip"><summary class="hub-sum">🧾 Rincian sales dilebur · ${esc(sName(st))} · ${fmtRp(C.reduce((a, x) => a + x.v, 0))}</summary>
-      <p class="small muted" style="margin:8px 0">Untuk mencocokkan dengan HO: cari komponen atau transaksi yang nilainya sama dengan selisih pool (mis. selisih per RA × jumlah RA). Ketik nilainya di kotak cari untuk menemukan transaksinya.</p>
+    const isNC = x => /^Tidak dihitung/.test(x.c), cnt = C.filter(x => !isNC(x)).reduce((a, x) => a + x.v, 0), nc = C.filter(isNC).reduce((a, x) => a + x.v, 0);
+    poolDiag = `<details class="card shot-skip"><summary class="hub-sum">🧾 Rincian sales dilebur · ${esc(sName(st))} · ${fmtRp(cnt)}${nc ? ` <span class="small muted">(+ ${fmtRp(nc)} tidak dihitung)</span>` : ''}</summary>
+      <p class="small muted" style="margin:8px 0">Untuk mencocokkan dengan HO: cari komponen atau transaksi yang nilainya sama dengan selisih pool (mis. selisih per RA × jumlah RA). Selisih bisa berupa gabungan banyak transaksi kecil, jadi cek juga tabel ringkasan. Baris "Tidak dihitung" (paper bag, dll.) tidak masuk pool, sama seperti HO.</p>
       <div class="tbl-wrap" style="max-height:320px"><table class="tbl"><thead><tr><th>Komponen</th><th>Tipe transaksi</th><th>Bill status</th><th class="r">Trx</th><th class="r">Nilai</th></tr></thead><tbody>
-      ${C.map(x => `<tr><td class="small"><b>${esc(x.c)}</b></td><td class="small">${esc(x.ty)}</td><td class="small">${esc(x.bs)}</td><td class="r">${fmtN(x.n.size)}</td><td class="r">${fmtN(x.v)}</td></tr>`).join('') || '<tr><td colspan="5" class="empty">Tidak ada.</td></tr>'}</tbody></table></div>
+      ${C.map(x => `<tr style="${isNC(x) ? 'opacity:.55' : ''}"><td class="small"><b>${esc(x.c)}</b></td><td class="small">${esc(x.ty)}</td><td class="small">${esc(x.bs)}</td><td class="r">${fmtN(x.n.size)}</td><td class="r">${fmtN(x.v)}</td></tr>`).join('') || '<tr><td colspan="5" class="empty">Tidak ada.</td></tr>'}</tbody></table></div>
       <div class="filters" style="margin:12px 0 6px"><b class="small">Per transaksi</b><input class="inp sm" id="poolQ" type="search" placeholder="Cari nilai / no. order / nama…" style="flex:1 1 200px"></div>
       <div class="tbl-wrap" style="max-height:380px"><table class="tbl" id="poolOrdT"><thead><tr><th>Tanggal</th><th>Order No</th><th>Komponen</th><th>Tipe</th><th>Status</th><th>Sales person</th><th>Item</th><th class="r">Qty</th><th class="r">Nilai</th></tr></thead><tbody>
       ${O.sort((a, b) => b.v - a.v).map(y => `<tr data-pq="${esc((y.o + ' ' + y.sp + ' ' + y.c + ' ' + y.ty + ' ' + y.bs + ' ' + Math.round(y.v) + ' ' + fmtN(y.v)).toLowerCase())}"><td class="small tn">${esc(y.d)}</td><td class="small tn">${esc(y.o)}</td><td class="small">${esc(y.c)}</td><td class="small">${esc(y.ty)}</td><td class="small">${esc(y.bs)}</td><td class="small">${esc(y.sp)}</td><td class="small">${esc(y.items.join(', '))}</td><td class="r">${fmtN(y.q)}</td><td class="r"><b>${fmtN(y.v)}</b></td></tr>`).join('')}</tbody></table></div>

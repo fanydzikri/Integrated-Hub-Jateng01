@@ -2300,7 +2300,7 @@ function pageRA(view) {
   const inScope = c => st ? c === st : typeOk(c);
   const storeTot = new Map(); let grand = 0;
   /* tidak dihitung, sama seperti HO: item non-produk (paper bag, brand SERVICE, dll. sesuai daftar pengecualian di Pengaturan) dan penjualan Eigerindo Voucher (agar tidak ganda saat voucher dipakai belanja) */
-  const isVch = OMNI[1][2], notCounted = l => isVch(l) || (!salesOk(l) && !isOmni(l));
+  const isVch = OMNI[1][2], notCounted = l => isVch(l) || !salesOk(l);   /* paper bag dkk. tidak dihitung di transaksi apa pun, termasuk di dalam order Endless Aisle / EASAP */
   for (const l of App.lines) { if (l.d < R.from || l.d > R.to || !inScope(l.s) || !lineOk(l) || notCounted(l)) continue; const v = VAL(l), k = l.s + '|' + l.d.slice(0, 7); storeTot.set(k, (storeTot.get(k) || 0) + v); grand += v; }
   /* transaksi Wholesale Offline (grosir) tidak dihitung sebagai sales sendiri RA walau atas nama RA: masuk pool & dibagi rata (sama seperti HO) */
   const isWs = l => tyIs(l, 'wholesale offline');
@@ -2389,7 +2389,7 @@ function pageRA(view) {
       const om = OMNI.find(o => o[2](l)), ok = salesOk(l), key = spName(l.sp) + '|' + l.s;
       if (!om && ok && !isWs(l) && eligSet.has(key)) continue;
       const v = VAL(l), nm = spName(l.sp);
-      const c = om && om[0] === 'ev' ? 'Tidak dihitung (sama seperti HO) · Eigerindo Voucher' : om ? om[1] : !ok ? 'Tidak dihitung (sama seperti HO) · ' + exWhy(l) : nm === '(TANPA NAMA)' ? 'Tanpa nama sales person' : isWs(l) && eligSet.has(key) ? 'Wholesale atas nama RA · ' + nm : 'Nama di luar daftar target · ' + nm;
+      const c = om && om[0] === 'ev' ? 'Tidak dihitung (sama seperti HO) · Eigerindo Voucher' : !ok ? 'Tidak dihitung (sama seperti HO) · ' + exWhy(l) + (om ? ' di ' + om[1] : '') : om ? om[1] : nm === '(TANPA NAMA)' ? 'Tanpa nama sales person' : isWs(l) && eligSet.has(key) ? 'Wholesale atas nama RA · ' + nm : 'Nama di luar daftar target · ' + nm;
       const ck = c + '|' + (l.ty || '–') + '|' + (l.st || '–'); let x = comp.get(ck); if (!x) comp.set(ck, x = { c, ty: l.ty || '–', bs: l.st || '–', n: new Set(), v: 0 }); x.n.add(l.d + l.o); x.v += v;
       const ok2 = l.d + '|' + l.o; let y = ord.get(ok2); if (!y) ord.set(ok2, y = { d: l.d, o: l.o, ty: l.ty || '–', bs: l.st || '–', sp: nm, c, v: 0, q: 0, items: [] }); y.v += v; y.q += l.q; y.items.push({ n: (App.sku[l.sku] || [])[0] || l.sku, sku: l.sku, q: l.q, v, c4: (App.sku[l.sku] || [])[2] || '', nc: /^Tidak dihitung/.test(c) });
     }

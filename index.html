@@ -2303,9 +2303,30 @@ function pageRA(view) {
   const isVch = OMNI[1][2], notCounted = l => isVch(l) || (!salesOk(l) && !isOmni(l));
   for (const l of App.lines) { if (l.d < R.from || l.d > R.to || !inScope(l.s) || !lineOk(l) || notCounted(l)) continue; const v = VAL(l), k = l.s + '|' + l.d.slice(0, 7); storeTot.set(k, (storeTot.get(k) || 0) + v); grand += v; }
   const lines = linesIn(R.from, R.to, st || null).filter(l => !isOmni(l));
+  /* retur customer dikembalikan ke RA penjual awal (sama seperti HO): cari penjualan awal barang yang sama di toko yang sama
+     (prioritas: customer sama, harga satuan sama, tanggal paling dekat sebelum retur, maks. 120 hari) */
+  const retOn = App.ui.raRet !== false, spOver = new Map(), retMoves = [];
+  if (retOn) {
+    const rets = lines.filter(l => l.q < 0 && VAL(l) < 0);
+    if (rets.length) {
+      const idx = new Map();
+      for (const l of App.lines) { if (l.q <= 0 || !lineOk(l) || isOmni(l) || !salesOk(l)) continue; const k = l.s + '|' + l.sku; (idx.get(k) || idx.set(k, []).get(k)).push(l); }
+      for (const r of rets) {
+        const L = idx.get(r.s + '|' + r.sku); if (!L) continue;
+        const lo = addDays(r.d, -120), up = Math.abs(VAL(r) / r.q); let best = null, bs = -1;
+        for (const x of L) {
+          if (x.d < lo || x.d > r.d || (x.d === r.d && (x.t || 0) > (r.t || 0)) || x.o === r.o) continue;
+          const sc = (r.cn && x.cn && r.cn === x.cn && r.d.slice(0, 7) === x.d.slice(0, 7) ? 4 : 0) + (Math.abs(VAL(x) / x.q - up) < 1 ? 2 : 0) + dayDiff(lo, x.d) / 1000;
+          if (sc > bs) { bs = sc; best = x; }
+        }
+        if (best && spName(best.sp) !== spName(r.sp) && spName(best.sp) !== '(TANPA NAMA)') { spOver.set(r, best.sp); retMoves.push({ r, o: best }); }
+      }
+    }
+  }
+  const spOf = l => spOver.has(l) ? spOver.get(l) : l.sp;
   const P = new Map(), byDay = new Map(), days = new Set(), ownM = new Map();
   for (const l of lines) {
-    const sp = spName(l.sp), key = sp + '|' + l.s;
+    const sp = spName(spOf(l)), key = sp + '|' + l.s;
     let x = P.get(key); if (!x) P.set(key, x = { sp, s: l.s, trx: new Set(), q: 0, v: 0 });
     const ok = l.d + '|' + l.o, v = VAL(l); x.v += v; if (!isPB(l.sku)) x.q += l.q; if (l.q > 0) x.trx.add(ok);
     days.add(l.d); const mk = key + '|' + l.d.slice(0, 7); ownM.set(mk, (ownM.get(mk) || 0) + v);
@@ -2393,6 +2414,7 @@ function pageRA(view) {
   const tileHtml = (arr, cls) => arr.map(([lbl, r, f]) => `<div class="ra-tile ${cls}"><span>${lbl}</span><b>${r ? esc(r.sp) : '–'}</b><small>${r ? f(r) + ' · ' + esc(sName(r.s)) : 'belum ada'}</small></div>`).join('');
   view.innerHTML = `<div class="stack">
     <div class="filters" style="margin:0"><label class="small muted" for="raStore">Toko</label><select id="raStore" class="inp"><option value="">Semua toko</option>${codes.map(c => `<option value="${esc(c)}" ${c === st ? 'selected' : ''}>${esc(c)} - ${esc(sName(c))}</option>`).join('')}</select>
+      <label class="small" style="display:flex;gap:6px;align-items:center;font-weight:700" title="Nilai retur dibebankan ke RA yang menjual barangnya, bukan RA yang memproses retur (sama seperti HO)"><input type="checkbox" id="raRet" ${retOn ? 'checked' : ''}> Retur ke penjual awal</label>
       <label class="small muted" for="raMin">Min. transaksi untuk peringkat</label><input type="number" id="raMin" class="inp sm" style="width:80px" min="0" value="${minT}">
       <span style="flex:1"></span><button class="btn" id="raXls">Download Excel</button></div>
     <div class="ra-tiles">${tileHtml(tiles, '')}</div>
@@ -2403,6 +2425,10 @@ function pageRA(view) {
       ${raNote}
       <div class="more" style="font-weight:700;color:var(--ink)">Total keseluruhan: ${fmtN(tot.trx)} transaksi · ${fmtN(tot.q)} qty · UPT ${tot.trx ? fmtX(tot.q / tot.trx, 2) : '–'} · basket ${tot.trx ? fmtRp(tot.v / tot.trx) : '–'} · ${fmtRp(tot.v)}${tgT ? ` · target tagging ${fmtRp(tgT)} · ach ${fmtPct(tgV / tgT, 1)}` : ''}</div></section>
     ${raReport}
+    ${App.admin && retMoves.length ? `<details class="card shot-skip"><summary class="hub-sum">↩️ Retur dikembalikan ke penjual awal · ${retMoves.length} transaksi · ${fmtRp(-retMoves.reduce((a, m) => a + VAL(m.r), 0))}</summary>
+      <p class="small muted" style="margin:8px 0">Nilai retur di bawah ini tidak dibebankan ke RA yang memproses retur, tetapi ke RA yang menjual barangnya (dicocokkan dari barang yang sama, customer & harga satuan, tanggal terdekat sebelum retur).</p>
+      <div class="tbl-wrap" style="max-height:340px"><table class="tbl"><thead><tr><th>Tgl retur</th><th>Order retur</th><th>Item</th><th class="r">Nilai</th><th>Diproses oleh</th><th>Penjual awal</th><th>Order jual</th></tr></thead><tbody>
+      ${retMoves.sort((a, b) => VAL(a.r) - VAL(b.r)).map(m => `<tr><td class="small tn">${esc(m.r.d)}</td><td class="small tn">${esc(m.r.o)}</td><td class="small">${esc(artName((App.sku[m.r.sku] || [])[0]) || m.r.sku)}</td><td class="r">${fmtN(VAL(m.r))}</td><td class="small">${esc(spName(m.r.sp))}</td><td class="small"><b>${esc(spName(m.o.sp))}</b></td><td class="small tn">${esc(m.o.d)} · ${esc(m.o.o)}</td></tr>`).join('')}</tbody></table></div></details>` : ''}
     ${poolDiag}
     <section class="card shot-skip"><div class="card-h"><h3>UPT by date</h3><p class="small muted">makin gelap makin tinggi · "–" = tidak ada transaksi</p></div>
       <div class="rp-wrap" style="max-height:60vh"><table class="mx"><thead><tr><th class="nm">Sales person</th>${dl.map(d => `<th>${fmtDateS(d)}</th>`).join('')}</tr></thead><tbody>
@@ -5089,6 +5115,7 @@ document.addEventListener('change', async e => {
   if (t.id === 'gwLfl') { App.ui.gwLfl = t.checked; render(); return; }
   if (t.id === 'gwComp') { App.ui.gwComp = t.checked; render(); return; }
   if (t.id === 'raStore') { App.ui.raStore = t.value; App.ui.more = {}; render(); return; }
+  if (t.id === 'raRet') { App.ui.raRet = t.checked; render(); return; }
   if (t.id === 'raMin') { App.ui.raMin = Math.max(0, +t.value || 0); render(); return; }
   if (t.id === 'eaDate') { if (t.value) { App.ui.eaDate = t.value; render(); } return; }
   if (t.id === 'omM') { App.ui.omM = t.value; render(); return; }

@@ -1293,13 +1293,19 @@ function computeLastDate() {
 function mergeSku(dict) { for (const k in dict) { const v = dict[k] || [], o = App.sku[k] || []; const n = Math.max(v.length, o.length), r = []; for (let i = 0; i < n; i++) r[i] = o[i] || v[i] || ''; App.sku[k] = r; } }
 /* ================= turunan data ================= */
 /* produk dikecualikan dari analisis produk (sama dengan logika tim): brand, kata kunci, SKU 81/ES, atau disembunyikan manual */
+/* Eco Friendly Shopping Bag: selalu dikeluarkan dari semua perhitungan (sales, target, RA, omni, produk & stok), apa pun pengaturannya */
+function isEco(sku) {
+  const C = App.cache.eco || (App.cache.eco = new Map()); if (C.has(sku)) return C.get(sku);
+  const nm = String(((App.dsrSku || {})[sku] || App.sku[sku] || [])[0] || '').toUpperCase();
+  const r = /ECO\W*FRIENDLY/.test(nm) && /BAG/.test(nm); C.set(sku, r); return r;
+}
 function isPB(sku) {
   const C = App.cache.excl || (App.cache.excl = new Map()); if (C.has(sku)) return C.get(sku);
   const S = SET(), m = App.sku[sku] || [], nm = String(m[0] || '').toUpperCase(), c4 = String(m[2] || '').toUpperCase(), br = String(m[4] || '').toUpperCase();
   const brands = App.cache.exB || (App.cache.exB = splitList(S.excludeBrands)), kws = App.cache.exK || (App.cache.exK = splitList(S.excludeKeywords));
   const ov = (App.overrides || {})[artOf(sku)];
   const r = (br && brands.includes(br)) || /^(81|ES)/i.test(sku) || kws.some(k => nm.includes(k) || c4 === k) || !!(ov && ov.hidden);
-  C.set(sku, r); return r;
+  C.set(sku, r || isEco(sku)); return r || isEco(sku);
 }
 const lineOk = l => { const S = SET(); return S.billStatuses[l.st || ''] !== false && S.txTypes[l.ty || ''] !== false; };
 function storeCodes() {
@@ -1350,7 +1356,7 @@ function srDaily(c, iso) {
 function srLast() { let L = null; for (const m in App.sr) { const M = App.sr[m]; const ds = [...(M.days || []), ...(M.cums || [])]; if (ds.length) { const iso = m + '-' + pad(Math.max(...ds)); if (!L || iso > L) L = iso; } } return L; }
 const repLast = () => { const a = App.lastDate, b = srLast(); return !a ? b : !b ? a : (a > b ? a : b); };
 /* produk yang dikecualikan (paper bag, voucher, artikel disembunyikan, dll.) tidak ikut total penjualan di semua menu, kecuali Monitoring OmniChannel */
-const salesOk = l => !(SET().excludeSales !== false && isPB(l.sku));
+const salesOk = l => !isEco(l.sku) && !(SET().excludeSales !== false && isPB(l.sku));
 const linesIn = (from, to, store) => {
   const k = 'li|' + from + '|' + to + '|' + (store || '') + '|' + (store ? '' : (App.ui.typeF || '') + '|' + (scopeOn() ? App.ui.scope : ''));
   const c = App.cache[k]; if (c) return c;
@@ -2103,7 +2109,7 @@ function omniData(m) {
   const T = App.omni[m] || {}, from = m + '-01', to = m + '-' + pad(dim(m));
   const act = new Map();
   for (const l of App.lines) {
-    if (l.d < from || l.d > to || !lineOk(l) || !typeOk(l.s)) continue;
+    if (l.d < from || l.d > to || !lineOk(l) || !typeOk(l.s) || isEco(l.sku)) continue;
     for (const [k, , f] of OMNI) if (f(l)) { let a = act.get(l.s); if (!a) act.set(l.s, a = { ea: 0, ev: 0, ti: 0, es: 0 }); a[k] += l.g; }
   }
   const codes = new Set([...Object.keys(T).filter(typeOk), ...act.keys()]);
@@ -2171,7 +2177,7 @@ async function exportOmni() {
   const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'OmniChannel');
   /* detail transaksi per channel untuk rekonsiliasi dengan file lain */
   const det = [['Channel', 'Tanggal', 'Kode Toko', 'Nama Toko', 'Order No', 'Bill Status', 'Tipe Transaksi', 'SKU', 'Nama SKU', 'Kategori Lv4', 'Qty', 'Gross', 'Net']];
-  for (const l of App.lines) { if (l.d < from || l.d > to || !lineOk(l) || !typeOk(l.s)) continue; for (const [, lbl, f] of OMNI) if (f(l)) { const m = (App.dsrSku || {})[l.sku] || App.sku[l.sku] || []; det.push([lbl, l.d, l.s, sName(l.s), l.o, l.st || '', l.ty || '', l.sku, m[0] || '', m[2] || '', l.q, l.g, l.n]); } }
+  for (const l of App.lines) { if (l.d < from || l.d > to || !lineOk(l) || !typeOk(l.s) || isEco(l.sku)) continue; for (const [, lbl, f] of OMNI) if (f(l)) { const m = (App.dsrSku || {})[l.sku] || App.sku[l.sku] || []; det.push([lbl, l.d, l.s, sName(l.s), l.o, l.st || '', l.ty || '', l.sku, m[0] || '', m[2] || '', l.q, l.g, l.n]); } }
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(det), 'Detail transaksi');
   const out = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
   (await getDownloads()).save({ filename: `Monitoring_OmniChannel_${O.m}.xlsx`, data: new Blob([out]) });
@@ -2381,7 +2387,7 @@ function pageRA(view) {
   /* rincian isi pool (admin, 1 toko): untuk mencocokkan dengan tarikan HO transaksi per transaksi */
   let poolDiag = '';
   if (App.admin && st) {
-    const exWhy = l => { const S = SET(), m = App.sku[l.sku] || [], nm = String(m[0] || '').toUpperCase(), c4 = String(m[2] || '').toUpperCase(), br = String(m[4] || '').toUpperCase();
+    const exWhy = l => { if (isEco(l.sku)) return 'ECO FRIENDLY SHOPPING BAG'; const S = SET(), m = App.sku[l.sku] || [], nm = String(m[0] || '').toUpperCase(), c4 = String(m[2] || '').toUpperCase(), br = String(m[4] || '').toUpperCase();
       if (br && splitList(S.excludeBrands).includes(br)) return 'brand ' + br; if (/^(81|ES)/i.test(l.sku)) return 'SKU ' + l.sku.slice(0, 2); const kw = splitList(S.excludeKeywords).find(k => nm.includes(k) || c4 === k); if (kw) return kw; return 'artikel disembunyikan'; };
     const comp = new Map(), ord = new Map();
     for (const l of App.lines) {

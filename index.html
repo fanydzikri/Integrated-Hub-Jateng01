@@ -1308,10 +1308,20 @@ function isPB(sku) {
   C.set(sku, r || isEco(sku)); return r || isEco(sku);
 }
 const lineOk = l => { const S = SET(); return S.billStatuses[l.st || ''] !== false && S.txTypes[l.ty || ''] !== false; };
-function storeCodes() {
+/* daftar toko area (whitelist): bila diisi, hanya toko ini yang tampil, dihitung & disimpan saat upload */
+const AREA_DEFAULT = ['2038', '2039', '2053', '2070', '2118', '2152', '2259', '2278', '2299', '2306', '2319', '2327', '2342', '2410', '2424', '7005', '7014', '7016', '7017', '7047', '7051', '2494', '2504', '9020', '9029'];
+function AREA() { const a = SET().areaStores; if (!a || !a.length) return null; return App.cache.area || (App.cache.area = new Set(a.map(String))); }
+const inArea = c => { const A = AREA(); return !A || A.has(String(c)); };
+function storeCodesRaw() {
   const set = new Set(Object.keys(App.stores));
   for (const m in App.index.sales) for (const c in App.index.sales[m]) set.add(c);
   for (const c in App.index.stock) set.add(c);
+  return [...set];
+}
+function storeCodes() {
+  const set = new Set(Object.keys(App.stores).filter(inArea));
+  for (const m in App.index.sales) for (const c in App.index.sales[m]) if (inArea(c)) set.add(c);
+  for (const c in App.index.stock) if (inArea(c)) set.add(c);
   /* urutan toko di semua menu & dropdown: nomor site (default) atau nama toko — diatur di Kelola data */
   const byCode = (SET().storeOrder || 'code') === 'code';
   return [...set].sort((a, b) => byCode ? (Number(a) - Number(b) || a.localeCompare(b)) : sName(a).localeCompare(sName(b), 'id'));
@@ -1333,7 +1343,7 @@ const sType = c => (App.stores[c] && App.stores[c].type) || autoType(c);
 const TYPE_LABEL = { rg: 'Reguler', bz: 'Bazaar', ot: 'Lainnya' };
 /* mode tampilan: '' = branch (semua toko), atau kode toko (store head hanya melihat tokonya) */
 const scopeOn = () => !!App.ui.scope && !['admin', 'settings', 'home', 'omset'].includes(App.page) && !isOps(App.page);
-const typeOk = c => (!scopeOn() || c === App.ui.scope) && (!App.ui.typeF || sType(c) === App.ui.typeF);
+const typeOk = c => inArea(c) && (!scopeOn() || c === App.ui.scope) && (!App.ui.typeF || sType(c) === App.ui.typeF);
 const activeStores = () => storeCodes().filter(typeOk);
 const hasTypes = () => new Set(storeCodes().map(sType)).size > 1;
 /* ---- data Sales Report: harian & kumulatif per toko, [qty, bruto, netto] ---- */
@@ -4544,6 +4554,12 @@ function pageAdmin(view) {
       ${(App.books || []).length ? `<div class="chips" style="margin:6px 0 4px">${App.books.map(b => `<a class="btn sm" href="${esc(b.url)}" target="_blank" rel="noopener">Data DSR ${esc(b.key)}</a>`).join('')}</div>` : ''}
       ${App.cells ? `<p class="small muted">Spreadsheet master terpakai ${fmtN(App.cells)} dari 10.000.000 sel (${fmtPct(App.cells / 1e7, 1)}).</p>` : ''}
       <div class="row-act">${SHEET_URL ? `<a class="btn" href="${esc(SHEET_URL)}" target="_blank" rel="noopener">Buka spreadsheet</a>` : ''}<button class="btn" id="rebuildBtn">Perbarui cache</button><span id="rebuildMsg" class="small muted"></span></div></section>
+    ${(() => { const A = SET().areaStores && SET().areaStores.length ? SET().areaStores : AREA_DEFAULT, aset = new Set(A), outside = storeCodesRaw().filter(c => !aset.has(c));
+      return `<section class="card" style="border-left:5px solid var(--orange)"><div class="card-h"><h3>🧹 Toko area Jateng 01 (whitelist)</h3><p class="small muted">${A.length} toko${SET().areaStores && SET().areaStores.length ? '' : ' · belum disimpan'}${outside.length ? ` · <b style="color:var(--bad)">${outside.length} toko di luar area masih ada di database</b>` : ' · database bersih ✓'}</p></div>
+      <p class="small muted" style="margin-top:0">Hanya toko di daftar ini yang tampil di dashboard dan disimpan saat upload. Data toko lain di file (mis. DSR Nasional) otomatis dilewati. Tulis kode site, satu per baris atau dipisah koma.</p>
+      <textarea class="inp" id="areaCodes" rows="4" style="width:100%;font-family:var(--font-mono)">${esc(A.join(', '))}</textarea>
+      <div class="row-act"><button class="btn primary" id="areaSave">Simpan daftar toko area</button>${outside.length ? `<button class="btn danger" id="areaPrune">Hapus data ${outside.length} toko di luar area dari database</button>` : ''}<span id="areaMsg" class="small muted"></span></div>
+      ${outside.length ? `<details style="margin-top:8px"><summary class="small" style="cursor:pointer">Lihat ${outside.length} toko di luar area</summary><p class="small muted" style="margin:6px 0 0">${outside.sort().map(c => esc(c + ' ' + ((App.stores[c] || {}).name || ''))).join(' · ')}</p></details>` : ''}</section>`; })()}
     <section class="card"><div class="card-h"><h3>Daftar toko area</h3><p class="small muted">${fmtN(storeCodes().length)} site</p></div>
       <p class="small muted" style="margin-top:0">Hanya toko di daftar ini yang diambil dari Lost Sale Report. Toko juga otomatis masuk saat muncul di file target atau Item DSR. Tambahkan toko baru cukup dengan kode site.</p>
       <div class="filters"><input id="newCode" class="inp" placeholder="Kode site, mis. 2501" style="width:170px" inputmode="numeric"><input id="newName" class="inp" placeholder="Nama toko (opsional)" style="flex:1 1 220px"><button class="btn primary" id="addStore">Tambah toko</button></div>
@@ -4661,8 +4677,26 @@ async function addFiles(files) {
 }
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 const hhmm = t => pad(Math.floor((t || 0) / 100)) + ':' + pad((t || 0) % 100);
+/* buang data toko di luar daftar toko area dari file yang akan disimpan */
+function areaFilter(p) {
+  const A = AREA(); if (!A) return 0; let n = 0; const ok = c => A.has(String(c));
+  const delKeys = o => { for (const c of Object.keys(o || {})) if (!ok(c)) { delete o[c]; n++; } };
+  if (p.kind === 'DSR' || p.kind === 'INV') delKeys(p.stores);
+  else if (p.kind === 'TGT') { for (const m in p.data) delKeys(p.data[m]); delKeys(p.names); }
+  else if (p.kind === 'OMT') { delKeys(p.data); delKeys(p.names); }
+  else if (p.kind === 'EAC') { for (const m in p.data) delKeys(p.data[m]); delKeys(p.names); }
+  else if (p.kind === 'LST') { const b = p.rows.length; p.rows = p.rows.filter(r => ok(r[2])); n = b - p.rows.length; }
+  else if (p.kind === 'BC') { const b = p.rows.length; p.rows = p.rows.filter(r => ok(r[0])); n = b - p.rows.length; }
+  else if (p.kind === 'DLY') { const b = p.rows.length; p.rows = p.rows.filter(r => ok(r[1])); n = b - p.rows.length; }
+  else if (p.kind === 'RAT') { const b = p.items.length; p.items = p.items.filter(r => ok(r[0])); n = b - p.items.length; }
+  return n;
+}
 async function saveAll() {
-  const items = App.pending.filter(p => !p.err); if (!items.length) return;
+  let items = App.pending.filter(p => !p.err); if (!items.length) return;
+  { let cut = 0; for (const p of items) cut += areaFilter(p);
+    items = items.filter(p => !((p.kind === 'DSR' || p.kind === 'INV') && !Object.keys(p.stores).length) && !(p.rows && Array.isArray(p.rows) && !p.rows.length && ['LST', 'BC', 'DLY'].includes(p.kind)));
+    if (cut) toast(`Data ${cut} toko/baris di luar daftar toko area tidak disimpan.`, 4000);
+    if (!items.length) { $('#saveMsg').textContent = 'Semua isi file berada di luar daftar toko area, tidak ada yang disimpan.'; return; } }
   const btn = $('#saveBtn'), msg = $('#saveMsg');
   const noMonth = items.find(p => (p.kind === 'TGT' || p.kind === 'OMT' || p.kind === 'RAT') && p.needMonth && !p.month);
   if (noMonth) { msg.textContent = 'Pilih bulan untuk file target ' + noMonth.file + ' dulu.'; return; }
@@ -5083,6 +5117,22 @@ document.addEventListener('click', async e => {
   const upw = t.closest('[data-uspw]'); if (upw) { const np = prompt('Password baru untuk ' + upw.dataset.uspw + ' (min. 6 karakter):'); if (np) userAction(upw.dataset.uspw, { newPw: np }, 'Password direset — beritahu pemilik akun'); return; }
   const udel = t.closest('[data-usdel]'); if (udel) { if (confirm('Hapus akun ' + udel.dataset.usdel + ' permanen?')) userAction(udel.dataset.usdel, { del: 1 }, 'Akun dihapus'); return; }
   if (t.id === 'rebuildBtn') { rebuildCache(); return; }
+  if (t.id === 'areaSave' || t.id === 'areaPrune') {
+    const codes = [...new Set((($('#areaCodes') || {}).value || '').split(/[\s,;]+/).map(x => x.trim()).filter(x => /^[0-9A-Za-z]{3,8}$/.test(x)))];
+    if (codes.length < 1) { toast('Isi minimal satu kode site'); return; }
+    if (t.id === 'areaSave') { saveSettings({ areaStores: codes }, `Daftar toko area disimpan (${codes.length} toko)`); return; }
+    const keep = new Set(codes), outside = storeCodesRaw().filter(c => !keep.has(c));
+    if (!confirm(`Hapus SEMUA data ${outside.length} toko di luar area dari database?\n(penjualan DSR, stok, target, lost sales, detention, blind counting, sales harian, daftar toko)\n\nYang disimpan hanya ${codes.length} toko area. Tindakan ini tidak bisa dibatalkan.`)) return;
+    const msg = $('#areaMsg'); t.disabled = true;
+    try {
+      msg.textContent = 'Menyimpan daftar toko area…'; await apiPost({ a: 'config', key: 'settings', value: Object.assign({}, SET(), { areaStores: codes }) }); App.settings = Object.assign({}, SET(), { areaStores: codes }); App.cache = {};
+      msg.textContent = 'Membersihkan daftar toko, stok, target, lost sales, dll…'; await withRetry(() => apiPost({ a: 'pruneMisc', keep: codes }));
+      const months = Object.keys(App.index.sales || {}).filter(m => Object.keys(App.index.sales[m]).some(c => !keep.has(c))).sort();
+      for (let i = 0; i < months.length; i++) { msg.textContent = `Membersihkan penjualan ${fmtMonth(months[i])} (${i + 1}/${months.length})… jangan tutup halaman`; await withRetry(() => apiPost({ a: 'pruneMonth', m: months[i], keep: codes })); }
+      msg.textContent = 'Memuat ulang…'; await loadAll(); toast('Database bersih: hanya toko area Jateng 01'); render();
+    } catch (er) { msg.textContent = 'Gagal: ' + errMsg(er) + ' — bagian yang sudah selesai tetap tersimpan, tekan tombol lagi untuk melanjutkan.'; t.disabled = false; }
+    return;
+  }
   if (t.id === 'addStore') { const c = ($('#newCode').value || '').trim(), n = ($('#newName').value || '').trim(); if (!/^[0-9A-Za-z]{3,8}$/.test(c)) { toast('Isi kode site yang valid'); return; } if (App.stores[c]) { toast('Kode ' + c + ' sudah ada di daftar'); return; } try { await apiPost({ a: 'storeAdd', code: c, name: n }); await loadAll(); toast('Toko ' + c + ' ditambahkan'); render(); } catch (er) { toast('Gagal: ' + errMsg(er)); } return; }
   const rms = t.closest('[data-rmstore]'); if (rms) { const c = rms.dataset.rmstore; if (!confirm(`Hapus ${c} - ${sName(c)} dari daftar toko area? Data penjualannya tidak ikut terhapus.`)) return; try { await apiPost({ a: 'storeRemove', code: c }); await loadAll(); toast('Dihapus dari daftar'); render(); } catch (er) { toast('Gagal: ' + errMsg(er)); } return; }
   if (t.id === 'mstReload') { toast('Memuat master & foto dari Katalog Produk…'); loadMaster(true); render(); return; }

@@ -632,6 +632,69 @@ table.rp{border-collapse:separate;border-spacing:0;font-size:12px;width:100%;min
   #onlinePop{top:56px}
   .toast{max-width:calc(100vw - 24px)}
 }
+
+/* ===== navigasi sederhana: 4 kelompok, PC = menu turun berbagian, HP = bar bawah + lembar menu ===== */
+.nav{position:relative;align-items:center}
+.nav-g{position:static}
+.nav .nbd{background:var(--bad);color:#fff;font-size:10.5px;font-weight:800;border-radius:999px;padding:1px 6px;margin-left:2px}
+.nav .nav-search{margin-left:auto;background:var(--navy-tint);border:1px solid var(--line)!important;border-radius:999px;padding:6px 14px!important;color:var(--navy);font-weight:700}
+.nav .nav-search:hover{border-color:var(--navy)!important}
+.nav-m.mega{left:6px;right:auto;width:max-content;max-width:min(980px,calc(100vw - 32px));grid-template-columns:repeat(var(--cols),minmax(210px,250px));gap:6px 10px;padding:12px}
+.nav-g.open .nav-m.mega{display:grid}
+.mm-sec{min-width:0}
+.mm-sec h5{margin:2px 10px 6px;font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.nav-m.mega button{display:flex!important;align-items:flex-start;gap:10px;white-space:normal;line-height:1.3}
+.nav-m.mega button .ic{font-size:17px;width:22px;text-align:center;flex:none;line-height:1.2}
+.nav-m.mega button .tx{flex:1;min-width:0}.nav-m.mega button b{display:block;font-weight:700;font-size:13.5px}
+.nav-m.mega button small{margin-top:1px}
+.nav-m.mega button .bd{background:var(--bad);color:#fff;font-size:10.5px;font-weight:800;border-radius:999px;padding:1px 7px;flex:none}
+.crumb{margin:0 0 6px;font-size:12.5px;color:#C9D3F0;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.crumb:empty{display:none}
+.crumb button{all:unset;cursor:pointer;font-weight:800;color:#fff;background:rgba(255,255,255,.14);border-radius:999px;padding:3px 10px}
+.crumb button:hover{background:rgba(255,255,255,.24)}
+.subnav{display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding-top:16px}
+.subnav:empty{display:none}
+.subnav .lbl{font-size:12px;font-weight:800;color:var(--muted);margin-right:2px;white-space:nowrap}
+.subnav .sep{width:1px;height:20px;background:var(--line-strong);margin:0 2px}
+.subnav button{border:1px solid var(--line-strong);background:var(--surface);border-radius:999px;padding:6px 12px;font:inherit;font-size:12.5px;font-weight:700;color:var(--ink);cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;gap:4px}
+.subnav button:hover{border-color:var(--navy);color:var(--navy)}
+.subnav button.on{background:var(--navy);border-color:var(--navy);color:#fff}
+.subnav .bd{background:var(--bad);color:#fff;font-size:10.5px;font-weight:800;border-radius:999px;padding:0 6px}
+.subnav + main.wrap{padding-top:16px}
+.mp-groups{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px}
+.mp-grp{border:1px solid var(--line);border-radius:14px;padding:12px;background:var(--surface)}
+.mp-gh{display:flex;gap:10px;align-items:center;padding:2px 4px 8px;border-bottom:1px solid var(--line);margin-bottom:6px;position:relative}
+.mp-gh .gi{font-size:24px;line-height:1}.mp-gh b{display:block;font-size:15px;color:var(--ink)}.mp-gh small{display:block;font-size:12px;color:var(--muted)}
+.mp-gh .bd{margin-left:auto;background:var(--bad);color:#fff;font-size:11px;font-weight:800;border-radius:999px;padding:1px 8px}
+.mp-sub h5{margin:10px 6px 4px;font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.mp-grp .mlist,.mp-sub .mlist{grid-template-columns:1fr}
+.mitem.on{background:var(--navy-tint);border-color:var(--navy)}
+.mp-title{flex:1;font-size:17px;color:var(--ink)}
+.grab{display:none}
+.bnav{display:none}
+@media (min-width:641px) and (max-width:1100px){.nav-m.mega{grid-template-columns:repeat(min(var(--cols),2),minmax(210px,1fr))}}
+@media (max-width:640px){
+  .nav{display:none!important}
+  .bnav:not([hidden]){display:grid;grid-template-columns:repeat(5,1fr);position:fixed;left:0;right:0;bottom:0;z-index:120;background:rgba(255,255,255,.97);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);border-top:1px solid var(--line);padding:4px 2px calc(4px + env(safe-area-inset-bottom,0px));box-shadow:0 -6px 20px rgba(11,27,74,.08)}
+  .bnav button{all:unset;box-sizing:border-box;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 2px 4px;font-size:10.5px;font-weight:700;color:var(--muted);position:relative;text-align:center;border-radius:12px;min-height:50px}
+  .bnav svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+  .bnav button.on{color:var(--navy)}
+  .bnav button.on svg{background:var(--navy-tint);border-radius:999px;padding:3px 12px;width:46px;height:28px;margin:-3px 0}
+  .bnav .bd{position:absolute;top:2px;left:calc(50% + 8px);background:var(--bad);color:#fff;font-size:10px;font-weight:800;border-radius:999px;padding:0 5px;line-height:16px}
+  body{padding-bottom:calc(66px + env(safe-area-inset-bottom,0px))}
+  .toast{bottom:calc(78px + env(safe-area-inset-bottom,0px))}
+  .subnav{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin:0;padding:12px 12px 2px;-webkit-overflow-scrolling:touch}
+  .subnav::-webkit-scrollbar{display:none}
+  .subnav > *{flex:none}
+  .subnav + main.wrap{padding-top:12px}
+  .crumb{font-size:12px}
+  .mp-ov{align-items:flex-end;padding:0}
+  .mp{width:100%;max-height:86vh;overflow-y:auto;border-radius:20px 20px 0 0;border-top-width:0;padding:6px 14px calc(16px + env(safe-area-inset-bottom,0px))}
+  .grab{display:block;width:44px;height:5px;border-radius:9px;background:#CBD5E1;margin:4px auto 10px}
+  .mp-top{position:sticky;top:-6px;background:var(--surface);z-index:2;padding:6px 0}
+  .mp-groups{grid-template-columns:1fr}
+  .mitem{padding:11px 10px;min-height:48px}
+}
 </style>
 </head>
 <body>
@@ -650,11 +713,13 @@ table.rp{border-collapse:separate;border-spacing:0;font-size:12px;width:100%;min
   </div>
 </header>
 <section class="phead"><div class="wrap">
-  <div><h1 id="pageTitle">Integrated Hub Jateng 01</h1><p id="pageSub"></p></div>
+  <div><div class="crumb" id="crumb"></div><h1 id="pageTitle">Integrated Hub Jateng 01</h1><p id="pageSub"></p></div>
   <div class="period" id="periodBox"></div>
 </div></section>
+<div class="wrap subnav" id="subnav"></div>
 <main class="wrap"><div id="view"><div class="loading"><span class="spin"></span>Memuat data area…</div></div></main>
 <footer><div class="wrap"><span><strong>Integrated Hub Jateng 01</strong> &middot; PT. Eigerindo MPI &middot; dibuat oleh <strong>Fany Dzikri Hakim</strong></span><span>Data dari spreadsheet master, diperbarui setiap admin mengunggah Item DSR &middot; <a href="#" id="admLink" style="color:var(--navy);font-weight:700">Kelola data (admin)</a></span></div></footer>
+<nav class="bnav" id="bnav" aria-label="Menu utama" hidden></nav>
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
@@ -1593,19 +1658,33 @@ const NAV = [
 ];
 const pageGroup = pg => (NAV.find(g => g.items && g.items.some(i => i[0] === pg)) || {}).k || (pg === 'toko' ? 'sales' : pg);
 function renderNav() {
-  const cur = pageGroup(App.page), open = App.ui.navOpen;
-  const navList = App.page === 'home' ? [] : (isOps(App.page) ? OPS_NAV : [{ k: 'home', label: 'Beranda', icon: 'home' }, ...NAV]);
-  $('#nav').innerHTML = (App.page === 'home' || !App.user ? '' : '<button class="menu-btn" data-menupal="1" title="Cari & buka semua menu">☰ Semua menu</button>') + navList.filter(g => !g.admin || App.admin).map(g => g.items
-    ? `<div class="nav-g ${open === g.k ? 'open' : ''}"><button data-navg="${g.k}" class="${cur === g.k ? 'on' : ''}" aria-haspopup="true" aria-expanded="${open === g.k}"><svg viewBox="0 0 24 24" aria-hidden="true">${ICON[g.icon]}</svg>${g.label}<span class="car">▼</span></button>
-      <div class="nav-m" role="menu">${g.items.map(([k, l, d]) => `<button role="menuitem" data-go="${k}" class="${App.page === k ? 'on' : ''}">${l}<small>${d}</small></button>`).join('')}</div></div>`
-    : `<button data-go="${g.k}" class="${App.page === g.k ? 'on' : ''}"><svg viewBox="0 0 24 24" aria-hidden="true">${ICON[g.icon]}</svg>${g.label}</button>`).join('');
-  /* di HP: menu dropdown ditampilkan di luar baris menu (yang bisa digeser), supaya tidak terpotong di Safari/Chrome HP */
-  const old = $('#navFloat'); if (old) old.remove();
-  const om = $('.nav-g.open .nav-m');
-  if (om && window.innerWidth <= 640) {
-    const f = document.createElement('div'); f.id = 'navFloat'; f.className = 'nav-m nav-float'; f.setAttribute('role', 'menu'); f.innerHTML = om.innerHTML;
-    f.style.top = (Math.max(0, $('#brandbar').getBoundingClientRect().bottom) + 4) + 'px';
-    document.body.appendChild(f);
+  const G = groupOf(App.page), open = App.ui.navOpen, logged = !!App.user;
+  const svg = k => `<svg viewBox="0 0 24 24" aria-hidden="true">${ICON[k] || ''}</svg>`;
+  const item = x => { const bd = menuBadge(x.k); return `<button role="menuitem" data-menu="${x.k}" class="${App.page === x.k ? 'on' : ''}"><span class="ic">${MENU_IC[x.k] || '•'}</span><span class="tx"><b>${esc(x.l)}</b><small>${esc(x.d)}</small></span>${bd ? `<span class="bd">${bd}</span>` : ''}</button>`; };
+  /* PC: Beranda + 4 kelompok (menu turun berisi bagian-bagian) + tombol cari */
+  $('#nav').innerHTML = !logged ? '' : `<button data-go="home" class="${App.page === 'home' ? 'on' : ''}">${svg('home')}Beranda</button>` + menuCatalog().map(g => {
+    const bd = groupBadge(MENU_GROUPS.find(x => x.k === g.k));
+    return `<div class="nav-g ${open === g.k ? 'open' : ''}"><button data-navg="${g.k}" class="${G && G.k === g.k ? 'on' : ''}" aria-haspopup="true" aria-expanded="${open === g.k}">${svg(MENU_GROUPS.find(x => x.k === g.k).icon)}${esc(g.t)}${bd ? `<span class="nbd">${bd}</span>` : ''}<span class="car">▼</span></button>
+      <div class="nav-m mega" role="menu" style="--cols:${g.secs.length}">${g.secs.map(([st, items]) => `<div class="mm-sec">${st ? `<h5>${esc(st)}</h5>` : ''}${items.map(item).join('')}</div>`).join('')}</div></div>`;
+  }).join('') + `<button class="nav-search" data-menupal="1" title="Cari menu">🔍 Cari menu</button>`;
+  /* sub menu sekelompok: tombol cepat di bawah judul halaman */
+  const sub = $('#subnav'), cr = $('#crumb'), cat = G && logged ? menuCatalog().find(x => x.k === G.k) : null;
+  if (sub) {
+    sub.innerHTML = cat ? `<span class="lbl">${cat.ic} ${esc(cat.t)}</span>` + cat.secs.map(([st, items], i) => (i ? '<span class="sep" aria-hidden="true"></span>' : '') + items.map(x => { const bd = menuBadge(x.k); return `<button data-menu="${x.k}" class="${App.page === x.k || (App.page === 'toko' && x.k === 'report') ? 'on' : ''}" title="${esc(x.d)}">${MENU_IC[x.k] || ''} ${esc(x.l)}${bd ? ` <span class="bd">${bd}</span>` : ''}</button>`; }).join('')).join('') : '';
+    const on = sub.querySelector('button.on'); if (on && sub.scrollWidth > sub.clientWidth) sub.scrollLeft = Math.max(0, on.offsetLeft - sub.clientWidth / 2 + on.offsetWidth / 2);
+  }
+  if (cr) { const st = secOf(App.page); cr.innerHTML = cat ? `<button data-navcrumb="${cat.k}">${cat.ic} ${esc(cat.t)}</button>${st ? ` <span>›</span> ${esc(st)}` : ''}` : ''; }
+  /* HP: bar bawah (Beranda · Penjualan · Stok · Operasional · Menu) */
+  const bn = $('#bnav');
+  if (bn) {
+    bn.hidden = !logged;
+    const opsB = groupBadge(MENU_GROUPS.find(x => x.k === 'g_ops'));
+    const tab = (attr, ic, lbl, on, bd) => `<button ${attr} class="${on ? 'on' : ''}">${svg(ic)}<span>${lbl}</span>${bd ? `<span class="bd">${bd}</span>` : ''}</button>`;
+    bn.innerHTML = !logged ? '' : tab('data-go="home"', 'home', 'Beranda', App.page === 'home')
+      + tab('data-bsheet="g_sales"', 'area', 'Penjualan', G && G.k === 'g_sales')
+      + tab('data-bsheet="g_stock"', 'produk', 'Stok', G && G.k === 'g_stock')
+      + tab('data-bsheet="g_ops"', 'task', 'Operasional', G && G.k === 'g_ops', opsB)
+      + `<button data-menupal="1" class="${G && G.k === 'g_admin' ? 'on' : ''}"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><span>Cari / Semua</span></button>`;
   }
   const L = App.lastDate;
   const RL = repLast();
@@ -3735,17 +3814,22 @@ const MENU_IC = { omset: '💬', report: '🎯', trend: '📈', promo: '🏷️'
 const MENU_EXTRA = { lost: ['Lost Sales', 'Barang dicari customer tapi tidak tersedia'], pica: ['Analisa PICA', 'Cari masalah & tindakan perbaikan toko'], juknis: ['Info Promo (Juknis)', 'Promo yang sedang & akan berjalan'], admin: ['Kelola data', 'Upload data, akun & daftar toko'], settings: ['Pengaturan', 'Pengaturan dashboard'],
   ops_approval: ['Approval', 'Ajukan & pantau persetujuan BM'], ops_task: ['Task', 'Checklist tugas tiap toko'], ops_info: ['Informasi', 'Info & materi terbaru dari HO'], ops_ess: ['ESS Self Assessment', 'Self assessment RA saat briefing siang'] };
 const MENU_KW = { omset: 'piket share omset per 2 jam sales report care', report: 'achievement target daily report pencapaian', ra: 'sales person karyawan upt basket tagging target per head', transfer: 'pindah stok antar toko', ro: 'order gudang ho repeat', detention: 'display gudang pajang', bc: 'stock opname so', ops_ess: 'briefing journey', ops_task: 'tugas checklist', ops_approval: 'pengajuan memo lembur', juknis: 'promo diskon', lost: 'kosong tidak ada stok' };
+/* ===== SATU struktur menu untuk semua tempat (menu atas PC, bar bawah HP, beranda, pencarian, sub-menu) =====
+   4 kelompok besar, tiap kelompok dibagi beberapa bagian kecil. Semua 24 sub menu tetap ada. */
+const MENU_GROUPS = [
+  { k: 'g_sales', t: 'Penjualan', icon: 'area', ic: '📊', d: 'Omset, target, tim, promo & channel', secs: [['Pantau harian', ['omset', 'report']], ['Analisa penjualan', ['trend', 'growth', 'pica']], ['Tim & member', ['ra', 'eac']], ['Promo & channel', ['juknis', 'promo', 'omni']]] },
+  { k: 'g_stock', t: 'Stok & Produk', icon: 'produk', ic: '📦', d: 'Produk, kelola stok, display & opname', secs: [['Produk', ['produk', 'pareto', 'lost']], ['Kelola stok', ['transfer', 'ro', 'promostock']], ['Display & opname', ['detention', 'bc']]] },
+  { k: 'g_ops', t: 'Operasional', icon: 'task', ic: '📋', d: 'Task, approval, informasi & ESS', secs: [['Tugas harian', ['ops_task', 'ops_approval']], ['Info & briefing', ['ops_info', 'ops_ess']]] },
+  { k: 'g_admin', t: 'Admin', icon: 'admin', ic: '⚙️', d: 'Kelola data & pengaturan', admin: 1, secs: [['', ['admin', 'settings']]] }
+];
+const menuInfo = k => { const n = NAV.flatMap(g => g.items || []).find(i => i[0] === k); if (n) return { k, l: n[1], d: n[2] }; const x = MENU_EXTRA[k]; return x ? { k, l: x[0], d: x[1] } : null; };
+const menuGroups = () => MENU_GROUPS.filter(g => !g.admin || App.admin);
+const groupOf = pg => { if (pg === 'toko' || pg === 'stok' || pg === 'area') pg = pg === 'stok' ? 'transfer' : 'report'; return MENU_GROUPS.find(g => g.secs.some(x => x[1].includes(pg))) || null; };
+const secOf = pg => { const g = groupOf(pg === 'toko' || pg === 'area' ? 'report' : pg); return g ? (g.secs.find(x => x[1].includes(pg === 'toko' || pg === 'area' ? 'report' : pg)) || [''])[0] : ''; };
+const groupBadge = g => g.secs.reduce((a, x) => a + x[1].reduce((b, k) => b + menuBadge(k), 0), 0);
 const QUICK_MENU = { toko: ['omset', 'report', 'ra', 'ops_task', 'ops_approval', 'ops_ess', 'juknis', 'lost'], other: ['report', 'omset', 'ra', 'pica', 'ops_approval', 'ops_task', 'transfer', 'omni'] };
 function menuCatalog() {
-  const sales = NAV.find(x => x.k === 'sales'), inv = NAV.find(x => x.k === 'inv'), it = k => ({ k, l: MENU_EXTRA[k][0], d: MENU_EXTRA[k][1] });
-  const g = [
-    { t: 'Penjualan', items: sales.items.map(([k, l, d]) => ({ k, l, d })) },
-    { t: 'Operasional toko', items: ['ops_task', 'ops_approval', 'ops_ess', 'ops_info'].map(it) },
-    { t: 'Stok & produk', items: inv.items.map(([k, l, d]) => ({ k, l, d })) },
-    { t: 'Analisa & promo', items: ['lost', 'pica', 'juknis'].map(it) }
-  ];
-  if (App.admin) g.push({ t: 'Admin', items: ['admin', 'settings'].map(it) });
-  return g;
+  return menuGroups().map(g => ({ k: g.k, t: g.t, ic: g.ic, d: g.d, secs: g.secs.map(([st, ks]) => [st, ks.map(menuInfo).filter(Boolean)]), items: g.secs.flatMap(x => x[1]).map(menuInfo).filter(Boolean) }));
 }
 const menuAll = () => menuCatalog().flatMap(g => g.items.map(x => Object.assign({ g: g.t }, x)));
 const menuFind = k => menuAll().find(x => x.k === k);
@@ -3769,12 +3853,26 @@ function menuBody(q) {
   const quick = QUICK_MENU[(App.user || {}).role === 'toko' ? 'toko' : 'other'].map(menuFind).filter(Boolean), rec = recentMenus();
   return `<div class="mp-sec"><h4>⭐ Paling sering dipakai</h4><div class="mtiles">${quick.map(mTile).join('')}</div></div>
     ${rec.length ? `<div class="mp-sec"><h4>🕘 Terakhir dibuka</h4><div class="mrec">${rec.map(k => `<button data-menu="${k}">${MENU_IC[k] || ''} ${esc(menuFind(k).l)}</button>`).join('')}</div></div>` : ''}
-    ${menuCatalog().map(g => `<div class="mp-sec"><h4>${esc(g.t)}</h4><div class="mlist">${g.items.map(mRow).join('')}</div></div>`).join('')}`;
+    <div class="mp-sec"><h4>🗂️ Semua menu</h4><div class="mp-groups">${menuCatalog().map(groupCard).join('')}</div></div>`;
+}
+function groupCard(g) {
+  const b = groupBadge(MENU_GROUPS.find(x => x.k === g.k));
+  return `<section class="mp-grp"><div class="mp-gh"><span class="gi">${g.ic}</span><div><b>${esc(g.t)}</b><small>${esc(g.d)}</small></div>${b ? `<span class="bd">${b}</span>` : ''}</div>
+    ${g.secs.map(([st, items]) => `<div class="mp-sub">${st ? `<h5>${esc(st)}</h5>` : ''}<div class="mlist">${items.map(mRow).join('')}</div></div>`).join('')}</section>`;
+}
+/* lembar menu satu kelompok (dipakai bar bawah di HP) */
+function openGroupSheet(k) {
+  closeMenuPal(); const g = menuCatalog().find(x => x.k === k); if (!g) return;
+  const ov = document.createElement('div'); ov.className = 'mp-ov'; ov.id = 'menuPal';
+  ov.innerHTML = `<div class="mp" role="dialog" aria-modal="true" aria-label="${esc(g.t)}"><div class="grab"></div><div class="mp-top"><b class="mp-title">${g.ic} ${esc(g.t)}</b><button class="btn" data-mpclose="1">Tutup</button></div>
+    ${g.secs.map(([st, items]) => `<div class="mp-sub">${st ? `<h5>${esc(st)}</h5>` : ''}<div class="mlist">${items.map(x => mRow(x).replace('class="mitem"', 'class="mitem' + (App.page === x.k ? ' on' : '') + '"')).join('')}</div></div>`).join('')}</div>`;
+  document.body.appendChild(ov);
+  if (!App.hub && k === 'g_ops') loadHub().then(() => { if ($('#menuPal')) openGroupSheet(k); }).catch(() => { });
 }
 function openMenuPal() {
   closeMenuPal(); App.ui.navOpen = null; const f = $('#navFloat'); if (f) f.remove();
   const ov = document.createElement('div'); ov.className = 'mp-ov'; ov.id = 'menuPal';
-  ov.innerHTML = `<div class="mp" role="dialog" aria-modal="true" aria-label="Semua menu"><div class="mp-top"><input class="inp" id="mpQ" type="search" placeholder="🔍 Cari menu… (mis. omset, stok, task)" autocomplete="off"><button class="btn" data-mpclose="1">Tutup</button></div><div id="mpBody">${menuBody('')}</div></div>`;
+  ov.innerHTML = `<div class="mp" role="dialog" aria-modal="true" aria-label="Semua menu"><div class="grab"></div><div class="mp-top"><input class="inp" id="mpQ" type="search" placeholder="🔍 Cari menu… (mis. omset, stok, task)" autocomplete="off"><button class="btn" data-mpclose="1">Tutup</button></div><div id="mpBody">${menuBody('')}</div></div>`;
   document.body.appendChild(ov);
   if (window.innerWidth > 640) setTimeout(() => { const q = $('#mpQ'); if (q) q.focus(); }, 30);
   if (!App.hub) loadHub().then(() => { const b = $('#mpBody'), q = $('#mpQ'); if (b) b.innerHTML = menuBody(q ? q.value : ''); }).catch(() => { });
@@ -4992,12 +5090,14 @@ function syncHash(push) { const h = hashFor(); if (location.hash === h) return; 
 window.addEventListener('popstate', () => { if (applyHash()) { App.ui.navOpen = null; closeDrawer(); render(); } });
 window.addEventListener('hashchange', () => { const before = App.page; if (applyHash() && (App.page !== before || App.page === 'toko')) render(); });
 function go(page) { if (typeof menuFind === 'function' && menuFind(page)) pushRecent(page); App.page = page; App.ui.navOpen = null; const f = $('#navFloat'); if (f) f.remove(); closeDrawer(); syncHash(true); render(); window.scrollTo(0, 0); }
-window.addEventListener('resize', () => { if (App.ui.navOpen) renderNav(); });
+window.addEventListener('resize', () => { if (App.ui.navOpen && window.innerWidth <= 640) { App.ui.navOpen = null; renderNav(); } });
 document.addEventListener('click', async e => {
   const t = e.target;
   if (t.closest && t.closest('[data-menupal]')) { openMenuPal(); return; }
   { const mm = t.closest && t.closest('[data-menu]'); if (mm) { openMenu(mm.dataset.menu); return; } }
   if ((t.closest && t.closest('[data-mpclose]')) || t.id === 'menuPal') { closeMenuPal(); return; }
+  { const bs = t.closest && t.closest('[data-bsheet]'); if (bs) { openGroupSheet(bs.dataset.bsheet); return; } }
+  { const nc = t.closest && t.closest('[data-navcrumb]'); if (nc) { if (window.innerWidth <= 640) openGroupSheet(nc.dataset.navcrumb); else { App.ui.navOpen = nc.dataset.navcrumb; renderNav(); window.scrollTo(0, 0); } return; } }
   { const pop = $('#onlinePop'); if (t.id === 'onlineChip') { if (pop) pop.remove(); else { const d = document.createElement('div'); d.id = 'onlinePop'; d.innerHTML = onlinePopHtml(); document.body.appendChild(d); } return; } if (pop && !pop.contains(t)) pop.remove(); }
   if (App.page === 'settings' && settingsClick(t)) return;
   const dl = t.closest && t.closest('[data-dellog]'); if (dl) { deleteByLog(dl.dataset.dellog); return; }
@@ -5219,6 +5319,7 @@ document.addEventListener('change', async e => {
   if (t.dataset && t.dataset.pxadd !== undefined) { const p = App.pending[+t.dataset.pxadd]; if (p && t.value && t.value !== p.date) { p.extra = [...new Set([...(p.extra || []), t.value])].sort(); renderPending(); } return; }
   if (t.dataset && t.dataset.pdate !== undefined) { const p = App.pending[+t.dataset.pdate]; if (p && t.value) { p.date = t.value; p.dateFromName = true; } return; }
 });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && App.ui.navOpen) { App.ui.navOpen = null; renderNav(); } });
 document.addEventListener('keydown', e => { if ((e.key === 'ArrowRight' || e.key === 'ArrowLeft') && $('#ov') && App.ui.pd && $('.pd-nav')) { const P = App.ui.pd, n = photosOf(P.art, P.col).length; if (n > 1) openProduct(P.art, P.store, P.col, (P.i + (e.key === 'ArrowRight' ? 1 : -1) + n) % n, P.all); return; } if (e.key === 'Escape') { closeMenuPal(); closeDrawer(); closeLogin(); if (App.ui.navOpen) { App.ui.navOpen = null; renderNav(); } } });
 window.addEventListener('scroll', () => { const b = document.getElementById('brandbar'); if (b) b.classList.toggle('scrolled', window.scrollY > 8); }, { passive: true });
 document.addEventListener('dragover', e => { const d = e.target.closest && e.target.closest('#drop'); if (d) { e.preventDefault(); d.classList.add('over'); } });

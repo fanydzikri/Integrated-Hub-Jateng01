@@ -695,6 +695,36 @@ table.rp{border-collapse:separate;border-spacing:0;font-size:12px;width:100%;min
   .mp-groups{grid-template-columns:1fr}
   .mitem{padding:11px 10px;min-height:48px}
 }
+
+/* ===== SA-TR / SA-BO & lokasi bin ===== */
+.sa-bars{display:flex;gap:6px;align-items:stretch;height:170px;padding:22px 0 0;overflow-x:auto;scrollbar-width:thin;margin-bottom:12px}
+.sa-bars .c{flex:1 0 46px;display:flex;flex-direction:column;align-items:center;gap:4px;min-width:46px}
+.sa-bars .bw{flex:1;width:100%;display:flex;align-items:flex-end;justify-content:center;border-bottom:1px solid var(--line)}
+.sa-bars.neg{padding-top:0}
+.sa-bars.neg .bw{align-items:flex-start;border-bottom:0;border-top:1px solid var(--line);padding-bottom:18px}
+.sa-bars i{display:block;width:78%;background:#4285F4;border-radius:5px 5px 0 0;position:relative}
+.sa-bars.neg i{background:#E53935;border-radius:0 0 5px 5px}
+.sa-bars i b{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(100% + 2px);font-size:11px;color:var(--ink);white-space:nowrap}
+.sa-bars.neg i b{bottom:auto;top:calc(100% + 2px)}
+.sa-bars span{font-size:10.5px;color:var(--muted);white-space:nowrap}
+.sa-wrap{max-height:560px}
+.sa-heat td,.sa-heat th{padding:7px 9px;font-size:12.5px;white-space:nowrap}
+.sa-heat .sa-st{position:sticky;left:0;background:var(--surface);z-index:1;min-width:190px;max-width:240px;overflow:hidden;text-overflow:ellipsis}
+.sa-heat thead .sa-st{z-index:3}
+.sa-heat .sa-z{color:#B8C0D2}
+.sa-heat .sa-tot td{border-top:2px solid var(--line-strong);background:#F6F8FC}
+.sa-heat tbody tr:hover .sa-st{color:var(--navy)}
+.bin-card{border-left:5px solid var(--orange)}
+.bin-list{display:grid;gap:8px}
+.bin-row{border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.bin-row.me{border-color:var(--navy);background:var(--navy-tint)}
+.bin-st{display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-size:13.5px}
+.bin-q{margin-left:auto;font-weight:800;color:var(--ok)}.bin-q.z{color:var(--muted)}
+.bin-st .pill{background:var(--navy);color:#fff;border-radius:999px;padding:1px 8px;font-size:11px;font-weight:700}
+.bin-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.bin-chip{display:inline-flex;gap:6px;align-items:center;background:#F3F5FA;border:1px solid var(--line);border-radius:8px;padding:3px 8px;font-size:12px}
+.bin-chip b{color:var(--navy)}.bin-chip.sa{background:#FFF4E5;border-color:#F5C88B}.bin-chip.neg{background:#FDECEB;border-color:#F3B1AA}.bin-chip.neg b{color:var(--bad)}
+@media (max-width:640px){.sa-heat .sa-st{min-width:130px;max-width:150px}.sa-bars{height:150px}.bin-q{margin-left:0;width:100%}}
 </style>
 </head>
 <body>
@@ -900,7 +930,7 @@ function parseInv(rows, hi, h, fileName) {
     const cat = C.cat >= 0 ? String(r[C.cat] ?? '') : '';
     if (/damage/i.test(cat) || /damage/i.test(zone)) { damaged++; continue; }
     const loc = parseLoc(r[C.loc]); if (!loc) continue;
-    const S = stores[loc.code] || (stores[loc.code] = { code: loc.code, name: loc.name, items: {}, meta: {}, pcs: 0 });
+    const S = stores[loc.code] || (stores[loc.code] = { code: loc.code, name: loc.name, items: {}, meta: {}, pcs: 0, bins: {}, sa: {} });
     const q = numV(r[C.tq]);
     const e = S.items[sku] || (S.items[sku] = [0, 0, 0, 0, 0, 0]);
     e[0] += q; if (/sales|pos|display/i.test(zone)) e[1] += q; else e[2] += q;
@@ -911,6 +941,9 @@ function parseInv(rows, hi, h, fileName) {
       if (z === 'warehouse') { const av = C.av >= 0 ? numV(r[C.av]) : q; if (av > 0) e[3] += av; }
       if (z === 'sales area' || /^S[A-Z]-/i.test(bin)) { e[4] += Math.max(0, q); e[5] = 1; }
     }
+    /* lokasi bin per SKU (untuk pencarian di menu Produk) & bin SA-TR-01-00 / SA-BO-01-00 (monitoring harian) */
+    if (bin && q) { const B = S.bins[sku] || (S.bins[sku] = {}); B[bin] = (B[bin] || 0) + q; }
+    { const ub = bin.toUpperCase(), sat = ub.startsWith('SA-TR-01-00') ? 'TR' : ub.startsWith('SA-BO-01-00') ? 'BO' : ''; if (sat && q) { const k = sat + '|' + sku; S.sa[k] = (S.sa[k] || 0) + q; } }
     S.pcs += q;
     if (!S.meta[sku]) S.meta[sku] = [String(r[C.name] ?? '').trim(), clean(r[C.c3]), clean(r[C.c4]), clean(r[C.c2])];
     n++;
@@ -1286,7 +1319,7 @@ async function loadAll(opt) {
   App.pendingUsers = M.pendingUsers || 0;
   App.omni = M.omni || {}; App.eac = M.eac || {}; App.hoInfo = M.hoInfo || null; App.juknis = M.juknis || {}; App.bc = M.bc || []; App.aiReady = !!M.aiReady;
   App.log = M.log || []; App.books = M.books || []; App.cells = M.cells || 0; App.raTgt = M.raTarget || {};
-  App.lines = []; App.loaded = new Set(); App.sku = {}; App.dsrSku = {}; App.stock = {}; App.stockLoaded = false; App.cache = {}; App.sr = {};
+  App.saBin = null; App.binCache = {}; App.lines = []; App.loaded = new Set(); App.sku = {}; App.dsrSku = {}; App.stock = {}; App.stockLoaded = false; App.cache = {}; App.sr = {};
   computeLastDate();
   App.loadWarn = [];
   /* ringkasan detention & lost sales sudah ikut di meta (server versi 12); server lama: ambil terpisah */
@@ -1649,7 +1682,7 @@ const ICON = {
 };
 const NAV = [
   { k: 'sales', label: 'Sales Performance', icon: 'area', items: [['omset', 'Share Omset Harian', 'Update sales per 2 jam dari toko piket'], ['report', 'Monitoring Sales', 'Achievement, UPT & basket size'], ['trend', 'Sales Trend', 'Jam, hari, UPT & basket harian'], ['promo', 'Kontribusi Promo', 'Porsi tiap promo terhadap sales'], ['omni', 'Monitoring OmniChannel', 'EA, Eigerindo Voucher, Tax Invoice, EASAP'], ['eac', 'Sales Member EAC', 'KPI penjualan ke member'], ['ra', 'RA Performance', 'Transaksi, UPT & basket per sales person'], ['pareto', 'Product Pareto', 'Kontribusi kategori & produk (80/20)'], ['growth', 'Growth vs Tahun Lalu', 'Harian, MTD & YTD dibanding tahun lalu']] },
-  { k: 'inv', label: 'Inventory', icon: 'produk', items: [['produk', 'Produk', 'Penjualan & stok per artikel'], ['transfer', 'Saran Transfer Stok', 'Pindahkan stok dari toko yang menumpuk ke toko yang butuh'], ['ro', 'Saran Repeat Order', 'Order ke gudang HO untuk stok yang menipis'], ['promostock', 'Stok DCNP/SMDS', 'Stok barang diskon per MC Lv2–Lv4'], ['detention', 'Detention Stock', '% generic & varian terdisplay per toko'], ['bc', 'Blind Counting', 'Progres stock opname harian per toko']] },
+  { k: 'inv', label: 'Inventory', icon: 'produk', items: [['produk', 'Produk', 'Penjualan & stok per artikel'], ['transfer', 'Saran Transfer Stok', 'Pindahkan stok dari toko yang menumpuk ke toko yang butuh'], ['ro', 'Saran Repeat Order', 'Order ke gudang HO untuk stok yang menipis'], ['promostock', 'Stok DCNP/SMDS', 'Stok barang diskon per MC Lv2–Lv4'], ['detention', 'Detention Stock', '% generic & varian terdisplay per toko'], ['bc', 'Blind Counting', 'Progres stock opname harian per toko'], ['satr', 'SA-TR', 'Bin transit SA-TR-01-00 harian · plus & minus'], ['sabo', 'SA-BO', 'Bin booking SA-BO-01-00 harian']] },
   { k: 'lost', label: 'Lost Sales', icon: 'lost' },
   { k: 'pica', label: 'Analisa PICA', icon: 'pica' },
   { k: 'juknis', label: 'Promo', icon: 'tag' },
@@ -1694,7 +1727,7 @@ function renderPeriod() {
   const box = $('#periodBox');
   if (App.page === 'home' || isOps(App.page)) { box.innerHTML = ''; return; }
   const tsel = hasTypes() && App.page !== 'toko' && !scopeOn() ? `<label class="small muted" for="typeSel">Jenis toko</label><select id="typeSel" class="inp"><option value="">Semua toko</option>${['rg', 'bz', 'ot'].filter(t => storeCodes().some(c => sType(c) === t)).map(t => `<option value="${t}" ${App.ui.typeF === t ? 'selected' : ''}>${TYPE_LABEL[t]}</option>`).join('')}</select>` : '';
-  if (['report', 'promo', 'omni', 'eac', 'lost', 'detention', 'growth', 'stok', 'transfer', 'ro', 'pica', 'juknis', 'bc', 'omset'].includes(App.page)) { box.innerHTML = tsel; return; }
+  if (['report', 'promo', 'omni', 'eac', 'lost', 'detention', 'growth', 'stok', 'transfer', 'ro', 'pica', 'juknis', 'bc', 'omset', 'satr', 'sabo'].includes(App.page)) { box.innerHTML = tsel; return; }
   if (!App.lastDate || App.page === 'admin' || App.page === 'settings') { box.innerHTML = ''; return; }
   const L = App.lastDate, cm = L.slice(0, 7);
   const months = Object.keys(App.index.sales).sort().reverse().filter(m => m !== cm);
@@ -1750,14 +1783,14 @@ function render() {
     return;
   }
   if (App.page === 'stok') App.page = 'transfer';
-  if (!isOps(App.page) && App.page !== 'home' && !App.lastDate && !['admin', 'report', 'settings', 'lost', 'detention', 'juknis', 'bc', 'omset'].includes(App.page)) { App.page = srLast() ? 'report' : 'detention'; }
+  if (!isOps(App.page) && App.page !== 'home' && !App.lastDate && !['admin', 'report', 'settings', 'lost', 'detention', 'juknis', 'bc', 'omset', 'satr', 'sabo'].includes(App.page)) { App.page = srLast() ? 'report' : 'detention'; }
   const NEED_STOCK = ['produk', 'transfer', 'ro', 'promostock', 'detention', 'pica', 'toko', 'stok', 'area', 'lost', 'settings'];
   if (NEED_STOCK.includes(App.page) && !App.stockLoaded && Object.keys(App.index.stock || {}).length) {
     view.innerHTML = '<div class="loading"><span class="spin"></span>Memuat data stok…</div>';
     const pg = App.page; loadStock().catch(e => { App.stockLoaded = true; toast('Data stok gagal dimuat: ' + (e.message || e.code)); }).then(() => { App.stockLoaded = true; if (App.page === pg) render(); });
     return;
   }
-  const fn = { area: pageArea, report: pageReport, trend: pageTrend, promo: pagePromo, omni: pageOmni, eac: pageEac, ra: pageRA, pareto: pagePareto, lost: pageLost, promostock: pagePromoStock, detention: pageDetention, growth: pageGrowth, transfer: pageTransfer, ro: pageRO, pica: pagePica, juknis: pageJuknis, home: pageHome, bc: pageBC, omset: pageOmset, ops_approval: pageApproval, ops_task: pageTask, ops_info: pageInfo, ops_ess: pageEss, toko: pageStore, produk: pageProduct, stok: pageStock, admin: pageAdmin, settings: pageSettings }[App.page] || pageReport;
+  const fn = { satr: v => pageSaBin(v, 'TR'), sabo: v => pageSaBin(v, 'BO'), area: pageArea, report: pageReport, trend: pageTrend, promo: pagePromo, omni: pageOmni, eac: pageEac, ra: pageRA, pareto: pagePareto, lost: pageLost, promostock: pagePromoStock, detention: pageDetention, growth: pageGrowth, transfer: pageTransfer, ro: pageRO, pica: pagePica, juknis: pageJuknis, home: pageHome, bc: pageBC, omset: pageOmset, ops_approval: pageApproval, ops_task: pageTask, ops_info: pageInfo, ops_ess: pageEss, toko: pageStore, produk: pageProduct, stok: pageStock, admin: pageAdmin, settings: pageSettings }[App.page] || pageReport;
   try { fn(view); lockScopedSelects(view); if (App.page === 'admin') renderUsers(); if ((App.loadWarn || []).length) view.insertAdjacentHTML('afterbegin', `<div class="note" style="margin-bottom:14px">Sebagian data belum termuat (${esc(App.loadWarn.join(', '))}). Tekan <b>Muat ulang</b> di kanan atas untuk mencoba lagi.</div>`); } catch (e) { console.error(e); view.innerHTML = `<div class="empty-state"><h2>Halaman gagal ditampilkan</h2><p class="muted">${esc(e.message)}</p></div>`; }
 }
 
@@ -3810,15 +3843,15 @@ const PRIO = { Tinggi: '🔥', Sedang: '⚡', Rendah: '🌿' };
 const APST = { Menunggu: ['⏳', 'or'], 'Proses Review': ['🔍', 'or'], Revisi: ['🔄', 'red'], Disetujui: ['✅', 'ok'], Ditolak: ['❌', 'red'] };
 /* ---------- beranda: pilih hub ---------- */
 /* ===== katalog menu: satu pintu untuk Store Management & Operational Hub ===== */
-const MENU_IC = { omset: '💬', report: '🎯', trend: '📈', promo: '🏷️', omni: '🛒', eac: '👥', ra: '🧑‍💼', pareto: '📊', growth: '📅', produk: '👕', transfer: '🔁', ro: '📦', promostock: '💸', detention: '🗄️', bc: '🔢', lost: '⚠️', pica: '💡', juknis: '🎁', admin: '⬆️', settings: '⚙️', ops_approval: '✅', ops_task: '📋', ops_info: '📢', ops_ess: '📝' };
+const MENU_IC = { omset: '💬', report: '🎯', trend: '📈', promo: '🏷️', omni: '🛒', eac: '👥', ra: '🧑‍💼', pareto: '📊', growth: '📅', produk: '👕', transfer: '🔁', ro: '📦', promostock: '💸', detention: '🗄️', bc: '🔢', satr: '🚚', sabo: '📌', lost: '⚠️', pica: '💡', juknis: '🎁', admin: '⬆️', settings: '⚙️', ops_approval: '✅', ops_task: '📋', ops_info: '📢', ops_ess: '📝' };
 const MENU_EXTRA = { lost: ['Lost Sales', 'Barang dicari customer tapi tidak tersedia'], pica: ['Analisa PICA', 'Cari masalah & tindakan perbaikan toko'], juknis: ['Info Promo (Juknis)', 'Promo yang sedang & akan berjalan'], admin: ['Kelola data', 'Upload data, akun & daftar toko'], settings: ['Pengaturan', 'Pengaturan dashboard'],
   ops_approval: ['Approval', 'Ajukan & pantau persetujuan BM'], ops_task: ['Task', 'Checklist tugas tiap toko'], ops_info: ['Informasi', 'Info & materi terbaru dari HO'], ops_ess: ['ESS Self Assessment', 'Self assessment RA saat briefing siang'] };
-const MENU_KW = { omset: 'piket share omset per 2 jam sales report care', report: 'achievement target daily report pencapaian', ra: 'sales person karyawan upt basket tagging target per head', transfer: 'pindah stok antar toko', ro: 'order gudang ho repeat', detention: 'display gudang pajang', bc: 'stock opname so', ops_ess: 'briefing journey', ops_task: 'tugas checklist', ops_approval: 'pengajuan memo lembur', juknis: 'promo diskon', lost: 'kosong tidak ada stok' };
+const MENU_KW = { satr: 'sa tr satr transit bin plus minus', sabo: 'sa bo sabo booking bin', produk: 'artikel sku lokasi bin cek stok toko lain', omset: 'piket share omset per 2 jam sales report care', report: 'achievement target daily report pencapaian', ra: 'sales person karyawan upt basket tagging target per head', transfer: 'pindah stok antar toko', ro: 'order gudang ho repeat', detention: 'display gudang pajang', bc: 'stock opname so', ops_ess: 'briefing journey', ops_task: 'tugas checklist', ops_approval: 'pengajuan memo lembur', juknis: 'promo diskon', lost: 'kosong tidak ada stok' };
 /* ===== SATU struktur menu untuk semua tempat (menu atas PC, bar bawah HP, beranda, pencarian, sub-menu) =====
    4 kelompok besar, tiap kelompok dibagi beberapa bagian kecil. Semua 24 sub menu tetap ada. */
 const MENU_GROUPS = [
   { k: 'g_sales', t: 'Penjualan', icon: 'area', ic: '📊', d: 'Omset, target, tim, promo & channel', secs: [['Pantau harian', ['omset', 'report']], ['Analisa penjualan', ['trend', 'growth', 'pica']], ['Tim & member', ['ra', 'eac']], ['Promo & channel', ['juknis', 'promo', 'omni']]] },
-  { k: 'g_stock', t: 'Stok & Produk', icon: 'produk', ic: '📦', d: 'Produk, kelola stok, display & opname', secs: [['Produk', ['produk', 'pareto', 'lost']], ['Kelola stok', ['transfer', 'ro', 'promostock']], ['Display & opname', ['detention', 'bc']]] },
+  { k: 'g_stock', t: 'Stok & Produk', icon: 'produk', ic: '📦', d: 'Produk, kelola stok, display & opname', secs: [['Produk', ['produk', 'pareto', 'lost']], ['Kelola stok', ['transfer', 'ro', 'promostock']], ['Display & opname', ['detention', 'bc']], ['Bin SA', ['satr', 'sabo']]] },
   { k: 'g_ops', t: 'Operasional', icon: 'task', ic: '📋', d: 'Task, approval, informasi & ESS', secs: [['Tugas harian', ['ops_task', 'ops_approval']], ['Info & briefing', ['ops_info', 'ops_ess']]] },
   { k: 'g_admin', t: 'Admin', icon: 'admin', ic: '⚙️', d: 'Kelola data & pengaturan', admin: 1, secs: [['', ['admin', 'settings']]] }
 ];
@@ -4466,14 +4499,17 @@ function pageProduct(view) {
   if (U.prodC3) rows = rows.filter(r => r.c3 === U.prodC3);
   if (U.prodL2) rows = rows.filter(r => r.l2 === U.prodL2);
   if (U.prodGd) rows = rows.filter(r => r.gd === U.prodGd);
-  if (U.prodQ) { const q = U.prodQ.toLowerCase(); rows = rows.filter(r => (r.name + ' ' + r.art + ' ' + r.c4).toLowerCase().includes(q)); }
-  view.innerHTML = `<section class="card"><div class="filters">
-      <input id="pq" class="inp" type="search" placeholder="Cari nama atau kode artikel" value="${esc(U.prodQ)}" style="flex:1 1 220px">
+  const sku12 = /^\d{12}$/.test(String(U.prodQ || '').trim()) ? String(U.prodQ).trim() : '';
+  if (sku12) rows = rows.filter(r => r.art === artOf(sku12));
+  else if (U.prodQ) { const q = U.prodQ.toLowerCase(); rows = rows.filter(r => (r.name + ' ' + r.art + ' ' + r.c4).toLowerCase().includes(q)); }
+  view.innerHTML = `<div class="stack"><div id="binBox" data-sku="${esc(sku12)}"></div><section class="card"><div class="filters">
+      <input id="pq" class="inp" type="search" inputmode="search" placeholder="Cari nama / kode artikel · ketik SKU 12 digit untuk lokasi bin semua toko" value="${esc(U.prodQ)}" style="flex:1 1 260px">
       <select id="pc3" class="inp"><option value="">Semua kategori</option>${c3s.map(c => `<option ${c === U.prodC3 ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select>
       ${l2s.length ? `<select id="pl2" class="inp"><option value="">Semua MC Lv2</option>${l2s.map(c => `<option ${c === U.prodL2 ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select>` : ''}
       ${gds.length ? `<select id="pgd" class="inp"><option value="">Semua gender</option>${gds.map(c => `<option ${c === U.prodGd ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select>` : ''}
       <select id="pst" class="inp"><option value="">Semua toko</option>${storeCodes().map(c => `<option value="${esc(c)}" ${c === U.prodStore ? 'selected' : ''}>${esc(sName(c))}</option>`).join('')}</select>
-    </div><div id="pT"></div><p class="small muted" style="margin-top:10px">Cover = stok ÷ rata-rata penjualan per bulan (90 hari terakhir). Paper bag tidak dihitung.</p></section>`;
+    </div>${sku12 ? '' : '<p class="small muted" style="margin:0 0 8px">💡 Ketik <b>SKU lengkap 12 digit</b> untuk melihat stok & lokasi bin artikel itu di semua toko.</p>'}<div id="pT"></div><p class="small muted" style="margin-top:10px">Cover = stok ÷ rata-rata penjualan per bulan (90 hari terakhir). Paper bag tidak dihitung.</p></section></div>`;
+  if (sku12) showBinCard(sku12);
   $('#pT').innerHTML = tbl('prod', {
     rows, sort: { k: 'n', dir: 'desc' }, limit: 30, onRow: r => openProduct(r.art, U.prodStore || null),
     cols: [
@@ -4484,6 +4520,96 @@ function pageProduct(view) {
       { k: 'stock', label: 'Stok', r: 1, h: r => fmtN(r.stock) }, { k: 'cover', label: 'Cover (bln)', r: 1, h: r => r.cover == null ? '–' : fmtX(r.cover) }
     ]
   });
+}
+/* ================= SA-TR & SA-BO: monitoring bin harian (dari Export by Bin) ================= */
+async function loadSaBin(force) { if (App.saBin && !force) return App.saBin; const r = await api('sabin'); App.saBin = r.rows || []; return App.saBin; }
+function saBars(dates, tot, neg) {
+  const mx = Math.max(1, ...dates.map(d => Math.abs(tot[d] || 0)));
+  return `<div class="sa-bars ${neg ? 'neg' : ''}">${dates.map(d => { const v = tot[d] || 0, h = Math.round(Math.abs(v) / mx * 100); return `<div class="c" title="${esc(fmtDate(d))}: ${fmtN(v)}"><div class="bw"><i style="height:${Math.max(h, v ? 3 : 0)}%"><b>${fmtN(v)}</b></i></div><span>${esc(fmtDateS(d))}</span></div>`; }).join('')}</div>`;
+}
+function saHeat(stores, dates, val, neg) {
+  const mx = Math.max(1, ...stores.flatMap(c => dates.map(d => Math.abs(val(c, d)))));
+  const cell = v => { if (!v) return '<td class="r sa-z">–</td>'; const a = .12 + .78 * Math.abs(v) / mx; return `<td class="r" style="background:rgba(${neg ? '229,57,53' : '66,133,244'},${a.toFixed(2)});color:${a > .55 ? '#fff' : 'var(--ink)'}">${fmtN(v)}</td>`; };
+  const tot = d => stores.reduce((a, c) => a + val(c, d), 0);
+  return `<div class="tbl-wrap sa-wrap"><table class="tbl sa-heat"><thead><tr><th class="sa-st">Toko</th>${dates.map(d => `<th class="r">${esc(fmtDateS(d))}</th>`).join('')}</tr></thead><tbody>
+    ${stores.map(c => `<tr data-sast="${esc(c)}" style="cursor:pointer" title="Lihat detail artikel toko ini"><td class="sa-st"><b class="tn">${esc(c)}</b> ${esc(sName(c))}</td>${dates.map(d => cell(val(c, d))).join('')}</tr>`).join('')}
+    <tr class="sa-tot"><td class="sa-st"><b>Total</b></td>${dates.map(d => `<td class="r"><b>${fmtN(tot(d))}</b></td>`).join('')}</tr></tbody></table></div>`;
+}
+function pageSaBin(view, T) {
+  const U = App.ui, isTR = T === 'TR', pg = App.page, bin = isTR ? 'SA-TR-01-00' : 'SA-BO-01-00';
+  setHead(isTR ? 'SA-TR · Bin Transit' : 'SA-BO · Bin Booking', `Monitoring qty di bin ${bin} per toko per hari${isTR ? ' · plus & minus' : ''}`);
+  if (!App.saBin) {
+    view.innerHTML = '<div class="loading"><span class="spin"></span>Memuat data bin SA…</div>';
+    loadSaBin().then(() => { if (App.page === pg) render(); }, loadFail); return;
+  }
+  const all = App.saBin.filter(r => r[2] === T && typeOk(r[1]));
+  const allDates = [...new Set(App.saBin.filter(r => typeOk(r[1])).map(r => r[0]))].sort().reverse();
+  if (!allDates.length) { view.innerHTML = `<div class="empty-state"><h2>Belum ada data ${bin}</h2><p class="muted">Data terisi otomatis setiap admin mengupload <b>Export by Bin</b> (mulai upload berikutnya setelah fitur ini dipasang). Riwayat disimpan 62 hari.</p></div>`; return; }
+  const nd = U.saDays || 14, dates = allDates.slice(0, nd), asc = dates.slice().reverse();
+  const stores = [...new Set([...storeCodes().filter(typeOk), ...all.map(r => r[1])])];
+  const sum = sign => { const M = new Map(); for (const r of all) { if (!dates.includes(r[0]) || (sign > 0 ? r[5] <= 0 : r[5] >= 0)) continue; const k = r[1] + '|' + r[0]; M.set(k, (M.get(k) || 0) + r[5]); } return (c, d) => M.get(c + '|' + d) || 0; };
+  const block = (sign, title) => {
+    const val = sum(sign), tot = {}; for (const d of dates) tot[d] = stores.reduce((a, c) => a + val(c, d), 0);
+    const L = dates[0], ord = stores.slice().sort((a, b) => Math.abs(val(b, L)) - Math.abs(val(a, L)) || dates.reduce((x, d) => x + Math.abs(val(b, d)), 0) - dates.reduce((x, d) => x + Math.abs(val(a, d)), 0));
+    const active = ord.filter(c => dates.some(d => val(c, d)));
+    return `<section class="card"><div class="card-h"><h3>${title}</h3><p class="small muted">${active.length} toko ada qty · klik toko untuk detail artikel</p></div>
+      ${saBars(asc, tot, sign < 0)}${active.length ? saHeat(U.saAllSt ? ord : active, dates, val, sign < 0) : '<p class="muted small">Tidak ada qty pada periode ini ✓</p>'}</section>`;
+  };
+  const latest = all.filter(r => r[0] === dates[0]), pl = latest.filter(r => r[5] > 0).reduce((a, r) => a + r[5], 0), mi = latest.filter(r => r[5] < 0).reduce((a, r) => a + r[5], 0);
+  /* detail artikel */
+  const dd = U.saDate && allDates.includes(U.saDate) ? U.saDate : dates[0], ds = U.saSt || '', sg = isTR ? (U.saSign || '') : '+', q = (U.saQ || '').toLowerCase();
+  const det = all.filter(r => r[0] === dd && (!ds || r[1] === ds) && (sg !== '+' || r[5] > 0) && (sg !== '-' || r[5] < 0) && (!q || (r[3] + ' ' + r[4]).toLowerCase().includes(q)))
+    .map(r => ({ d: r[0], c: r[1], st: sName(r[1]), sku: r[3], n: r[4], q: r[5] }));
+  App.ui.saLast = { T, dd, det };
+  view.innerHTML = `<div class="stack">
+    <div class="pt-tiles" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr))">
+      <div class="pt-tile"><span>Data terakhir</span><b>${esc(fmtDateS(dates[0]))}</b><small>${bin}</small></div>
+      <div class="pt-tile" style="background:#1B5FD6"><span>Qty plus (+)</span><b>${fmtN(pl)}</b><small>${new Set(latest.filter(r => r[5] > 0).map(r => r[1])).size} toko</small></div>
+      ${isTR ? `<div class="pt-tile" style="background:#C0392B"><span>Qty minus (−)</span><b>${fmtN(mi)}</b><small>${new Set(latest.filter(r => r[5] < 0).map(r => r[1])).size} toko</small></div>` : ''}
+      <div class="pt-tile" style="background:#0B1B4A"><span>Artikel di bin</span><b>${fmtN(new Set(latest.filter(r => isTR || r[5] > 0).map(r => r[3])).size)}</b><small>SKU unik, ${esc(fmtDateS(dates[0]))}</small></div></div>
+    <div class="filters"><label class="small muted" for="saDays">Tampilkan</label><select id="saDays" class="inp">${[7, 14, 30, 62].map(n => `<option value="${n}" ${n === nd ? 'selected' : ''}>${n} hari terakhir</option>`).join('')}</select>
+      <label class="small" style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="saAllSt" ${U.saAllSt ? 'checked' : ''}> Tampilkan juga toko yang kosong</label></div>
+    ${block(1, `${isTR ? 'SA-TR' : 'SA-BO'} <b>PLUS (+)</b>`)}
+    ${isTR ? block(-1, 'SA-TR <b>MINUS (−)</b>') : ''}
+    <section class="card" id="saDet"><div class="card-h"><h3>Detail artikel</h3><p class="small muted">${fmtN(det.length)} baris · ${fmtN(det.reduce((a, r) => a + r.q, 0))} qty</p></div>
+      <div class="filters">
+        <select id="saDate" class="inp">${allDates.map(d => `<option value="${d}" ${d === dd ? 'selected' : ''}>${esc(fmtDate(d))}</option>`).join('')}</select>
+        <select id="saSt" class="inp"><option value="">Semua toko</option>${stores.map(c => `<option value="${esc(c)}" ${c === ds ? 'selected' : ''}>${esc(c + ' ' + sName(c))}</option>`).join('')}</select>
+        ${isTR ? `<select id="saSign" class="inp"><option value="">Plus & minus</option><option value="+" ${sg === '+' ? 'selected' : ''}>Plus (+) saja</option><option value="-" ${sg === '-' ? 'selected' : ''}>Minus (−) saja</option></select>` : ''}
+        <input id="saQ" class="inp" type="search" placeholder="Cari SKU / nama artikel" value="${esc(U.saQ || '')}" style="flex:1 1 200px">
+        <button class="btn" id="saXls">Download Excel</button></div>
+      <div id="saT"></div></section></div>`;
+  $('#saT').innerHTML = tbl('sad', { rows: det, sort: { k: 'q', dir: 'desc' }, limit: 50, onRow: r => { App.ui.prodQ = r.sku; App.ui.prodStore = ''; openMenu('produk'); }, cols: [
+    { k: 'st', label: 'Toko', h: r => `<b class="tn">${esc(r.c)}</b> ${esc(r.st)}` }, { k: 'sku', label: 'SKU', h: r => `<span class="tn">${esc(r.sku)}</span>` }, { k: 'n', label: 'Nama artikel', h: r => esc(r.n) },
+    { k: 'q', label: 'Qty', r: 1, h: r => `<b style="color:${r.q < 0 ? 'var(--bad)' : 'var(--ink)'}">${fmtN(r.q)}</b>` }] });
+}
+async function exportSaBin() {
+  const X = App.ui.saLast; if (!X || !(await needXLSX())) return;
+  const aoa = [['Tanggal', 'Kode Toko', 'Nama Toko', 'Bin', 'SKU', 'Nama Artikel', 'Qty'], ...X.det.map(r => [r.d, r.c, r.st, X.T === 'TR' ? 'SA-TR-01-00' : 'SA-BO-01-00', r.sku, r.n, r.q])];
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), 'SA-' + X.T);
+  (await getDownloads()).save({ filename: `SA-${X.T}_${X.dd}.xlsx`, data: new Blob([XLSX.write(wb, { bookType: 'xlsx', type: 'array' })]) });
+}
+/* ================= lokasi bin per SKU (menu Produk) ================= */
+function binCardHtml(sku) {
+  const R = (App.binCache || {})[sku];
+  if (!R) return `<section class="card bin-card"><div class="loading" style="padding:18px"><span class="spin"></span>Mencari lokasi bin SKU ${esc(sku)} di semua toko…</div></section>`;
+  if (R.err) return `<section class="card bin-card"><p class="muted">Lokasi bin gagal dimuat: ${esc(R.err)}</p></section>`;
+  const me = App.ui.scope || ((App.user || {}).role === 'toko' ? App.user.store : '');
+  const L = (R.rows || []).filter(x => inArea(x.c)).map(x => ({ c: x.c, n: x.n, t: x.t, b: String(x.b || '').split('|').filter(Boolean).map(s => { const i = s.lastIndexOf(':'); return [s.slice(0, i), +s.slice(i + 1)]; }) }))
+    .sort((a, b) => (b.c === me) - (a.c === me) || b.t - a.t);
+  const nm = (L.find(x => x.n) || {}).n || (App.sku[sku] || [])[0] || '';
+  const tot = L.reduce((a, x) => a + Math.max(0, x.t), 0), dates = Object.values(R.idx || {}).sort();
+  return `<section class="card bin-card"><div class="card-h"><h3>📍 Lokasi stok · <span class="tn">${esc(sku)}</span></h3><p class="small muted">${esc(nm)}${dates.length ? ' · data bin per ' + esc(fmtDateS(dates[dates.length - 1])) : ''}</p></div>
+    ${L.length ? `<p class="small" style="margin:0 0 10px"><b>${fmtN(L.filter(x => x.t > 0).length)}</b> toko punya stok · total <b>${fmtN(tot)}</b> pcs</p>
+    <div class="bin-list">${L.map(x => `<div class="bin-row ${x.c === me ? 'me' : ''}"><div class="bin-st"><b class="tn">${esc(x.c)}</b> ${esc(sName(x.c))}${x.c === me ? ' <span class="pill">toko kamu</span>' : ''}<span class="bin-q ${x.t <= 0 ? 'z' : ''}">${fmtN(x.t)} pcs</span></div>
+      <div class="bin-chips">${x.b.map(([b, q]) => `<span class="bin-chip ${q < 0 ? 'neg' : /^SA-(TR|BO)/i.test(b) ? 'sa' : ''}"><span class="tn">${esc(b)}</span><b>${fmtN(q)}</b></span>`).join('')}</div></div>`).join('')}</div>`
+      : `<p class="muted">SKU ini tidak ditemukan di bin toko mana pun.${Object.keys(R.idx || {}).length ? '' : ' Lokasi bin tersedia setelah admin mengupload Export by Bin berikutnya.'}</p>`}</section>`;
+}
+function showBinCard(sku) {
+  const box = $('#binBox'); if (!box) return;
+  App.binCache = App.binCache || {}; box.innerHTML = binCardHtml(sku);
+  if (App.binCache[sku]) return;
+  api('bins', { sku }).then(r => { App.binCache[sku] = r; }, e => { App.binCache[sku] = { err: errMsg(e) }; }).then(() => { const b = $('#binBox'); if (b && b.dataset.sku === sku) b.innerHTML = binCardHtml(sku); });
 }
 /* ---------- detail produk (gaya katalog) ---------- */
 const COLOR_ID = { BLK: 'Hitam', WHT: 'Putih', NVY: 'Navy', BLU: 'Biru', GRY: 'Abu-abu', DGR: 'Abu tua', LGR: 'Abu muda', OLI: 'Olive', RED: 'Merah', GRN: 'Hijau', BRW: 'Cokelat', BRN: 'Cokelat', KHK: 'Khaki', MRN: 'Maroon', MAR: 'Maroon', ORG: 'Oranye', ORN: 'Oranye', YLW: 'Kuning', PNK: 'Pink', PRP: 'Ungu', TSK: 'Tosca', CRM: 'Krem', BGE: 'Beige', SLV: 'Silver', GLD: 'Emas', CML: 'Camel', MST: 'Mustard', TRQ: 'Turquoise', CHC: 'Cokelat tua', ARM: 'Army', MOS: 'Moss', SND: 'Sand', TAN: 'Tan', BOL: 'Biru olive', DBL: 'Biru tua', LBL: 'Biru muda' };
@@ -4845,6 +4971,22 @@ async function saveAll() {
       for (const d of extra) for (const x of snaps) { detRows.push([d, ...x.row.slice(1), note]); x.mc.forEach(m => detMc.push([d, ...m.slice(1)])); }
       if (snaps.length) { say('Menyimpan ringkasan detention harian' + (extra.length ? ` (+${extra.length} tanggal libur)` : '') + '…'); await withRetry(() => apiPost({ a: 'detSnap', rows: detRows, mc: detMc })); }
       p.detPairs = extra.flatMap(d => snaps.map(x => x.row[1] + '|' + d));
+      /* SA-TR & SA-BO harian (juga untuk tanggal libur yang disamakan) */
+      { const saRows = [], pairs = [];
+        for (const S of Object.values(p.stores)) { for (const d of [p.date, ...extra]) { pairs.push(S.code + '|' + d); for (const k in (S.sa || {})) { const [ty, sku] = k.split('|'); saRows.push([d, S.code, ty, sku, (S.meta[sku] || [])[0] || '', S.sa[k]]); } } }
+        if (pairs.length) { say('Menyimpan monitoring SA-TR & SA-BO…'); await withRetry(() => apiPost({ a: 'saBin', rows: saRows, pairs })); App.saBin = null; } }
+      /* lokasi bin per SKU, per toko (dikirim bertahap supaya tidak terlalu besar) */
+      { const L = Object.values(p.stores).filter(S => !(r.skipped || []).includes(S.code) && Object.keys(S.bins || {}).length);
+        for (let i = 0; i < L.length; i++) {
+          const S = L[i], rowsB = Object.keys(S.bins).map(sku => { const B = S.bins[sku], ks = Object.keys(B).filter(b => B[b]).sort((a, b) => B[b] - B[a]); return [sku, (S.meta[sku] || [])[0] || '', ks.map(b => b + ':' + B[b]).join('|'), ks.reduce((a, b) => a + B[b], 0)]; }).filter(x => x[2]);
+          for (let j = 0, part = 0; j < rowsB.length || part === 0; j += 6000, part++) {
+            say(`Menyimpan lokasi bin ${sName(S.code)} (${i + 1}/${L.length})…`);
+            const chunk = rowsB.slice(j, j + 6000), last = j + 6000 >= rowsB.length;
+            await withRetry(() => apiPost({ a: 'bins', code: S.code, date: p.date, rows: chunk, part, last }));
+            if (last) break;
+          }
+        }
+        App.binCache = {}; }
       const stScope = {}; for (const c in stores) if (!(r.skipped || []).includes(c)) stScope[c] = p.date;
       logs.push({ id: uid(), scope: { stock: stScope, det: p.detPairs || [] }, at: now, kind: 'INV', file: p.file, stores: Object.keys(p.stores).length, info: 'stok per ' + fmtDate(p.date) + ((p.extra || []).length ? ', juga untuk ' + p.extra.map(fmtDateS).join(', ') : '') + ((r.skipped || []).length ? `, ${r.skipped.length} toko dilewati (sudah ada stok lebih baru)` : '') });
     }
@@ -5074,7 +5216,7 @@ function settingsChange(t) {
 
 /* ================= navigasi & event ================= */
 /* ---------- alamat link per menu (#/nama-menu) ---------- */
-const SLUG = { report: 'monitoring-sales', trend: 'sales-trend', promo: 'kontribusi-promo', omni: 'omnichannel', eac: 'sales-member-eac', ra: 'ra-performance', pareto: 'product-pareto', growth: 'growth', toko: 'per-toko',
+const SLUG = { satr: 'sa-tr', sabo: 'sa-bo', report: 'monitoring-sales', trend: 'sales-trend', promo: 'kontribusi-promo', omni: 'omnichannel', eac: 'sales-member-eac', ra: 'ra-performance', pareto: 'product-pareto', growth: 'growth', toko: 'per-toko',
   produk: 'produk', transfer: 'saran-transfer', ro: 'saran-repeat-order', promostock: 'stok-dcnp-smds', detention: 'detention-stock', lost: 'lost-sales', pica: 'analisa-pica', juknis: 'promo', admin: 'kelola-data', settings: 'pengaturan', home: 'home', bc: 'blind-counting', omset: 'share-omset', ops_approval: 'ops/approval', ops_task: 'ops/task', ops_info: 'ops/informasi', ops_ess: 'ops/ess' };
 const PAGE_OF = Object.fromEntries(Object.entries(SLUG).map(([k, v]) => [v, k]));
 function hashFor() { const sl = SLUG[App.page] || 'monitoring-sales'; return '#/' + sl + (App.page === 'toko' && App.ui.store ? '/' + App.ui.store : ''); }
@@ -5178,6 +5320,8 @@ document.addEventListener('click', async e => {
   const gws = t.closest('[data-gws]'); if (gws) { const k = gws.dataset.gws; const s0 = App.ui.gwSort || { k: 'yG', dir: 'asc' }; App.ui.gwSort = s0.k === k ? { k, dir: s0.dir === 'asc' ? 'desc' : 'asc' } : { k, dir: k === 'name' ? 'asc' : 'desc' }; render(); return; }
   const gwb = t.closest('[data-gwb]'); if (gwb) { App.ui.gwBasis = gwb.dataset.gwb; render(); return; }
   if (t.id === 'raXls') { exportRA(); return; }
+  if (t.id === 'saXls') { exportSaBin(); return; }
+  { const ss = t.closest && t.closest('[data-sast]'); if (ss) { App.ui.saSt = ss.dataset.sast; App.ui.more = {}; render(); const d = $('#saDet'); if (d) d.scrollIntoView({ behavior: 'smooth', block: 'start' }); return; } }
   if (t.id === 'spXls') { (async () => { const X = App.ui.spLast; if (!X || !(await needXLSX())) return; const aoa = [['Tanggal', 'Jam', 'Order No', 'Sales Person', 'Bill Status', 'Tipe Transaksi', 'SKU', 'Item', 'Customer', 'Qty', 'Nilai']].concat(X.L.slice().sort((a, b) => (a.d + a.o).localeCompare(b.d + b.o)).map(l => [l.d, hhmm(l.t), l.o, spName(l.sp), l.st || '', l.ty || '', l.sku, (App.sku[l.sku] || [])[0] || '', l.cn || '', l.q, Math.round(VAL(l))])); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), 'Transaksi RA'); (await getDownloads()).save({ filename: `Transaksi_RA_${X.st}_${X.R.from}_${X.R.to}.xlsx`, data: new Blob([XLSX.write(wb, { bookType: 'xlsx', type: 'array' })]) }); })(); return; }
   if (t.id === 'poolXls') { (async () => { const X = App.ui.poolLast; if (!X || !(await needXLSX())) return; const det = [['Tanggal', 'Order No', 'Komponen', 'Tipe Transaksi', 'Bill Status', 'Sales Person', 'SKU', 'Nama Item', 'Kategori Lv4', 'Qty', 'Nilai', 'Dihitung?']]; X.O.forEach(y => y.items.forEach(i => det.push([y.d, y.o, y.c, y.ty, y.bs, y.sp, i.sku, i.n, i.c4, i.q, Math.round(i.v), i.nc ? 'tidak' : 'ya'])));
     const aoa = [['Tanggal', 'Order No', 'Komponen', 'Tipe Transaksi', 'Bill Status', 'Sales Person', 'Item', 'Qty', 'Nilai'], ...X.O.map(y => [y.d, y.o, y.c, y.ty, y.bs, y.sp, y.items.map(i => i.n + ' x' + i.q + ' = ' + Math.round(i.v)).join('; '), y.q, Math.round(y.v)])]; const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), 'Sales dilebur'); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(det), 'Per item'); (await getDownloads()).save({ filename: `Rincian_Sales_Dilebur_${X.st}_${X.R.from}_${X.R.to}.xlsx`, data: new Blob([XLSX.write(wb, { bookType: 'xlsx', type: 'array' })]) }); })(); return; }
@@ -5255,6 +5399,7 @@ document.addEventListener('input', e => {
   if (t.id === 'poolQ') { const q = t.value.trim().toLowerCase().replace(/[.,\s]/g, ''); $$('#poolOrdT tbody tr').forEach(tr => { tr.style.display = !q || tr.dataset.pq.replace(/[.,\s]/g, '').includes(q) ? '' : 'none'; }); return; }
   if (t.id === 'mpQ') { const b = $('#mpBody'); if (b) b.innerHTML = menuBody(t.value); return; }
   const deb = (key) => { App.ui[key] = t.value; App.ui.more = {}; clearTimeout(qTimer); qTimer = setTimeout(() => { const pos = t.selectionStart; const id = t.id; render(); const n = document.getElementById(id); if (n) { n.focus(); try { n.setSelectionRange(pos, pos); } catch (er) { } } }, 300); };
+  if (t.id === 'saQ') { deb('saQ'); return; }
   if (t.id === 'pq') deb('prodQ'); else if (t.id === 'hq') deb('stQ'); else if (t.id === 'trq') deb('trQ'); else if (t.id === 'tfQ') deb('tfQ'); else if (t.id === 'chatGreet') { const R = App.ui.rpLast; if (R) { App.settings = Object.assign({}, SET(), { chatGreet: t.value }); const pre = $('#chatPre'); if (pre) pre.textContent = reportChatText(R); } } else if (t.id === 'apQ') deb('apQ'); else if (t.id === 'tkQ') deb('tkQ'); else if (t.id === 'ifQ') deb('ifQ');
   else if (t.dataset && t.dataset.tgt !== undefined) { const sum = $$('[data-tgt]').reduce((s, i) => s + (Number(String(i.value).replace(/[^0-9]/g, '')) || 0), 0); const el = $('#tgtSum'); if (el) el.textContent = fmtRp(sum); }
 });
@@ -5292,6 +5437,8 @@ document.addEventListener('change', async e => {
   if (t.id === 'gwLfl') { App.ui.gwLfl = t.checked; render(); return; }
   if (t.id === 'gwComp') { App.ui.gwComp = t.checked; render(); return; }
   if (t.id === 'raStore') { App.ui.raStore = t.value; App.ui.more = {}; render(); return; }
+  if (['saDays', 'saDate', 'saSt', 'saSign'].includes(t.id)) { App.ui[t.id] = t.id === 'saDays' ? +t.value : t.value; App.ui.more = {}; render(); return; }
+  if (t.id === 'saAllSt') { App.ui.saAllSt = t.checked; render(); return; }
   if (t.id === 'raRet') { App.ui.raRet = t.checked; render(); return; }
   if (t.id === 'raMin') { App.ui.raMin = Math.max(0, +t.value || 0); render(); return; }
   if (t.id === 'eaDate') { if (t.value) { App.ui.eaDate = t.value; render(); } return; }

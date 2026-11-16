@@ -798,6 +798,8 @@ function chipGrowth(x, suffix = '') {
   const cls = x > 0.005 ? 'up' : x < -0.005 ? 'down' : 'flat';
   return `<span class="chip ${cls}">${x > 0 ? '+' : ''}${fmtPct(x)}${suffix}</span>`;
 }
+/* barang siap jual: SKU berawalan 91, 92, 94, 99 (dipakai di monitoring SA-TR & SA-BO) */
+const isReady = sku => /^(91|92|94|99)/.test(String(sku || '').trim());
 const artOf = sku => (/^\d{12}$/.test(sku) ? sku.slice(0, 9) : sku);
 const artName = n => String(n || '').split(',')[0].trim();
 const varName = n => String(n || '').split(',').slice(1).join(',').trim();
@@ -943,7 +945,7 @@ function parseInv(rows, hi, h, fileName) {
     }
     /* lokasi bin per SKU (untuk pencarian di menu Produk) & bin SA-TR-01-00 / SA-BO-01-00 (monitoring harian) */
     if (bin && q) { const B = S.bins[sku] || (S.bins[sku] = {}); B[bin] = (B[bin] || 0) + q; }
-    { const ub = bin.toUpperCase(), sat = ub.startsWith('SA-TR-01-00') ? 'TR' : ub.startsWith('SA-BO-01-00') ? 'BO' : ''; if (sat && q) { const k = sat + '|' + sku; S.sa[k] = (S.sa[k] || 0) + q; } }
+    { const ub = bin.toUpperCase(), sat = ub.startsWith('SA-TR-01-00') ? 'TR' : ub.startsWith('SA-BO-01-00') ? 'BO' : ''; if (sat && q && isReady(sku)) { const k = sat + '|' + sku; S.sa[k] = (S.sa[k] || 0) + q; } }
     S.pcs += q;
     if (!S.meta[sku]) S.meta[sku] = [String(r[C.name] ?? '').trim(), clean(r[C.c3]), clean(r[C.c4]), clean(r[C.c2])];
     n++;
@@ -4537,12 +4539,12 @@ function saHeat(stores, dates, val, neg) {
 }
 function pageSaBin(view, T) {
   const U = App.ui, isTR = T === 'TR', pg = App.page, bin = isTR ? 'SA-TR-01-00' : 'SA-BO-01-00';
-  setHead(isTR ? 'SA-TR · Bin Transit' : 'SA-BO · Bin Booking', `Monitoring qty di bin ${bin} per toko per hari${isTR ? ' · plus & minus' : ''}`);
+  setHead(isTR ? 'SA-TR · Bin Transit' : 'SA-BO · Bin Booking', `Monitoring qty di bin ${bin} per toko per hari${isTR ? ' · plus & minus' : ''} · hanya barang siap jual (SKU 91/92/94/99)`);
   if (!App.saBin) {
     view.innerHTML = '<div class="loading"><span class="spin"></span>Memuat data bin SA…</div>';
     loadSaBin().then(() => { if (App.page === pg) render(); }, loadFail); return;
   }
-  const all = App.saBin.filter(r => r[2] === T && typeOk(r[1]));
+  const all = App.saBin.filter(r => r[2] === T && typeOk(r[1]) && isReady(r[3]));
   const allDates = [...new Set(App.saBin.filter(r => typeOk(r[1])).map(r => r[0]))].sort().reverse();
   if (!allDates.length) { view.innerHTML = `<div class="empty-state"><h2>Belum ada data ${bin}</h2><p class="muted">Data terisi otomatis setiap admin mengupload <b>Export by Bin</b> (mulai upload berikutnya setelah fitur ini dipasang). Riwayat disimpan 62 hari.</p></div>`; return; }
   const nd = U.saDays || 14, dates = allDates.slice(0, nd), asc = dates.slice().reverse();
@@ -4977,15 +4979,19 @@ async function saveAll() {
         if (pairs.length) { say('Menyimpan monitoring SA-TR & SA-BO…'); await withRetry(() => apiPost({ a: 'saBin', rows: saRows, pairs })); App.saBin = null; } }
       /* lokasi bin per SKU, per toko (dikirim bertahap supaya tidak terlalu besar) */
       { const L = Object.values(p.stores).filter(S => !(r.skipped || []).includes(S.code) && Object.keys(S.bins || {}).length);
-        for (let i = 0; i < L.length; i++) {
-          const S = L[i], rowsB = Object.keys(S.bins).map(sku => { const B = S.bins[sku], ks = Object.keys(B).filter(b => B[b]).sort((a, b) => B[b] - B[a]); return [sku, (S.meta[sku] || [])[0] || '', ks.map(b => b + ':' + B[b]).join('|'), ks.reduce((a, b) => a + B[b], 0)]; }).filter(x => x[2]);
-          for (let j = 0, part = 0; j < rowsB.length || part === 0; j += 6000, part++) {
-            say(`Menyimpan lokasi bin ${sName(S.code)} (${i + 1}/${L.length})…`);
-            const chunk = rowsB.slice(j, j + 6000), last = j + 6000 >= rowsB.length;
+        let done = 0, next = 0;
+        const one = async S => {
+          const rowsB = Object.keys(S.bins).map(sku => { const B = S.bins[sku], ks = Object.keys(B).filter(b => B[b]).sort((a, b) => B[b] - B[a]); return [sku, (S.meta[sku] || [])[0] || '', ks.map(b => b + ':' + B[b]).join('|'), ks.reduce((a, b) => a + B[b], 0)]; }).filter(x => x[2]);
+          for (let j = 0, part = 0; ; j += 15000, part++) {
+            const chunk = rowsB.slice(j, j + 15000), last = j + 15000 >= rowsB.length;
             await withRetry(() => apiPost({ a: 'bins', code: S.code, date: p.date, rows: chunk, part, last }));
             if (last) break;
           }
-        }
+          done++; say(`Menyimpan lokasi bin… ${done}/${L.length} toko`);
+        };
+        say(`Menyimpan lokasi bin… 0/${L.length} toko`);
+        /* 4 toko dikirim bersamaan (tiap toko punya tab sendiri di spreadsheet bin) */
+        await Promise.all(Array.from({ length: Math.min(4, L.length) }, async () => { while (next < L.length) await one(L[next++]); }));
         App.binCache = {}; }
       const stScope = {}; for (const c in stores) if (!(r.skipped || []).includes(c)) stScope[c] = p.date;
       logs.push({ id: uid(), scope: { stock: stScope, det: p.detPairs || [] }, at: now, kind: 'INV', file: p.file, stores: Object.keys(p.stores).length, info: 'stok per ' + fmtDate(p.date) + ((p.extra || []).length ? ', juga untuk ' + p.extra.map(fmtDateS).join(', ') : '') + ((r.skipped || []).length ? `, ${r.skipped.length} toko dilewati (sudah ada stok lebih baru)` : '') });

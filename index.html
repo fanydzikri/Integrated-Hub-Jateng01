@@ -1974,6 +1974,7 @@ async function refreshForPeriod() {
 }
 
 function loadFail(e) {
+  if (e && e.code === 'auth' && App.user) { sessionExpired(); return; }
   const v = $('#view'); if (!v) return;
   v.innerHTML = `<div class="empty-state"><h2>Data belum berhasil dimuat</h2><p class="muted">${esc((e && e.message) || 'Server Google tidak merespons.')}</p><button class="btn primary" id="reloadBtn">⟳ Coba lagi</button></div>`;
 }
@@ -3967,6 +3968,7 @@ function showAuth(mode, msg) {
     ${mode === 'login' ? `<form id="authLogin" autocomplete="on" onsubmit="return false">
       <label class="fl">Username<input class="inp" id="auU" name="username" autocomplete="username" placeholder="Username" required></label>
       <label class="fl">Password<input class="inp" id="auP" name="password" type="password" autocomplete="current-password" required></label>
+      <label class="small" style="display:flex;gap:8px;align-items:center;margin:2px 0 8px;font-weight:600"><input type="checkbox" id="auRem" ${LS.get('dash_rem') === '0' ? '' : 'checked'}> Ingat saya di perangkat ini (30 hari)</label>
       <button class="btn primary" id="auGo" style="width:100%;margin-top:6px">Masuk</button>
       <p class="small muted" style="margin:12px 0 0;text-align:center">Belum punya akun? <a href="#" data-auth="reg" style="color:var(--navy);font-weight:700">Daftar di sini</a></p></form>`
     : `<form id="authReg" autocomplete="on" onsubmit="return false">
@@ -4012,14 +4014,21 @@ async function autoRefresh() {
   } catch (e) { PRES.dv = 'retry'; } finally { PRES.busy = false; }
 }
 async function presPing() {
-  if (!App.user || !App.token || document.visibilityState !== 'visible' || Date.now() - PRES.last > 5 * 60e3) return;
+  if (!App.user || !App.token || document.visibilityState !== 'visible') return;
+  /* tidak ada aktivitas > 5 menit (mis. layar dibiarkan terbuka): tetap cek data baru, cukup tiap 2 menit */
+  if (Date.now() - PRES.last > 5 * 60e3) { PRES.idle = (PRES.idle || 0) + 1; if (PRES.idle % 2) return; } else PRES.idle = 0;
   try {
     const t0 = Date.now(), r = await api1('ping', { pg: App.page || '' });
     App.online = r.online || []; renderOnline();
     const own = (PRES.mine || 0) > (PRES.pingAt || 0);        /* perubahan dari aksi kita sendiri tidak perlu dimuat ulang */
     PRES.pingAt = t0;
+    /* role / toko akun diubah admin: perbarui sesi tersimpan lalu muat ulang tampilan sesuai akses baru */
+    if (r.me && App.user && (r.me.role !== App.user.role || (r.me.store || '') !== (App.user.store || ''))) {
+      const nu = Object.assign({}, App.user, r.me); if (LS.get('dash_tok')) LS.set('dash_usr', JSON.stringify(nu));
+      toast('Akses akun kamu diperbarui admin, memuat ulang…', 3000); setTimeout(() => location.reload(), 1500); return;
+    }
     if (r.dv) { if (PRES.dv && r.dv !== PRES.dv && !own) autoRefresh(); PRES.dv = r.dv; }
-  } catch (e) { }
+  } catch (e) { if (e && e.code === 'auth' && App.user) sessionExpired(); }
 }
 function presStop() { if (PRES.timer) { clearInterval(PRES.timer); PRES.timer = null; } }
 function presStart() { presStop(); presPing(); PRES.timer = setInterval(presPing, 60000); }
@@ -4037,14 +4046,23 @@ async function doAuthLogin() {
   if (!u.trim() || !p) { toast('Isi username dan password'); return; }
   if (btn) { btn.disabled = true; btn.textContent = 'Memeriksa…'; }
   try {
-    const r = await apiPost({ a: 'login', u: u.trim(), p });
-    App.token = r.token; App.adminPw = r.token; App.user = r.user; App.admin = r.user.role === 'admin' || r.user.role === 'ic'; App.superAdmin = r.user.role === 'admin'; if (r.user.role === 'ic') App.ui.ckPic = 'IC';
-    if (r.user.role === 'toko' && r.user.store) { App.ui.scope = r.user.store; App.ui.scopeLocked = true; App.ui.scopeAsked = true; ['lsStore', 'raStore', 'ptStore', 'tdStore', 'prStore', 'psStore', 'dtStore', 'prodStore', 'stStore', 'trStore', 'tfStore', 'roStore', 'pcStore'].forEach(k => { App.ui[k] = r.user.store; }); App.ui.store = r.user.store; }
+    const rem = !($('#auRem') && !$('#auRem').checked); LS.set('dash_rem', rem ? '1' : '0');
+    const r = await apiPost({ a: 'login', u: u.trim(), p, remember: rem });
+    if (rem) { LS.set('dash_tok', r.token); LS.set('dash_usr', JSON.stringify(r.user)); } else { LS.set('dash_tok', ''); LS.set('dash_usr', ''); }
+    applyUser(r.token, r.user);
     hideAuth(); await routeAfterLogin();
   } catch (e) {
     if (btn) { btn.disabled = false; btn.textContent = 'Masuk'; }
     showAuth('login', e.code === 'pending' ? '⏳ ' + esc(e.message) : '❌ ' + esc(e.code === 'auth' ? e.message : errMsg(e)));
     const f = $('#auU'); if (f) f.value = u;
+  }
+}
+/* pasang data pengguna yang login (dipakai saat login & saat sesi tersimpan dipulihkan) */
+function applyUser(token, user) {
+  const r = { token, user };
+  {
+    App.token = r.token; App.adminPw = r.token; App.user = r.user; App.admin = r.user.role === 'admin' || r.user.role === 'ic'; App.superAdmin = r.user.role === 'admin'; if (r.user.role === 'ic') App.ui.ckPic = 'IC';
+    if (r.user.role === 'toko' && r.user.store) { App.ui.scope = r.user.store; App.ui.scopeLocked = true; App.ui.scopeAsked = true; ['lsStore', 'raStore', 'ptStore', 'tdStore', 'prStore', 'psStore', 'dtStore', 'prodStore', 'stStore', 'trStore', 'tfStore', 'roStore', 'pcStore'].forEach(k => { App.ui[k] = r.user.store; }); App.ui.store = r.user.store; }
   }
 }
 async function doAuthReg() {
@@ -4056,8 +4074,8 @@ async function doAuthReg() {
   try { await apiPost({ a: 'register', u, p, name: n, job: j, store: s }); showAuth('login', `✅ Pendaftaran <b>${esc(u)}</b> terkirim. Kamu bisa login setelah admin menyetujui akunmu.`); const f = $('#auU'); if (f) f.value = u; }
   catch (e) { if (btn) { btn.disabled = false; btn.textContent = 'Kirim pendaftaran'; } toast(e.message || errMsg(e)); }
 }
-function sessionExpired(msg) { presStop(); App.token = ''; App.adminPw = ''; App.admin = false; App.superAdmin = false; App.user = null; showAuth('login', msg || 'Sesi berakhir. Silakan login lagi.'); }
-async function doLogout() { presStop(); try { await apiPost({ a: 'logout' }); } catch (e) { } App.token = ''; App.adminPw = ''; App.admin = false; App.superAdmin = false; App.user = null; App.ui.scopeLocked = false; App.ui.scope = ''; App.ui.scopeAsked = false; App.hub = null; App.storeLoaded = false; App.mode = null; App.page = 'home'; try { history.replaceState(null, '', '#/home'); } catch (e) { } showAuth('login', 'Kamu sudah keluar.'); }
+function sessionExpired(msg) { LS.set('dash_tok', ''); LS.set('dash_usr', ''); presStop(); App.token = ''; App.adminPw = ''; App.admin = false; App.superAdmin = false; App.user = null; showAuth('login', msg || 'Sesi berakhir. Silakan login lagi.'); }
+async function doLogout() { LS.set('dash_tok', ''); LS.set('dash_usr', ''); presStop(); try { await apiPost({ a: 'logout' }); } catch (e) { } App.token = ''; App.adminPw = ''; App.admin = false; App.superAdmin = false; App.user = null; App.ui.scopeLocked = false; App.ui.scope = ''; App.ui.scopeAsked = false; App.hub = null; App.storeLoaded = false; App.mode = null; App.page = 'home'; try { history.replaceState(null, '', '#/home'); } catch (e) { } showAuth('login', 'Kamu sudah keluar.'); }
 /* kelola akun (admin) */
 async function renderUsers() {
   const box = $('#usersBox'); if (!box || !App.admin) return;
@@ -5984,6 +6002,9 @@ async function init() {
   if (typeof Chart !== 'undefined') { Chart.defaults.font.family = '"Plus Jakarta Sans", system-ui, sans-serif'; }
   if (!/^https:\/\/script\.google(usercontent)?\.com\//.test(SHEET_API_URL)) { $('#view').innerHTML = '<div class="empty-state"><h2>Spreadsheet belum disambungkan</h2><p class="muted">Isi SHEET_API_URL di bagian atas file index.html dengan URL Web App Apps Script.</p></div>'; return; }
   LS.set('dash_admin', ''); LS.set('dash_view', '');
+  /* sesi tersimpan ("Ingat saya"): langsung masuk tanpa login ulang; bila sesi sudah tidak berlaku, server menolak lalu muncul halaman login */
+  const tok = LS.get('dash_tok'); let usr = null; try { usr = JSON.parse(LS.get('dash_usr') || 'null'); } catch (e) { }
+  if (tok && usr && usr.u) { applyUser(tok, usr); try { await routeAfterLogin(); } catch (e) { if (e && e.code === 'auth') sessionExpired(); else loadFail(e); } return; }
   showAuth('login');
 }
 document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target && $('#authWall')) { if (e.target.closest('#authLogin')) { e.preventDefault(); doAuthLogin(); } else if (e.target.closest('#authReg')) { e.preventDefault(); doAuthReg(); } } });

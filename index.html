@@ -3220,6 +3220,12 @@ function growthFor(c, D, basis, comp) {
   out.months = []; for (let i = 1; i <= +D.slice(5, 7); i++) { const mm = y + '-' + pad(i); const ds = pick(range(mm + '-01', mm === D.slice(0, 7) ? D : mm + '-' + pad(dim(mm)))); out.months.push({ mm, t: sum(ds, d => tyVal(c, d)), l: sum(ds, d => lyVal(c, d, basis)) }); }
   return out;
 }
+/* bulan yang sama sekali belum ada Item DSR tahun ini (sebelum bulan acuan) */
+function emptyMonths(days, D) {
+  const cnt = {}; for (const d of days) { const m = d.slice(0, 7); if (m < D.slice(0, 7)) cnt[m] = (cnt[m] || 0) + 1; }
+  return Object.keys(cnt).filter(m => cnt[m] >= dim(m)).sort();
+}
+const emptyMonthsNote = (ms, admin) => ms.length ? `<div class="note" style="border-left:4px solid var(--bad)"><b>⚠ Item DSR ${ms.map(fmtMonth).join(', ')} belum terbaca dashboard.</b> Bulan tersebut tampil kosong dan tidak ikut dihitung di growth. ${admin ? `Bila tab <b>${ms.map(m => 'DSR_' + m).join(', ')}</b> di spreadsheet sudah berisi data, tekan tombol ini untuk membaca ulang (tanpa upload ulang):<div class="row-act" style="margin-top:8px"><button class="btn primary" data-reidx="${ms.join(',')}">🔧 Baca ulang ${ms.map(fmtMonth).join(', ')} dari spreadsheet</button><span class="small muted" data-reidxmsg></span></div>` : 'Minta admin menekan tombol "Baca ulang" di halaman ini.'}</div>` : '';
 function storeGrowth(c, D) {
   const box = $('#sgBox'), sub = $('#sgSub'); if (!box) return;
   if (!App.daily) { loadDaily().then(() => { if (App.page === 'toko' && App.ui.store === c) storeGrowth(c, D); }).catch(() => { if (sub) sub.textContent = 'data tahun lalu gagal dimuat'; }); return; }
@@ -3229,6 +3235,7 @@ function storeGrowth(c, D) {
   const tile = (lbl, k, note) => { const v = g[k + 'G']; return `<div class="pt-tile" style="background:${v == null ? '#5A6482' : v >= 0 ? '#13806F' : '#C0392B'}"><span>${lbl}</span><b>${v == null ? '–' : (v >= 0 ? '+' : '') + fmtPct(v, 1)}</b><small style="color:#fff;opacity:.9">${fmtRpS(g[k + 'T'])} vs ${fmtRpS(g[k + 'L'])}${note ? ' · ' + note : ''}</small></div>`; };
   box.innerHTML = `<div class="pt-tiles" style="grid-template-columns:repeat(auto-fit,minmax(190px,1fr))">${tile('Hari · ' + fmtDateS(D), 'd')}${tile('Bulan · MTD ' + MON[+D.slice(5, 7) - 1], 'm', g.mN + ' hari')}${tile('Tahun · YTD ' + y, 'y', g.yN + ' hari')}</div>
     ${g.yL ? '' : '<p class="small muted" style="margin:10px 0 0">Toko ini belum punya penjualan di tahun lalu (toko baru), jadi belum ada pembanding.</p>'}
+    ${(() => { const ds = []; for (let d = D.slice(0, 4) + '-01-01'; d <= D; d = addDays(d, 1)) if (tyVal(c, d) == null) ds.push(d); const ms = emptyMonths(ds, D).filter(m => { const x = App.daily && [...Array(dim(m)).keys()].some(i => lyVal(c, m + '-' + pad(i + 1), basis)); return x; }); return ms.length ? '<div style="margin-top:10px">' + emptyMonthsNote(ms, App.admin) + '</div>' : ''; })()}
     <div class="chart-box" style="height:220px;margin-top:14px"><canvas id="sgChart"></canvas></div>
     <p class="small muted" style="margin:8px 0 0">Gross semua item (termasuk paper bag & voucher) supaya sebanding dengan data tahun lalu. Pengaturan pembanding sama dengan menu <a href="#" data-go="growth" style="color:var(--navy);font-weight:700">Growth vs Tahun Lalu</a>.</p>`;
   if (typeof Chart !== 'undefined') { const ink = css('--muted');
@@ -3289,6 +3296,7 @@ function pageGrowth(view) {
       <label class="small" style="display:flex;gap:6px;align-items:center;font-weight:700"><input type="checkbox" id="gwLfl" ${lfl ? 'checked' : ''}> Like-for-like</label>
       <label class="small" style="display:flex;gap:6px;align-items:center;font-weight:700" title="Hanya membandingkan tanggal yang sudah ada data tahun ini"><input type="checkbox" id="gwComp" ${comp ? 'checked' : ''}> Hanya tanggal yang ada datanya</label>
       <div class="seg" role="group" aria-label="Format angka"><button data-rpf="1" class="${rpFull() ? 'on' : ''}">Penuh</button><button data-rpf="0" class="${rpFull() ? '' : 'on'}">Ringkas (jt)</button></div></div>
+    ${emptyMonthsNote(emptyMonths(missTY, D), App.admin)}
     ${missTY.length ? `<div class="note">Sales tahun ini belum ada untuk ${missTY.length} hari di ${y} (mis. ${missTY.slice(0, 3).map(fmtDateS).join(', ')}${missTY.length > 3 ? ', …' : ''}). ${comp ? `Growth MTD & YTD sementara hanya membandingkan <b>${dY.length} tanggal yang sudah ada datanya</b> dengan tanggal yang sama tahun lalu.` : 'Tanggal yang belum ada datanya dihitung 0, sehingga growth bisa terlihat minus.'} Agar YTD utuh, upload Item DSR historis atau file sales harian ${y} dengan format yang sama seperti data tahun lalu.</div>` : ''}
     <div class="pt-tiles" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr))">${tile('Growth harian · ' + fmtDateS(D), tot.dG, tot.dT, tot.dL)}${tile('Growth MTD · ' + MONL[+m.slice(5) - 1], tot.mG, tot.mT, tot.mL)}${tile('Growth YTD · ' + y, tot.yG, tot.yT, tot.yL)}</div>
     <div class="grid g2">
@@ -5475,10 +5483,29 @@ async function downloadTemplate(m) {
   (await getDownloads()).save({ filename: `Template_Target_Jateng01_${m}.xlsx`, data: new Blob([out]) });
   toast('Template ' + label + ' diunduh. Isi angkanya lalu upload di sini.');
 }
+/* perbaiki indeks & cache DSR per bulan langsung dari isi tab DSR_yyyy-mm di spreadsheet (tanpa upload ulang) */
+async function reindexMonths(months, say) {
+  const out = [];
+  for (let i = 0; i < months.length; i++) {
+    say(`Membaca ulang Item DSR ${fmtMonth(months[i])} dari spreadsheet (${i + 1}/${months.length})…`);
+    const R = await withRetry(() => apiPost({ a: 'reindex', m: months[i] }));
+    if (R && R.error) throw new Error(R.message || R.error);
+    out.push(R);
+  }
+  return out;
+}
+const reidxReport = L => L.map(r => `${fmtMonth(r.m)}: ${r.missing ? 'tab tidak ada' : `${fmtN(r.rows)} baris · ${r.stores} toko · s/d tgl ${r.last}`}`).join('<br>');
 async function rebuildCache() {
-  const el = $('#rebuildMsg'); if (el) el.textContent = 'Memproses ulang data di spreadsheet… (bisa 1–2 menit)';
-  try { await apiPost({ a: 'rebuild' }); await loadAll(); toast('Cache diperbarui dari spreadsheet'); render(); }
-  catch (e) { if (el) el.textContent = 'Gagal: ' + errMsg(e); }
+  const el = $('#rebuildMsg'), say = t => { if (el) el.innerHTML = t; };
+  try {
+    say('Mencari tab DSR di spreadsheet…');
+    let T; try { T = await apiPost({ a: 'dsrTabs' }); } catch (e) { T = null; }
+    if (!T || !Array.isArray(T.tabs)) { say('Memproses ulang data di spreadsheet… (bisa 1–2 menit)'); await apiPost({ a: 'rebuild' }); await loadAll(); toast('Cache diperbarui dari spreadsheet'); render(); return; }
+    const L = await reindexMonths(T.tabs.map(x => x.m), say);
+    await loadAll(); App.loaded = new Set(); App.cache = {}; render();
+    const el2 = $('#rebuildMsg'); if (el2) el2.innerHTML = '<b>Selesai.</b><br>' + reidxReport(L);
+    toast('Indeks penjualan diperbarui dari spreadsheet');
+  } catch (e) { say('Gagal: ' + esc(errMsg(e)) + ' — tekan tombol lagi untuk melanjutkan.'); }
 }
 
 /* ================= halaman: pengaturan (admin) ================= */
@@ -5708,6 +5735,17 @@ document.addEventListener('click', async e => {
   const upw = t.closest('[data-uspw]'); if (upw) { const np = prompt('Password baru untuk ' + upw.dataset.uspw + ' (min. 6 karakter):'); if (np) userAction(upw.dataset.uspw, { newPw: np }, 'Password direset — beritahu pemilik akun'); return; }
   const udel = t.closest('[data-usdel]'); if (udel) { if (confirm('Hapus akun ' + udel.dataset.usdel + ' permanen?')) userAction(udel.dataset.usdel, { del: 1 }, 'Akun dihapus'); return; }
   if (t.id === 'rebuildBtn') { rebuildCache(); return; }
+  { const rx = t.closest && t.closest('[data-reidx]'); if (rx) {
+    const ms = rx.dataset.reidx.split(',').filter(Boolean), box = rx.parentNode.querySelector('[data-reidxmsg]'), say = x => { if (box) box.innerHTML = x; };
+    rx.disabled = true;
+    try {
+      const L = await reindexMonths(ms, say);
+      const bad = L.filter(r => r.missing || !r.rows);
+      await loadAll(); App.loaded = new Set(); App.cache = {}; render();
+      if (bad.length) alert(`Tab ${bad.map(r => 'DSR_' + r.m).join(', ')} kosong / tidak ditemukan di spreadsheet DSR.\nUpload ulang Item DSR bulan tersebut di Kelola data.`);
+      else toast('Berhasil: ' + L.map(r => `${fmtMonth(r.m)} ${r.stores} toko s/d tgl ${r.last}`).join(' · '));
+    } catch (er) { say('Gagal: ' + esc(errMsg(er)) + (/tidak dikenal/i.test(errMsg(er)) ? ' — pasang Code.gs versi 31 dulu.' : '')); rx.disabled = false; }
+    return; } }
   if (t.id === 'areaSave' || t.id === 'areaPrune') {
     const codes = [...new Set((($('#areaCodes') || {}).value || '').split(/[\s,;]+/).map(x => x.trim()).filter(x => /^[0-9A-Za-z]{3,8}$/.test(x)))];
     if (codes.length < 1) { toast('Isi minimal satu kode site'); return; }

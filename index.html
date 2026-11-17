@@ -725,6 +725,12 @@ table.rp{border-collapse:separate;border-spacing:0;font-size:12px;width:100%;min
 .bin-chip{display:inline-flex;gap:6px;align-items:center;background:#F3F5FA;border:1px solid var(--line);border-radius:8px;padding:3px 8px;font-size:12px}
 .bin-chip b{color:var(--navy)}.bin-chip.sa{background:#FFF4E5;border-color:#F5C88B}.bin-chip.neg{background:#FDECEB;border-color:#F3B1AA}.bin-chip.neg b{color:var(--bad)}
 @media (max-width:640px){.sa-heat .sa-st{min-width:130px;max-width:150px}.sa-bars{height:150px}.bin-q{margin-left:0;width:100%}}
+
+button.pd-sz{font:inherit;background:var(--surface);cursor:pointer}
+button.pd-sz:hover{box-shadow:0 0 0 3px rgba(15,49,146,.12)}
+.pd-sz.sel{background:var(--navy);border-color:var(--navy);opacity:1}.pd-sz.sel b,.pd-sz.sel small{color:#fff}
+.pd-bins{border:1px solid var(--line);border-left:5px solid var(--orange);border-radius:12px;padding:12px 14px;background:var(--surface)}
+.pd-bins .card-h{margin-bottom:6px}.pd-bins h3{font-size:15px}
 </style>
 </head>
 <body>
@@ -4510,7 +4516,7 @@ function pageProduct(view) {
       ${l2s.length ? `<select id="pl2" class="inp"><option value="">Semua MC Lv2</option>${l2s.map(c => `<option ${c === U.prodL2 ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select>` : ''}
       ${gds.length ? `<select id="pgd" class="inp"><option value="">Semua gender</option>${gds.map(c => `<option ${c === U.prodGd ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select>` : ''}
       <select id="pst" class="inp"><option value="">Semua toko</option>${storeCodes().map(c => `<option value="${esc(c)}" ${c === U.prodStore ? 'selected' : ''}>${esc(sName(c))}</option>`).join('')}</select>
-    </div>${sku12 ? '' : '<p class="small muted" style="margin:0 0 8px">💡 Ketik <b>SKU lengkap 12 digit</b> untuk melihat stok & lokasi bin artikel itu di semua toko.</p>'}<div id="pT"></div><p class="small muted" style="margin-top:10px">Cover = stok ÷ rata-rata penjualan per bulan (90 hari terakhir). Paper bag tidak dihitung.</p></section></div>`;
+    </div>${sku12 ? '' : /^\d{6,11}$|^\d{13,}$/.test(String(U.prodQ || '').trim()) ? `<p class="small" style="margin:0 0 8px;color:var(--orange-deep)">💡 Lokasi bin muncul untuk <b>SKU lengkap 12 digit</b>. Yang diketik sekarang ${String(U.prodQ).trim().length} digit.</p>` : '<p class="small muted" style="margin:0 0 8px">💡 Ketik <b>SKU lengkap 12 digit</b> untuk melihat stok & lokasi bin artikel itu di semua toko.</p>'}<div id="pT"></div><p class="small muted" style="margin-top:10px">Cover = stok ÷ rata-rata penjualan per bulan (90 hari terakhir). Paper bag tidak dihitung.</p></section></div>`;
   if (sku12) showBinCard(sku12);
   $('#pT').innerHTML = tbl('prod', {
     rows, sort: { k: 'n', dir: 'desc' }, limit: 30, onRow: r => openProduct(r.art, U.prodStore || null),
@@ -4595,7 +4601,9 @@ async function exportSaBin() {
 function binCardHtml(sku) {
   const R = (App.binCache || {})[sku];
   if (!R) return `<section class="card bin-card"><div class="loading" style="padding:18px"><span class="spin"></span>Mencari lokasi bin SKU ${esc(sku)} di semua toko…</div></section>`;
-  if (R.err) return `<section class="card bin-card"><p class="muted">Lokasi bin gagal dimuat: ${esc(R.err)}</p></section>`;
+  if (R.err) return `<section class="card bin-card"><h3 style="margin:0 0 6px">📍 Lokasi stok · <span class="tn">${esc(sku)}</span></h3><p class="muted">Lokasi bin gagal dimuat: ${esc(R.err)}</p></section>`;
+  /* server lama (Code.gs belum versi 27) tidak mengenal pencarian bin → jawabannya tidak berisi daftar */
+  if (!Array.isArray(R.rows)) return `<section class="card bin-card"><h3 style="margin:0 0 6px">📍 Lokasi stok · <span class="tn">${esc(sku)}</span></h3><p class="muted"><b>Server Google belum diperbarui.</b> Pasang <b>Code.gs versi 27</b> (Deploy → Manage deployments → Edit → New version → Deploy), lalu upload ulang Export by Bin.${R.versi ? ' Versi server sekarang: ' + esc(R.versi) + '.' : ''}</p></section>`;
   const me = App.ui.scope || ((App.user || {}).role === 'toko' ? App.user.store : '');
   const L = (R.rows || []).filter(x => inArea(x.c)).map(x => ({ c: x.c, n: x.n, t: x.t, b: String(x.b || '').split('|').filter(Boolean).map(s => { const i = s.lastIndexOf(':'); return [s.slice(0, i), +s.slice(i + 1)]; }) }))
     .sort((a, b) => (b.c === me) - (a.c === me) || b.t - a.t);
@@ -4605,7 +4613,8 @@ function binCardHtml(sku) {
     ${L.length ? `<p class="small" style="margin:0 0 10px"><b>${fmtN(L.filter(x => x.t > 0).length)}</b> toko punya stok · total <b>${fmtN(tot)}</b> pcs</p>
     <div class="bin-list">${L.map(x => `<div class="bin-row ${x.c === me ? 'me' : ''}"><div class="bin-st"><b class="tn">${esc(x.c)}</b> ${esc(sName(x.c))}${x.c === me ? ' <span class="pill">toko kamu</span>' : ''}<span class="bin-q ${x.t <= 0 ? 'z' : ''}">${fmtN(x.t)} pcs</span></div>
       <div class="bin-chips">${x.b.map(([b, q]) => `<span class="bin-chip ${q < 0 ? 'neg' : /^SA-(TR|BO)/i.test(b) ? 'sa' : ''}"><span class="tn">${esc(b)}</span><b>${fmtN(q)}</b></span>`).join('')}</div></div>`).join('')}</div>`
-      : `<p class="muted">SKU ini tidak ditemukan di bin toko mana pun.${Object.keys(R.idx || {}).length ? '' : ' Lokasi bin tersedia setelah admin mengupload Export by Bin berikutnya.'}</p>`}</section>`;
+      : Object.keys(R.idx || {}).length ? `<p class="muted">SKU ini tidak ditemukan di bin toko mana pun (data bin ${Object.keys(R.idx).length} toko, per ${esc(fmtDateS(Object.values(R.idx).sort().pop()))}). Cek lagi 12 digit SKU-nya.</p>`
+      : `<p class="muted"><b>Data lokasi bin belum ada.</b> Admin perlu mengupload <b>Export by Bin</b> sekali lagi setelah Code.gs versi 27 terpasang. Pastikan proses upload sampai tulisan "Menyimpan lokasi bin… 25/25 toko" selesai.</p>`}</section>`;
 }
 function showBinCard(sku) {
   const box = $('#binBox'); if (!box) return;
@@ -4621,6 +4630,7 @@ const SIZE_ORDER = ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', '2XL', 'XXXL', '3XL
 const sizeSort = (a, b) => { const ia = SIZE_ORDER.indexOf(a), ib = SIZE_ORDER.indexOf(b); if (ia >= 0 || ib >= 0) return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib); const na = parseFloat(a), nb = parseFloat(b); return !isNaN(na) && !isNaN(nb) ? na - nb : String(a).localeCompare(String(b)); };
 const sizeOfSku = sku => { const k = App.mst.sku && App.mst.sku.get(sku), it = k && mItem(k); if (it && it.a && it.a[sku]) return String(it.a[sku]); const p = String((App.sku[sku] || [])[0] || '').split(','); return p.length >= 3 ? p[p.length - 1].trim() : ''; };
 function openProduct(art, store, color, idx, allColors) {
+  if (!App.ui.pd || App.ui.pd.art !== art) App.ui.pdSku = '';
   const R = periodRange(), inf = artInfo(art), H = health();
   const M = artMaster(art), colors = [...new Set([...(M ? M.colors : []), ...Object.keys((App.mst.photo && App.mst.photo.items && App.mst.photo.items[art] || {}).c || {})])];
   /* warna yang ada di stok/penjualan tapi tidak di master */
@@ -4640,6 +4650,11 @@ function openProduct(art, store, color, idx, allColors) {
   if (mi && mi.a) for (const sku in mi.a) sizes.set(String(mi.a[sku]), { sku, stock: 0 });
   for (const c of storeCodes()) { const S = App.stock[c]; if (!S) continue; for (const sku in S.items) if (artOf(sku) === art && inCol(sku)) { const sz = sizeOfSku(sku) || sku.slice(-3); const x = sizes.get(sz) || { sku, stock: 0 }; x.stock += Math.max(0, S.items[sku][0]); sizes.set(sz, x); } }
   const szList = [...sizes.entries()].sort((a, b) => sizeSort(a[0], b[0]));
+  /* SKU (warna + ukuran) yang dilihat lokasi bin-nya: pilihan terakhir → SKU yang dicari → ukuran pertama yang ada stok */
+  const q12 = /^\d{12}$/.test(String(App.ui.prodQ || '').trim()) ? String(App.ui.prodQ).trim() : '';
+  const okSku = k => k && szList.some(([, x]) => x.sku === k);
+  const binSku = okSku(App.ui.pdSku) ? App.ui.pdSku : okSku(q12) ? q12 : ((szList.find(([, x]) => x.stock > 0) || szList[0] || [])[1] || {}).sku || '';
+  st.sku = binSku;
   /* per toko */
   const per = storeCodes().filter(typeOk).map(c => { const ls = cur.filter(l => l.s === c && (st.all || inCol(l.sku))); const S = App.stock[c]; let stock = 0; if (S) for (const sku in S.items) if (artOf(sku) === art && (st.all || inCol(sku))) stock += S.items[sku][0];
     const h = H.stores[c] && H.stores[c].items.get(art); return { c, name: sName(c), q: ls.reduce((s, l) => s + l.q, 0), n: ls.reduce((s, l) => s + VAL(l), 0), stock, rate: h ? h.rate : 0 }; }).filter(r => r.q || r.stock);
@@ -4656,7 +4671,9 @@ function openProduct(art, store, color, idx, allColors) {
     <h2 class="pd-name">${esc(inf.name)}</h2>
     ${price ? `<div class="pd-price"><b>${fmtRp(net)}</b>${disc ? `<span class="pd-disc">-${disc}%</span>` : ''}</div>${disc ? `<p class="pd-old"><s>${fmtRp(price)}</s> <span>Hemat ${fmtRp(price - net)}</span></p>` : ''}` : ''}
     ${colors.length ? `<p class="pd-lbl">Warna: <b>${esc(colorLabel(col))}</b></p><div class="pd-colors">${colors.map(c => { const u = photosOf(art, c)[0]; return `<button class="pd-col ${c === col ? 'on' : ''}" data-pdc="${esc(c)}" title="${esc(colorLabel(c))}">${u ? imgTag(sizedImg(u, 200), '', c) : `<span>${esc(c)}</span>`}</button>`; }).join('')}</div>` : ''}
-    ${szList.length ? `<p class="pd-lbl">Ukuran & stok area <span class="muted">(warna ${esc(col)})</span></p><div class="pd-sizes">${szList.map(([sz, x]) => `<span class="pd-sz ${x.stock > 0 ? '' : 'off'}"><b>${esc(sz)}</b><small>${fmtN(x.stock)}</small></span>`).join('')}</div>` : ''}
+    ${szList.length ? `<p class="pd-lbl">Ukuran & stok area <span class="muted">(warna ${esc(col)})</span></p><div class="pd-sizes">${szList.map(([sz, x]) => `<button class="pd-sz ${x.stock > 0 ? '' : 'off'} ${x.sku === binSku ? 'sel' : ''}" data-pdsz="${esc(x.sku)}" title="Lihat lokasi bin ukuran ${esc(sz)}"><b>${esc(sz)}</b><small>${fmtN(x.stock)}</small></button>`).join('')}</div>
+    <p class="small muted" style="margin:6px 0 0">Ketuk ukuran untuk melihat lokasi bin-nya di semua toko.</p>
+    <div id="pdBins" data-sku="${esc(binSku)}" style="margin-top:12px"></div>` : ''}
     <p class="small muted" style="margin:10px 0 0">Kode artikel ${esc(art)}${inf.gd ? ' · ' + esc(inf.gd) : ''} · ${esc(R.label)}</p>
     <div class="pd-stats"><div><span>Terjual</span><b>${fmtN(tq)}</b></div><div><span>${VL()}</span><b>${fmtRpS(tn)}</b></div><div><span>Stok area</span><b>${fmtN(ts)}</b></div><div><span>Jual/bln</span><b>${fmtX(tr, 1)}</b></div></div>
     <div class="card-h" style="margin:18px 0 8px"><h3 style="margin:0">Per toko</h3><div class="seg" role="group"><button data-pdall="0" class="${st.all ? '' : 'on'}">Warna ini</button><button data-pdall="1" class="${st.all ? 'on' : ''}">Semua warna</button></div></div>
@@ -4667,6 +4684,14 @@ function openProduct(art, store, color, idx, allColors) {
     <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Varian</th><th class="r">Qty</th><th class="r">${VL()}</th><th class="r">Stok</th></tr></thead><tbody>
     ${vars.map(v => `<tr><td>${esc(varName((App.sku[v.sku] || [])[0]) || colorOfSku(v.sku) + ', ' + sizeOfSku(v.sku))}<span class="sub">${esc(v.sku)}</span></td><td class="r">${fmtN(v.q)}</td><td class="r">${fmtRpS(v.n)}</td><td class="r">${fmtN(v.stock)}</td></tr>`).join('') || '<tr><td colspan="4" class="empty">Tidak ada varian.</td></tr>'}
     </tbody></table></div></div>`);
+  if (binSku) showPdBins(binSku);
+}
+/* lokasi bin di panel detail produk (memakai data & tampilan yang sama dengan pencarian SKU) */
+function showPdBins(sku) {
+  const draw = () => { const b = $('#pdBins'); if (b && b.dataset.sku === sku) b.innerHTML = binCardHtml(sku).replace('class="card bin-card"', 'class="pd-bins"'); };
+  App.binCache = App.binCache || {}; draw();
+  if (App.binCache[sku]) return;
+  api('bins', { sku }).then(r => { App.binCache[sku] = r; }, e => { App.binCache[sku] = { err: errMsg(e) }; }).then(draw);
 }
 
 /* ================= halaman: kesehatan stok ================= */
@@ -5344,7 +5369,8 @@ document.addEventListener('click', async e => {
   if (t.id === 'rpXls') { exportReport(); return; }
   const tb = t.closest('[data-sttab]'); if (tb) { App.ui.stTab = tb.dataset.sttab; render(); return; }
   const pdi = t.closest('[data-pdi]'); if (pdi && App.ui.pd) { const P = App.ui.pd; openProduct(P.art, P.store, P.col, +pdi.dataset.pdi, P.all); return; }
-  const pdc = t.closest('[data-pdc]'); if (pdc && App.ui.pd) { const P = App.ui.pd; openProduct(P.art, P.store, pdc.dataset.pdc, 0, P.all); return; }
+  const pdc = t.closest('[data-pdc]'); if (pdc && App.ui.pd) { const P = App.ui.pd; App.ui.pdSku = ''; openProduct(P.art, P.store, pdc.dataset.pdc, 0, P.all); return; }
+  const pdz = t.closest('[data-pdsz]'); if (pdz && App.ui.pd) { const P = App.ui.pd; App.ui.pdSku = pdz.dataset.pdsz; const d = $('.drawer'), y = d ? d.scrollTop : 0; openProduct(P.art, P.store, P.col, P.i, P.all); const d2 = $('.drawer'); if (d2) d2.scrollTop = y; return; }
   const pda = t.closest('[data-pdall]'); if (pda && App.ui.pd) { const P = App.ui.pd; const y = $('.drawer') ? $('.drawer').scrollTop : 0; openProduct(P.art, P.store, P.col, P.i, pda.dataset.pdall === '1'); if ($('.drawer')) $('.drawer').scrollTop = y; return; }
   const pxr = t.closest('[data-pxrm]'); if (pxr) { e.preventDefault(); const [i, d] = pxr.dataset.pxrm.split('|'); const p = App.pending[+i]; if (p) { p.extra = (p.extra || []).filter(x => x !== d); renderPending(); } return; }
   const pxg = t.closest('[data-pxgap]'); if (pxg) { const p = App.pending[+pxg.dataset.pxgap]; if (p) { const codes = Object.keys(p.stores); const add = new Set(p.extra || []);

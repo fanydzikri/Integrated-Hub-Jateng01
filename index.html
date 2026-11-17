@@ -3994,7 +3994,7 @@ async function doAuthLogin() {
   if (btn) { btn.disabled = true; btn.textContent = 'Memeriksa…'; }
   try {
     const r = await apiPost({ a: 'login', u: u.trim(), p });
-    App.token = r.token; App.adminPw = r.token; App.user = r.user; App.admin = r.user.role === 'admin';
+    App.token = r.token; App.adminPw = r.token; App.user = r.user; App.admin = r.user.role === 'admin' || r.user.role === 'ic'; App.superAdmin = r.user.role === 'admin'; if (r.user.role === 'ic') App.ui.ckPic = 'IC';
     if (r.user.role === 'toko' && r.user.store) { App.ui.scope = r.user.store; App.ui.scopeLocked = true; App.ui.scopeAsked = true; ['lsStore', 'raStore', 'ptStore', 'tdStore', 'prStore', 'psStore', 'dtStore', 'prodStore', 'stStore', 'trStore', 'tfStore', 'roStore', 'pcStore'].forEach(k => { App.ui[k] = r.user.store; }); App.ui.store = r.user.store; }
     hideAuth(); await routeAfterLogin();
   } catch (e) {
@@ -4012,11 +4012,12 @@ async function doAuthReg() {
   try { await apiPost({ a: 'register', u, p, name: n, job: j, store: s }); showAuth('login', `✅ Pendaftaran <b>${esc(u)}</b> terkirim. Kamu bisa login setelah admin menyetujui akunmu.`); const f = $('#auU'); if (f) f.value = u; }
   catch (e) { if (btn) { btn.disabled = false; btn.textContent = 'Kirim pendaftaran'; } toast(e.message || errMsg(e)); }
 }
-function sessionExpired(msg) { presStop(); App.token = ''; App.adminPw = ''; App.admin = false; App.user = null; showAuth('login', msg || 'Sesi berakhir. Silakan login lagi.'); }
-async function doLogout() { presStop(); try { await apiPost({ a: 'logout' }); } catch (e) { } App.token = ''; App.adminPw = ''; App.admin = false; App.user = null; App.ui.scopeLocked = false; App.ui.scope = ''; App.ui.scopeAsked = false; App.hub = null; App.storeLoaded = false; App.mode = null; App.page = 'home'; try { history.replaceState(null, '', '#/home'); } catch (e) { } showAuth('login', 'Kamu sudah keluar.'); }
+function sessionExpired(msg) { presStop(); App.token = ''; App.adminPw = ''; App.admin = false; App.superAdmin = false; App.user = null; showAuth('login', msg || 'Sesi berakhir. Silakan login lagi.'); }
+async function doLogout() { presStop(); try { await apiPost({ a: 'logout' }); } catch (e) { } App.token = ''; App.adminPw = ''; App.admin = false; App.superAdmin = false; App.user = null; App.ui.scopeLocked = false; App.ui.scope = ''; App.ui.scopeAsked = false; App.hub = null; App.storeLoaded = false; App.mode = null; App.page = 'home'; try { history.replaceState(null, '', '#/home'); } catch (e) { } showAuth('login', 'Kamu sudah keluar.'); }
 /* kelola akun (admin) */
 async function renderUsers() {
   const box = $('#usersBox'); if (!box || !App.admin) return;
+  if (!App.superAdmin) { box.innerHTML = '<p class="small muted">Kelola akun (setujui pendaftaran, ganti role, reset password) khusus admin utama.</p>'; return; }
   box.innerHTML = '<div class="loading" style="padding:12px"><span class="spin"></span>Memuat akun…</div>';
   let L = [], ON = []; try { const rr = await api('users'); L = rr.users || []; ON = rr.online || []; } catch (e) { box.innerHTML = `<p class="small" style="color:var(--bad)">${esc(errMsg(e))}</p>`; return; }
   App.pendingUsers = L.filter(x => x.status === 'pending').length; renderNav();
@@ -4026,16 +4027,16 @@ async function renderUsers() {
   const seen = x => { const o = onM[String(x.u).toLowerCase()]; return !o ? '' : o.ago < 180 ? ' · <b style="color:var(--ok)">🟢 online</b>' : ' · aktif ' + (o.ago < 3600 ? Math.round(o.ago / 60) + ' mnt' : Math.floor(o.ago / 3600) + ' jam') + ' lalu'; };
   const nowOn = ON.filter(o => o.ago < 180);
   const onlineBar = `<div class="small" style="margin-bottom:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b>🟢 Online sekarang (${nowOn.length})</b><span>${nowOn.map(o => esc(o.name || o.u) + (o.store ? ' (' + esc(o.store) + ')' : '') + (o.pg ? ' · ' + esc(o.pg) : '')).join(', ') || 'tidak ada'}</span><button class="btn sm" id="usRef" title="Segarkan status online">⟳</button></div>`;
-  const roleTxt = x => x.role === 'admin' ? 'Admin' : x.role === 'toko' ? 'Toko ' + (x.store || '?') : 'Semua toko';
+  const roleTxt = x => x.role === 'admin' ? 'Admin' : x.role === 'ic' ? 'Inventory Control' : x.role === 'toko' ? 'Toko ' + (x.store || '?') : 'Semua toko';
   const stTxt = { pending: '⏳ Menunggu', approved: '✅ Aktif', rejected: '❌ Ditolak', disabled: '⛔ Nonaktif' };
   box.innerHTML = onlineBar + `<div class="seg" role="group" style="margin-bottom:10px">${[['pending', 'Menunggu (' + L.filter(x => x.status === 'pending').length + ')'], ['approved', 'Aktif (' + L.filter(x => x.status === 'approved').length + ')'], ['all', 'Semua (' + L.length + ')']].map(([k, l]) => `<button data-ustab="${k}" class="${tab === k ? 'on' : ''}">${l}</button>`).join('')}</div>
     <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Akun</th><th>Jabatan / toko</th><th>Status</th><th>Akses</th><th>Aksi</th></tr></thead><tbody>
     ${shown.map(x => `<tr><td><span class="nm">${esc(x.u)}</span><span class="sub">${esc(x.name)} · daftar ${x.created ? fmtDateS(x.created.slice(0, 10)) : '–'}${x.last ? ' · login ' + fmtDateS(x.last.slice(0, 10)) : ''}${seen(x)}</span></td>
       <td class="small">${esc(x.job || '–')}${x.store ? ' · ' + esc(x.store) + ' ' + esc(sName(x.store) !== x.store ? sName(x.store) : '') : ''}</td><td class="small">${stTxt[x.status] || esc(x.status)}</td>
-      <td><select class="inp sm" data-usrole="${esc(x.u)}"><option value="viewer" ${x.role !== 'toko' ? 'selected' : ''}>Semua toko</option><option value="toko" ${x.role === 'toko' ? 'selected' : ''}>Hanya toko…</option></select>
+      <td><select class="inp sm" data-usrole="${esc(x.u)}"><option value="viewer" ${x.role !== 'toko' && x.role !== 'ic' ? 'selected' : ''}>Semua toko</option><option value="toko" ${x.role === 'toko' ? 'selected' : ''}>Hanya toko…</option><option value="ic" ${x.role === 'ic' ? 'selected' : ''}>Inventory Control (akses admin)</option></select>
         <input class="inp sm" style="width:72px;${x.role === 'toko' ? '' : 'display:none'}" data-usstore="${esc(x.u)}" value="${esc(x.store)}" placeholder="kode"></td>
       <td style="white-space:nowrap">${x.status !== 'approved' ? `<button class="btn sm primary" data-usok="${esc(x.u)}">Setujui</button> ` : `<button class="btn sm" data-ussave="${esc(x.u)}">Simpan</button> `}${x.status === 'pending' ? `<button class="btn sm danger" data-usno="${esc(x.u)}">Tolak</button> ` : x.status === 'approved' ? `<button class="btn sm" data-usoff="${esc(x.u)}">Nonaktifkan</button> ` : ''}<button class="btn sm" data-uspw="${esc(x.u)}" title="Reset password">🔑</button> <button class="btn sm danger" data-usdel="${esc(x.u)}" title="Hapus akun">🗑</button></td></tr>`).join('') || '<tr><td colspan="5" class="empty">Tidak ada akun di daftar ini.</td></tr>'}
-    </tbody></table></div><p class="small muted" style="margin:8px 0 0">"Hanya toko…" mengunci akun ke satu toko (cocok untuk store head). Akun admin utama (${esc(App.user ? App.user.u : '')}) tidak tampil di sini.</p>`;
+    </tbody></table></div><p class="small muted" style="margin:8px 0 0">"Hanya toko…" mengunci akun ke satu toko (cocok untuk store head). Akun admin utama (${esc(App.user ? App.user.u : '')}) tidak tampil di sini. <b>Inventory Control</b> = akses seperti admin (semua menu, Kelola data, upload & simpan data, daftar RA ESS); kelola akun & keputusan approval tetap khusus admin utama.</p>`;
 }
 async function userAction(u, body, okMsg) { try { await apiPost(Object.assign({ a: 'userSet', u }, body)); toast(okMsg); renderUsers(); } catch (e) { toast('Gagal: ' + errMsg(e)); } }
 
@@ -4201,7 +4202,7 @@ function pageApproval(view) {
         ${a.link ? `<a class="hi-link" href="${esc(a.link)}" target="_blank" rel="noopener">🔗 ${esc(a.linkText || 'Buka link pengajuan')}</a>` : ''}${a.desc ? `<span class="small muted">${esc(a.desc)}</span>` : ''}
         ${a.remarks ? `<span class="hi-rem">💬 ${esc(a.remarks)}${a.decidedBy ? ' — ' + esc(a.decidedBy) : ''}</span>` : ''}
         <span class="small muted">Diajukan ${a.created ? fmtDate(a.created.slice(0, 10)) : '–'} oleh ${esc(a.byName || a.by || '–')}${a.next ? ' · next approval ' + fmtDate(a.next) : ''}</span></div>
-        <div class="hi-act">${App.admin ? `<button class="btn sm primary" data-apdec="${a.id}|Disetujui">Setujui</button><button class="btn sm" data-apdec="${a.id}|Revisi">Revisi</button><button class="btn sm danger" data-apdec="${a.id}|Ditolak">Tolak</button>` : ''}
+        <div class="hi-act">${App.superAdmin ? `<button class="btn sm primary" data-apdec="${a.id}|Disetujui">Setujui</button><button class="btn sm" data-apdec="${a.id}|Revisi">Revisi</button><button class="btn sm danger" data-apdec="${a.id}|Ditolak">Tolak</button>` : ''}
           ${App.admin ? `<button class="btn sm" data-hubedit="approval|${a.id}">✏️ Ubah</button>` : a.by === me.u && a.status !== 'Disetujui' ? `<button class="btn sm" data-apedit="${a.id}">Ubah link</button>` : ''}${App.admin || (a.by === me.u && a.status !== 'Disetujui') ? `<button class="btn sm danger" data-hubdel="approval|${a.id}" title="Hapus">🗑</button>` : ''}</div></div>`; }).join('') || '<p class="muted small" style="padding:12px">Tidak ada pengajuan di daftar ini.</p>'}
       ${rows.length > (U.apMore || 60) ? `<button class="btn" data-apmore="1">Tampilkan lebih banyak (${rows.length - (U.apMore || 60)} lagi)</button>` : ''}</div>
   </div>`;
@@ -4324,7 +4325,7 @@ async function saveHubEdit(col, id) {
   if (col === 'task') { item.stores = $$('#hubEditForm [data-efstore]:checked').map(x => x.value); if (!item.stores.length) { toast('Pilih minimal satu toko'); return; } if (!item.title) { toast('Nama task wajib diisi'); return; } }
   if (item.link && !/^https?:\/\//i.test(item.link)) { toast('Link harus diawali https://'); return; }
   const ok = await hubPost(col, { op: 'update', id, item }, null); if (!ok) return;
-  if (col === 'approval' && App.admin && status != null && (status !== it.status || remarks !== (it.remarks || ''))) await hubPost('approval', { op: 'decide', id, status, remarks: remarks || '' }, null);
+  if (col === 'approval' && App.superAdmin && status != null && (status !== it.status || remarks !== (it.remarks || ''))) await hubPost('approval', { op: 'decide', id, status, remarks: remarks || '' }, null);
   closeDrawer(); toast('Perubahan disimpan');
 }
 /* ---------- import dari Excel Operational Hub (admin, sekali migrasi) ---------- */
@@ -5846,7 +5847,7 @@ async function doLogin(sfx = '') {
   }
   try {
     await apiPost({ a: 'check' }, pw);
-    App.adminPw = pw; App.admin = true; LS.set('dash_admin', pw);
+    App.adminPw = pw; App.admin = true; App.superAdmin = true; LS.set('dash_admin', pw);
     closeLogin(); toast('Berhasil masuk sebagai admin'); await boot();
   } catch (e) { er.textContent = e.code === 'auth' ? (e.message || 'Password salah.') : errMsg(e); btn.disabled = false; }
 }
@@ -5935,7 +5936,7 @@ async function essLoadRes(d) {
 }
 const essHl = (t, kws) => { let h = esc(t); (kws || []).slice().sort((a, b) => b.length - a.length).forEach(k => { const e = esc(k).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); h = h.replace(new RegExp('(?![^<]*>)(' + e + ')', 'i'), '<mark>$1</mark>'); }); return h; };
 function essHasil(E, me) {
-  const rows = App.essRes && App.essRes.d === E.d ? App.essRes : null, canEdit = me.role === 'admin' || me.role === 'toko';
+  const rows = App.essRes && App.essRes.d === E.d ? App.essRes : null, canEdit = (me.role === 'admin' || me.role === 'ic') || me.role === 'toko';
   const bar = `<div class="card" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button class="btn" data-ess="day:-1" title="Hari sebelumnya">◀</button><input class="inp" type="date" id="essD" value="${esc(E.d)}" style="width:auto"><button class="btn" data-ess="day:1" title="Hari berikutnya">▶</button><button class="btn ${E.d === todayISO() ? 'primary' : ''}" data-ess="day:0">Hari ini</button><span class="small muted" style="flex:1;min-width:220px">RA yang libur ditandai <b>OFF</b>: dianggap selesai dan tidak wajib mengisi.</span></div>`;
   if (!rows) { essLoadRes(E.d); return bar + '<div class="loading"><span class="spin"></span>Memuat hasil…</div>'; }
   const G = '#13806F', Y = '#E0A100', Rd = '#C0392B', col = v => v >= 95 ? G : v >= 80 ? Y : Rd, colP = v => v >= 90 ? G : v >= 75 ? Y : Rd;
@@ -5978,7 +5979,7 @@ function essHasil(E, me) {
     ${canEdit && R.length ? `<details class="card" style="padding:14px 18px"><summary style="cursor:pointer"><b>Hapus isian (salah isi)</b></summary><div style="margin-top:8px">${R.map(r => `<span class="ess-chip">${esc(essName(r.code))} · ${esc(r.ra)} <button title="Hapus isian ini" data-essrm="${esc(r.id)}">×</button></span>`).join('')}</div></details>` : ''}`;
 }
 function essRoster(E, me) {
-  const R = App.essRoster || {}, admin = me.role === 'admin', stores = (App.hub && App.hub.stores) || [], code = admin ? (E.code || (stores[0] && stores[0][0]) || '') : me.store, list = R[code] || [];
+  const R = App.essRoster || {}, admin = (me.role === 'admin' || me.role === 'ic'), stores = (App.hub && App.hub.stores) || [], code = admin ? (E.code || (stores[0] && stores[0][0]) || '') : me.store, list = R[code] || [];
   return `<div class="card"><h3 style="margin:0 0 6px">Daftar RA — ${esc(code)} ${esc(essName(code))}</h3>
     ${admin ? `<label class="fl">Toko<select class="inp" id="essRs">${stores.map(r => `<option value="${esc(r[0])}" ${r[0] === code ? 'selected' : ''}>${esc(r[0])} · ${esc(r[1])}${(R[r[0]] || []).length ? ' (' + R[r[0]].length + ')' : ''}</option>`).join('')}</select></label>` : ''}
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-top:8px"><label class="fl" style="margin:0">NIK<input class="inp" id="essRk" placeholder="NIK karyawan" style="width:160px"></label><label class="fl" style="margin:0;flex:1;min-width:180px">Nama RA<input class="inp" id="essRn" placeholder="Nama lengkap"></label><button class="btn primary" data-ess="radd">➕ Tambah</button></div>
@@ -5992,7 +5993,7 @@ function essRoster(E, me) {
 }
 /* ---- upload / template Excel daftar RA ---- */
 function essTemplate() {
-  const me = App.user || {}, admin = me.role === 'admin', stores = (App.hub && App.hub.stores) || [], sc = admin ? '2278' : (me.store || '');
+  const me = App.user || {}, admin = (me.role === 'admin' || me.role === 'ic'), stores = (App.hub && App.hub.stores) || [], sc = admin ? '2278' : (me.store || '');
   const ws = XLSX.utils.aoa_to_sheet([['Kode Toko', 'NIK', 'Nama RA'], [sc, '220450', 'Contoh Nama RA 1'], [sc, '220451', 'Contoh Nama RA 2']]);
   for (let r = 1; r < 400; r++) for (let c = 0; c < 3; c++) { const a = XLSX.utils.encode_cell({ r, c }); if (!ws[a]) ws[a] = { t: 's', v: '' }; ws[a].z = '@'; }
   ws['!ref'] = 'A1:C400'; ws['!cols'] = [{ wch: 12 }, { wch: 18 }, { wch: 36 }];
@@ -6018,7 +6019,7 @@ async function essUpload(file, mode) {
 }
 function pageEss(view) {
   setHead('ESS Self Assessment', 'Reminder briefing siang: RA mengisi Paham / Kendala lewat link khusus (tanpa login)');
-  const me = App.user || {}, E = essState(), manage = me.role === 'admin' || me.role === 'toko';
+  const me = App.user || {}, E = essState(), manage = (me.role === 'admin' || me.role === 'ic') || me.role === 'toko';
   if (!App.hub || !App.essRoster) { view.innerHTML = '<div class="loading"><span class="spin"></span>Memuat…</div>'; essLoad(); return; }
   if (!manage && E.tab === 'roster') E.tab = 'hasil';
   view.innerHTML = `<div class="stack"><div class="card"><h3 style="margin:0 0 6px">🔗 Link untuk RA (tanpa akun)</h3><div style="display:flex;gap:8px;flex-wrap:wrap"><input class="inp" id="essUrl" readonly value="${esc(essLink())}" style="flex:1;min-width:220px"><button class="btn primary" data-ess="copy">Salin link</button></div>
@@ -6033,7 +6034,7 @@ document.addEventListener('change', e => {
 });
 document.addEventListener('click', async e => {
   const t = e.target.closest && e.target.closest('[data-ess],[data-essdel],[data-redit],[data-essrm],[data-essoff]'); if (!t || App.page !== 'ops_ess') return;
-  const E = essState(), d = t.dataset, me = App.user || {}, code = me.role === 'admin' ? (E.code || ((App.hub.stores[0] || [])[0]) || '') : me.store;
+  const E = essState(), d = t.dataset, me = App.user || {}, code = (me.role === 'admin' || me.role === 'ic') ? (E.code || ((App.hub.stores[0] || [])[0]) || '') : me.store;
   const done = r => { App.essRoster = r.roster; if (r.skipped && r.skipped.length) toast('Dilewati: ' + r.skipped.slice(0, 3).join(' · '), 6000); essRender(); };
   try {
     if (d.essoff) {

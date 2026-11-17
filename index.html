@@ -746,6 +746,10 @@ button.pd-sz:hover{box-shadow:0 0 0 3px rgba(15,49,146,.12)}
 
 .pic{display:inline-block;vertical-align:2px;margin-left:4px;border-radius:6px;padding:1px 7px;font-size:10.5px;font-weight:800;letter-spacing:.03em}
 .pic.ic{background:#7A4FB5;color:#fff}.pic.ad{background:#E8ECF5;color:var(--navy)}
+
+.chat-ph{display:flex;flex-wrap:wrap;gap:5px;align-items:center;margin-top:6px}
+.chat-ph button{font:inherit;font-family:var(--font-mono);font-size:11.5px;border:1px solid var(--line-strong);background:var(--navy-tint);color:var(--navy);border-radius:7px;padding:2px 7px;cursor:pointer}
+.chat-ph button:hover{border-color:var(--navy)}
 </style>
 </head>
 <body>
@@ -2195,19 +2199,34 @@ function rpSub(label, t) { return `<tr class="subt"><td></td><td class="nm">Subt
 /* 🟢 ≥ 100% · 🟡 95–99,9% · 🔴 < 95% (ambang dari Pengaturan; bila kosong/tidak valid pakai 100 dan 95) */
 const achEmoji = v => { if (v == null || isNaN(v)) return ''; const G = (+SET().achGreen || 100) / 100, Y = Math.min((+SET().achYellow || 95) / 100, G), p = Math.round(v * 1e4) / 1e4; return p >= G ? ' 🟢' : p >= Y ? ' 🟡' : ' 🔴'; };
 const CHAT_GREET = 'Semangat Pagi Pak Riadi, Pak Budhi, Pak Andreas, Pak Yohanes';
-function reportChatText(R) {
+/* template pesan bisa diedit admin; kode {…} diganti angka otomatis */
+const CHAT_TPL = '{salam}\nBerikut pencapaian sales harian Jateng 01\n\nSales Achievement Jateng 01\n{tanggal}\nTarget    : {target_harian}\nSales     : {sales_harian}\n%Ach      : {ach_harian} {emoji_harian}\nGAP       : {gap_harian}\n\nSales Kumulatif Jateng 01\n{periode}\nTarget    : {target_kumulatif}\nSales     : {sales_kumulatif}\n%Ach      : {ach_kumulatif} {emoji_kumulatif}\nGAP       : {gap_kumulatif}\n\nTerimakasih 🙏';
+const CHAT_PH = [['salam', 'salam pembuka'], ['tanggal', 'tanggal laporan'], ['periode', '1 – tanggal laporan'], ['target_harian', 'target hari ini'], ['sales_harian', 'sales hari ini'], ['ach_harian', '% ach hari ini'], ['emoji_harian', '🟢🟡🔴 hari ini'], ['gap_harian', 'selisih hari ini'],
+  ['target_kumulatif', 'target s/d hari ini'], ['sales_kumulatif', 'sales s/d hari ini'], ['ach_kumulatif', '% ach kumulatif'], ['emoji_kumulatif', '🟢🟡🔴 kumulatif'], ['gap_kumulatif', 'selisih kumulatif']];
+function reportChatVals(R) {
   const D = R.D, d0 = +D.slice(8), mon = MONL[+D.slice(5, 7) - 1], y = D.slice(0, 4), t = R.t;
-  const n = v => (v < 0 ? '-' : '') + fmtN(Math.abs(Math.round(v || 0))), L = (k, v) => (k + ' '.repeat(10)).slice(0, 10) + ': ' + v;
-  const greet = (SET().chatGreet || CHAT_GREET).trim();
-  return `${greet}\nBerikut pencapaian sales harian Jateng 01\n\n` +
-    '```\nSales Achievement Jateng 01\n' + `${d0} ${mon} ${y}`.padStart(28) + '\n' + [L('Target', n(t.dT)), L('Sales', n(t.ds)), L('%Ach', fmtPct(t.dAch, 1) + achEmoji(t.dAch)), L('GAP', n(t.dDiff))].join('\n') +
-    '\n\nSales Kumulatif Jateng 01\n' + `1 - ${d0} ${mon} ${y}`.padStart(28) + '\n' + [L('Target', n(t.cT)), L('Sales', n(t.cs)), L('%Ach', fmtPct(t.cAch, 1) + achEmoji(t.cAch)), L('GAP', n(t.cDiff))].join('\n') + '\n```\n\nTerimakasih 🙏';
+  const n = v => (v < 0 ? '-' : '') + fmtN(Math.abs(Math.round(v || 0)));
+  return { salam: (SET().chatGreet || CHAT_GREET).trim(), tanggal: `${d0} ${mon} ${y}`, periode: `1 - ${d0} ${mon} ${y}`,
+    target_harian: n(t.dT), sales_harian: n(t.ds), ach_harian: fmtPct(t.dAch, 1), emoji_harian: achEmoji(t.dAch).trim(), gap_harian: n(t.dDiff),
+    target_kumulatif: n(t.cT), sales_kumulatif: n(t.cs), ach_kumulatif: fmtPct(t.cAch, 1), emoji_kumulatif: achEmoji(t.cAch).trim(), gap_kumulatif: n(t.cDiff) };
+}
+function reportChatText(R) {
+  const V = reportChatVals(R), tpl = SET().chatTpl || CHAT_TPL;
+  return tpl.replace(/\{([a-z_]+)\}/g, (m, k) => k in V ? V[k] : m).replace(/[ \t]+$/gm, '');
+}
+/* pratinjau tanpa menyimpan: pakai isi kotak salam & template yang sedang diketik */
+function chatPreview() {
+  const R = App.ui.rpLast, pre = $('#chatPre'); if (!R || !pre) return;
+  const keep = App.settings; App.settings = Object.assign({}, SET(), { chatGreet: (($('#chatGreet') || {}).value || ''), chatTpl: (($('#chatTpl') || {}).value || '') || CHAT_TPL });
+  try { pre.textContent = reportChatText(R); } finally { App.settings = keep; }
 }
 function reportChatCard(R) {
   return `<section class="card chat-card"><div class="card-h"><h3>💬 Template chat ke manajemen</h3><p class="small muted">khusus admin · ${fmtDate(R.D)}</p></div>
     <div class="chat-grid"><div><label class="fl">Salam pembuka<textarea class="inp" id="chatGreet" rows="2">${esc(SET().chatGreet || CHAT_GREET)}</textarea></label>
-      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary" id="chatCopy">📋 Salin teks</button><button class="btn" id="chatSaveG" title="Simpan salam pembuka untuk dipakai lagi">Simpan salam</button></div>
-      <p class="small muted" style="margin:8px 0 0">Angka di bagian tengah dibungkus format kode WhatsApp (\`\`\`) supaya titik dua sejajar seperti tabel. Biasanya dikirim bersama gambar dari 📸 Screenshot.</p></div>
+      <label class="fl">Isi pesan <span class="small muted">(bebas diedit, kode {…} terisi otomatis)</span><textarea class="inp" id="chatTpl" rows="12" style="font-family:var(--font-mono);font-size:13px">${esc(SET().chatTpl || CHAT_TPL)}</textarea></label>
+      <div class="chat-ph"><span class="small muted">Sisipkan:</span>${CHAT_PH.map(([k, l]) => `<button type="button" data-chatph="${k}" title="${esc(l)}">{${k}}</button>`).join('')}</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"><button class="btn primary" id="chatCopy">📋 Salin teks</button><button class="btn" id="chatSaveG" title="Simpan salam & isi pesan untuk dipakai lagi">💾 Simpan template</button><button class="btn" id="chatReset" title="Kembalikan isi pesan bawaan">↺ Template bawaan</button></div>
+      <p class="small muted" style="margin:8px 0 0">Pratinjau di kanan langsung berubah saat diketik. Template tersimpan untuk semua admin. Tanpa tanda \`\`\` titik dua mungkin tidak sejajar sempurna di WhatsApp; bila ingin sejajar, tambahkan \`\`\` di awal dan akhir bagian angka.</p></div>
       <pre class="chat-pre" id="chatPre">${esc(reportChatText(R))}</pre></div></section>`;
 }
 function pageReport(view) {
@@ -5589,7 +5608,9 @@ document.addEventListener('click', async e => {
   const prm = t.closest('[data-prm]'); if (prm) { App.ui.prMode = prm.dataset.prm; render(); return; }
   if (t.id === 'chatCopy') { const tx = ($('#chatPre') || {}).textContent || ''; navigator.clipboard.writeText(tx).then(() => toast('Teks laporan tersalin — tempel di WA')).catch(() => prompt('Salin teks:', tx)); return; }
   if (t.id === 'usRef') { renderUsers(); return; }
-  if (t.id === 'chatSaveG') { saveSettings({ chatGreet: (($('#chatGreet') || {}).value || '').trim() }, 'Salam pembuka disimpan'); return; }
+  if (t.id === 'chatSaveG') { saveSettings({ chatGreet: (($('#chatGreet') || {}).value || '').trim(), chatTpl: (($('#chatTpl') || {}).value || '').replace(/\s+$/, '') }, 'Template chat disimpan'); return; }
+  if (t.id === 'chatReset') { if (!confirm('Kembalikan isi pesan ke template bawaan? (salam pembuka tidak berubah)')) return; const ta = $('#chatTpl'); if (ta) { ta.value = CHAT_TPL; chatPreview(); } toast('Template bawaan dipasang — klik Simpan template untuk menyimpan'); return; }
+  { const ph = t.closest && t.closest('[data-chatph]'); if (ph) { const ta = $('#chatTpl'); if (ta) { const k = '{' + ph.dataset.chatph + '}', a = ta.selectionStart ?? ta.value.length, b = ta.selectionEnd ?? a; ta.value = ta.value.slice(0, a) + k + ta.value.slice(b); ta.focus(); ta.setSelectionRange(a + k.length, a + k.length); chatPreview(); } return; } }
   if (t.id === 'omsRe') { loadOmset(App.ui.omsDate, true).then(render).then(() => toast('Data terbaru dimuat')); return; }
   if (t.id === 'omsWa') { const txt = omsWaText(); navigator.clipboard.writeText(txt).then(() => toast('Teks share omset tersalin — tempel di grup WA')).catch(() => { prompt('Salin teks berikut:', txt); }); return; }
   const omss = t.closest('[data-omss]'); if (omss) { const k = omss.dataset.omss, s0 = App.ui.omsSort || { k: 'ach', dir: 'desc' }; App.ui.omsSort = s0.k === k ? { k, dir: s0.dir === 'asc' ? 'desc' : 'asc' } : { k, dir: k === 'name' ? 'asc' : 'desc' }; render(); return; }
@@ -5728,7 +5749,7 @@ document.addEventListener('input', e => {
   if (t.id === 'mpQ') { const b = $('#mpBody'); if (b) b.innerHTML = menuBody(t.value); return; }
   const deb = (key) => { App.ui[key] = t.value; App.ui.more = {}; clearTimeout(qTimer); qTimer = setTimeout(() => { const pos = t.selectionStart; const id = t.id; render(); const n = document.getElementById(id); if (n) { n.focus(); try { n.setSelectionRange(pos, pos); } catch (er) { } } }, 300); };
   if (t.id === 'saQ') { deb('saQ'); return; }
-  if (t.id === 'pq') deb('prodQ'); else if (t.id === 'hq') deb('stQ'); else if (t.id === 'trq') deb('trQ'); else if (t.id === 'tfQ') deb('tfQ'); else if (t.id === 'chatGreet') { const R = App.ui.rpLast; if (R) { App.settings = Object.assign({}, SET(), { chatGreet: t.value }); const pre = $('#chatPre'); if (pre) pre.textContent = reportChatText(R); } } else if (t.id === 'apQ') deb('apQ'); else if (t.id === 'tkQ') deb('tkQ'); else if (t.id === 'ifQ') deb('ifQ');
+  if (t.id === 'pq') deb('prodQ'); else if (t.id === 'hq') deb('stQ'); else if (t.id === 'trq') deb('trQ'); else if (t.id === 'tfQ') deb('tfQ'); else if (t.id === 'chatGreet') chatPreview(); else if (t.id === 'apQ') deb('apQ'); else if (t.id === 'tkQ') deb('tkQ'); else if (t.id === 'ifQ') deb('ifQ');
   else if (t.dataset && t.dataset.tgt !== undefined) { const sum = $$('[data-tgt]').reduce((s, i) => s + (Number(String(i.value).replace(/[^0-9]/g, '')) || 0), 0); const el = $('#tgtSum'); if (el) el.textContent = fmtRp(sum); }
 });
 document.addEventListener('change', async e => {
@@ -5743,7 +5764,8 @@ document.addEventListener('change', async e => {
   if (t.id === 'lsM') { App.ui.lsM = t.value; render(); return; }
   if (t.id === 'lsStore') { App.ui.lsStore = t.value; App.ui.more = {}; render(); return; }
   if (t.id === 'ptStore') { App.ui.ptStore = t.value; App.ui.more = {}; render(); return; }
-  if (t.id === 'chatGreet') { const R = App.ui.rpLast; if (R) { const keep = SET().chatGreet; App.settings = Object.assign({}, SET(), { chatGreet: t.value }); const pre = $('#chatPre'); if (pre) pre.textContent = reportChatText(R); } return; }
+  if (t.id === 'chatTpl') { chatPreview(); return; }
+  if (t.id === 'chatGreet') { chatPreview(); return; }
   if (t.id === 'stOrd') { saveSettings({ storeOrder: t.value }, 'Urutan toko di semua menu: ' + (t.value === 'code' ? 'nomor site' : 'nama toko')); return; }
   if (t.id === 'omsDate') { App.ui.omsDate = t.value || todayISO(); render(); return; }
   if (t.id === 'omsFile') { if (t.files[0]) omsUpload(t.files[0]); t.value = ''; return; }

@@ -1472,7 +1472,7 @@ async function loadAll(opt) {
   App.tgtDetail = M.targets || {}; App.tgtBasis = M.tgtBasis || 'total'; App.targets = targetsFromDetail();
   App.pendingUsers = M.pendingUsers || 0;
   App.omni = M.omni || {}; App.eac = M.eac || {}; App.hoInfo = M.hoInfo || null; App.juknis = M.juknis || {}; App.bc = M.bc || []; App.aiReady = !!M.aiReady;
-  App.log = M.log || []; App.books = M.books || []; App.cells = M.cells || 0;
+  App.log = M.log || []; App.logAt = 0; App.books = M.books || []; App.cells = M.cells || 0;
   { const prev = JSON.stringify(App.mstInfo || null); App.mstInfo = M.mst || {}; if (App.mst && App.mst.status === 'ok' && prev !== 'null' && prev !== JSON.stringify(App.mstInfo)) setTimeout(() => loadMaster(true), 0); } App.raTgt = M.raTarget || {};
   App.saBin = null; App.binCache = {}; App.lines = []; App.loaded = new Set(); App.sku = {}; App.dsrSku = {}; App.stock = {}; App.stockLoaded = false; App.cache = {}; App.sr = {};
   computeLastDate();
@@ -3896,22 +3896,31 @@ function uploadChecklist() {
   const st = (ok, warn) => ok ? 'ok' : warn ? 'warn' : 'bad';
   const ageTxt = d => { const a = ago(d); return d ? (a <= 0 ? 'hari ini' : a === 1 ? 'kemarin' : a + ' hari lalu') + ' · ' + fmtDateS(d) : 'belum pernah'; };
   const codes = storeCodes().filter(c => sType(c) !== 'bz');
-  /* harian */
-  const dsrLast = App.lastDate, dsrMiss = dsrLast ? codes.filter(c => (lastDateOf(c) || '') < dsrLast) : [];
-  const stDates = Object.values(App.stock || {}).map(x => x.date).filter(Boolean), stLast = stDates.length ? stDates.reduce((a, d) => d > a ? d : a) : null, stOld = codes.filter(c => !App.stock[c] || ago(App.stock[c].date) > 2);
+  /* toko aktif = punya penjualan dalam 14 hari terakhir (toko tutup / belum buka tidak dihitung kurang) */
+  const act = codes.filter(c => { const L = lastDateOf(c); return L && L >= addDays(yest, -14); });
+  const lst = a => a.slice(0, 6).join(', ') + (a.length > 6 ? ', …' : '');
+  /* jadwal: DSR, lost sales, blind counting = H-1 (tunggu semua toko closing). Stok toko & stok gudang HO = hari H, Senin–Jumat (Sabtu/Minggu cukup data Jumat) */
+  const wd = iso => new Date(iso + 'T12:00:00Z').getUTCDay(), lastWork = d => { while (wd(d) === 0 || wd(d) === 6) d = addDays(d, -1); return d; };
+  const stDue = lastWork(today), stPrev = lastWork(addDays(stDue, -1)), wkEnd = stDue !== today;
+  const dueTxt = d => 'Wajib ada: data ' + (d === today ? 'hari ini' : d === yest ? 'kemarin' : fmtDateS(d)) + ' · ' + fmtDateS(d);
+  const dsrLast = App.lastDate, dsrMiss = act.filter(c => (lastDateOf(c) || '') < yest);
+  const stDates = Object.values(App.stock || {}).map(x => x.date).filter(Boolean), stLast = stDates.length ? stDates.reduce((a, d) => d > a ? d : a) : null;
+  const stOld = codes.filter(c => App.stock[c] || act.includes(c)).filter(c => !App.stock[c] || App.stock[c].date < stDue);
   const lostLast = (App.lost || []).reduce((a, x) => x.d > a ? x.d : a, '') || null, hoLast = App.hoInfo && App.hoInfo.date;
+  const bcLast = (App.bc || []).reduce((a, r) => r[0] > a ? r[0] : a, '') || null;
+  const h1 = (n, d, last, extra) => ({ n, d, last, due: yest, s: st(last >= yest, last >= addDays(yest, -1)), extra });
   const daily = [
-    { n: 'Item DSR Report', d: 'penjualan semua toko (kemarin)', last: dsrLast, s: st(dsrLast >= yest && !dsrMiss.length, dsrLast >= addDays(today, -2)), extra: dsrMiss.length ? `${dsrMiss.length} toko belum sampai ${fmtDateS(dsrLast)}` : '' },
-    { n: 'Export by Bin (stok)', pic: 'IC', d: 'stok semua toko · Jumat: tandai juga Sabtu–Minggu', last: stLast, s: st(stLast >= yest && !stOld.length, ago(stLast) <= 3), extra: stOld.length ? `${stOld.length} toko stoknya > 2 hari` : '' },
-    { n: 'Lost Sale Report', d: 'lost sales toko area', last: lostLast, s: st(lostLast >= yest, ago(lostLast) <= 3) },
-    { n: 'Blind counting (Total KPI)', d: 'progres stock opname', last: (App.bc || []).reduce((a, r) => r[0] > a ? r[0] : a, '') || null, s: st(((App.bc || []).reduce((a, r) => r[0] > a ? r[0] : a, '')) >= yest, ago((App.bc || []).reduce((a, r) => r[0] > a ? r[0] : a, '') || null) <= 3) },
-    { n: 'Stok gudang HO', pic: 'IC', d: 'file Data Stock (pagi/siang)', last: hoLast, s: st(hoLast >= yest, ago(hoLast) <= 3), extra: App.hoInfo && App.hoInfo.label ? App.hoInfo.label : '' }
+    Object.assign(h1('Item DSR Report', 'H-1 · penjualan kemarin, upload setelah semua toko closing', dsrLast), { s: st(dsrLast >= yest && !dsrMiss.length, dsrLast >= addDays(yest, -1)), extra: dsrMiss.length ? `${dsrMiss.length} toko belum ada data ${fmtDateS(yest)}: ${lst(dsrMiss)}` : act.length ? `lengkap ${act.length} toko s/d ${fmtDateS(yest)}` : '' }),
+    h1('Lost Sale Report', 'H-1 · lost sales kemarin', lostLast),
+    h1('Blind counting (Total KPI)', 'H-1 · progres stock opname kemarin', bcLast),
+    { n: 'Export by Bin (stok)', pic: 'IC', d: 'Hari H · Senin–Jumat (Sabtu & Minggu tidak perlu)', last: stLast, due: stDue, s: st(stLast >= stDue && !stOld.length, stLast >= stPrev), extra: (stOld.length ? `${stOld.length} toko belum stok ${fmtDateS(stDue)}: ${lst(stOld)}` : '') + (wkEnd ? (stOld.length ? ' · ' : '') + 'akhir pekan: cukup data Jumat' : '') },
+    { n: 'Stok gudang HO', pic: 'IC', d: 'Hari H · Senin–Jumat · file Data Stock (pagi/siang)', last: hoLast, due: stDue, s: st(hoLast >= stDue, hoLast >= stPrev), extra: [App.hoInfo && App.hoInfo.label, wkEnd ? 'akhir pekan: cukup data Jumat' : ''].filter(Boolean).join(' · ') }
   ];
   /* mingguan */
-  const gaps7 = (() => { let n = 0; for (let d = addDays(today, -7); d < today; d = addDays(d, 1)) { const M = App.index.sales[d.slice(0, 7)] || {}; n += codes.filter(c => !((M[c] || {}).d || []).includes(+d.slice(8))).length; } return n; })();
+  const gaps7 = (() => { let n = 0; for (let d = addDays(yest, -6); d <= yest; d = addDays(d, 1)) { const M = App.index.sales[d.slice(0, 7)] || {}; n += act.filter(c => !((M[c] || {}).d || []).includes(+d.slice(8))).length; } return n; })();
   const weekly = [
-    { n: 'Cek kelengkapan DSR 7 hari terakhir', d: 'grid "Kelengkapan data" di bawah', s: gaps7 ? 'warn' : 'ok', extra: gaps7 ? gaps7 + ' toko-hari belum ada data' : 'lengkap' },
-    { n: 'Perbarui cache', d: 'hanya bila ada koreksi manual di spreadsheet', s: 'info' }
+    { n: 'Cek kelengkapan DSR 7 hari terakhir', d: `${fmtDateS(addDays(yest, -6))} – ${fmtDateS(yest)} · grid "Kelengkapan data" di bawah`, s: gaps7 ? 'warn' : 'ok', extra: gaps7 ? gaps7 + ' toko-hari belum ada data' : 'lengkap' },
+    { n: 'Perbarui cache', d: 'bila ada koreksi manual di spreadsheet / bulan tidak terbaca di grafik', s: 'info' }
   ];
   /* bulanan */
   const m = today.slice(0, 7), nm = addMonths(m, 1), late = +today.slice(8) >= 20, tm = late ? nm : m;
@@ -3933,13 +3942,13 @@ function uploadChecklist() {
   const yearly = [{ n: 'Sales harian tahun lalu', d: 'Report Daily Sales (sekali setahun, untuk Growth)', s: 'info' }];
   const icon = { ok: '✅', warn: '⚠️', bad: '❌', info: 'ℹ️' };
   const PIC = { IC: 'Inventory Control', AD: 'Admin' }, pf = App.ui.ckPic || '', picOf = x => x.pic || 'AD';
-  const item = x => `<li class="ck ${x.s}"><span class="ic">${icon[x.s]}</span><div><b>${esc(x.n)} <span class="pic ${picOf(x).toLowerCase()}" title="Diupload oleh ${PIC[picOf(x)]}">${picOf(x) === 'IC' ? 'IC' : 'Admin'}</span></b><span class="small muted">${esc(x.d)}</span>${x.last !== undefined ? `<span class="small">Terakhir: ${ageTxt(x.last)}</span>` : ''}${x.extra ? `<span class="small">${esc(x.extra)}</span>` : ''}</div></li>`;
+  const item = x => `<li class="ck ${x.s}"><span class="ic">${icon[x.s]}</span><div><b>${esc(x.n)} <span class="pic ${picOf(x).toLowerCase()}" title="Diupload oleh ${PIC[picOf(x)]}">${picOf(x) === 'IC' ? 'IC' : 'Admin'}</span></b><span class="small muted">${esc(x.d)}</span>${x.due ? `<span class="small muted">${dueTxt(x.due)}</span>` : ''}${x.last !== undefined ? `<span class="small">Terakhir: ${ageTxt(x.last)}</span>` : ''}${x.extra ? `<span class="small">${esc(x.extra)}</span>` : ''}</div></li>`;
   const vis = arr => pf ? arr.filter(x => picOf(x) === pf) : arr;
   const col = (t, sub, arr) => vis(arr).length ? `<div class="ck-col"><h4>${t}<small>${sub}</small></h4><ul>${vis(arr).map(item).join('')}</ul></div>` : '';
   const todo = vis([...daily, ...mon]).filter(x => x.s === 'bad' || x.s === 'warn').length;
   return `<section class="card"><div class="card-h"><h3>Checklist upload</h3><div class="seg" role="group" aria-label="Tampilkan tugas">${[['', 'Semua'], ['IC', 'Tugas IC'], ['AD', 'Tugas Admin']].map(([k, l]) => `<button data-ckpic="${k}" class="${pf === k ? 'on' : ''}">${l}</button>`).join('')}</div><p class="small muted">${todo ? `<b style="color:var(--bad)">${todo} item perlu diperhatikan</b>` : '<b style="color:var(--ok)">Semua data terbaru ✓</b>'}</p></div>
     <p class="small muted" style="margin:0 0 10px"><span class="pic ic">IC</span> = diupload <b>Inventory Control</b> (Export by Bin, Stok gudang HO, Master Artikel, Master Foto, List Artikel Promo) · <span class="pic ad">Admin</span> = diupload admin.</p>
-    <div class="ck-grid">${col('Harian', 'setiap pagi', daily)}${col('Mingguan', 'cek ringan', weekly)}${col('Bulanan', late ? 'mulai tgl 20: siapkan ' + fmtMonth(nm) : 'awal bulan / bila ada perubahan', mon)}${col('Tahunan', 'sekali setahun', yearly)}</div>
+    <div class="ck-grid">${col('Harian', 'DSR/lost/BC = H-1 · stok = hari H', daily)}${col('Mingguan', 'cek ringan', weekly)}${col('Bulanan', late ? 'mulai tgl 20: siapkan ' + fmtMonth(nm) : 'awal bulan / bila ada perubahan', mon)}${col('Tahunan', 'sekali setahun', yearly)}</div>
     <p class="small muted" style="margin:10px 0 0">Tip: target, bobot, OmniChannel & EAC cukup lewat <b>Download template</b> di bawah, diisi, lalu diupload sekali. Master Artikel & Master Foto diupload apa adanya dari HO. List promo bisa dari file HO atau <b>Template List Promo</b>. Semua file bisa diupload bersamaan.</p></section>`;
 }
 
@@ -5039,7 +5048,6 @@ function pageAdmin(view) {
   const tsh = (k, l, cls) => `<th class="s ${cls || ''}" data-tgs="${k}" style="cursor:pointer">${l}${tsS.k === k ? (tsS.dir === 'asc' ? ' ▲' : ' ▼') : ''}</th>`;
   view.innerHTML = `<div class="stack">${permNote}
     ${uploadChecklist()}
-    <section class="card"><div class="card-h"><h3>Akun pengguna</h3><p class="small muted">${App.pendingUsers ? `<b style="color:var(--bad)">${App.pendingUsers} pendaftaran menunggu persetujuan</b>` : 'setujui pendaftaran & atur akses'}</p></div><div id="usersBox"></div></section>
     <section class="card"><div class="card-h"><h3>Upload data</h3><p class="small muted">Item DSR Report, Lost Sale Report, Export by Bin (stok), dan file target. Semua tersimpan di spreadsheet master.</p></div>
       <label class="drop" id="drop"><input type="file" id="fileIn" multiple accept=".xlsx,.xls,.xlsb,.csv,.pdf"><b>Pilih file</b><span class="small muted">atau seret file ke sini. Toko dikenali otomatis dari kolom Location.</span></label>
       <div class="pend" id="pend"></div>
@@ -5049,6 +5057,7 @@ function pageAdmin(view) {
         <button class="btn sm primary" id="tplPromo">Template List Promo</button>${App.mst.promo && App.mst.promo.src === 'hub' ? '<button class="btn sm" id="dlPromo">Download list promo aktif</button>' : ''}</div>
       <div class="row-act"><button class="btn primary" id="saveBtn" ${App.pending.some(p => !p.err) ? '' : 'disabled'}>Simpan ke database</button><button class="btn" id="clrBtn" ${App.pending.length ? '' : 'disabled'}>Kosongkan daftar</button><span id="saveMsg" class="small muted"></span></div>
       <p class="small muted" style="margin-top:10px">File yang diupload bersamaan digabung otomatis, jadi DSR boleh dipecah per toko, per tanggal, atau per bagian. Tanggal yang sama untuk toko yang sama di upload berikutnya akan diganti dengan data baru, jadi aman upload ulang. Untuk stok, yang disimpan hanya snapshot terbaru tiap toko.</p></section>
+    <section class="card"><div class="card-h"><h3>Akun pengguna</h3><p class="small muted">${App.pendingUsers ? `<b style="color:var(--bad)">${App.pendingUsers} pendaftaran menunggu persetujuan</b>` : 'setujui pendaftaran & atur akses'}</p></div><div id="usersBox"></div></section>
     <section class="card"><div class="card-h"><h3>Kelengkapan data</h3><select id="covM" class="inp sm">${months.map(m => `<option value="${m}" ${m === cm ? 'selected' : ''}>${fmtMonth(m)}</option>`).join('') || '<option>Belum ada</option>'}</select></div><div id="cov" style="overflow-x:auto"></div></section>
     <section class="card"><div class="card-h"><h3>Target & nama toko</h3><div class="filters" style="margin:0"><select id="tgtM" class="inp sm">${tmOpts.map(m => `<option value="${m}" ${m === tm ? 'selected' : ''}>${fmtMonth(m)}</option>`).join('')}</select>
       <label class="small muted" for="stOrd">Urutan toko di semua menu</label><select id="stOrd" class="inp sm"><option value="code" ${(SET().storeOrder || 'code') === 'code' ? 'selected' : ''}>Nomor site</option><option value="name" ${SET().storeOrder === 'name' ? 'selected' : ''}>Nama toko (A–Z)</option></select>
@@ -5086,14 +5095,26 @@ function pageAdmin(view) {
         Foto produk: ${App.mst.photo ? `<b>${fmtN(Object.keys(App.mst.photo.items || {}).length)}</b> generic · sumber ${esc(App.mst.photo.source || '-')} · dibuat ${esc(App.mst.photo.generated || '-')}` : '<b style="color:var(--bad)">gagal dimuat</b>'}</p>`
         : App.mst.status === 'err' ? '<p class="small" style="color:var(--bad)">Master & foto belum bisa dimuat dari Katalog Produk. Cek koneksi atau pastikan repo Katalog-Produk aktif.</p>' : '<p class="small muted">Sedang memuat…</p>'}
       <div class="row-act"><button class="btn sm" id="mstReload">Muat ulang master & foto</button></div></section>
-    <section class="card"><div class="card-h"><h3>Riwayat upload</h3></div><div id="logT"></div></section>
+    <section class="card"><div class="card-h"><h3>Riwayat upload</h3><div class="row-act" style="margin:0"><span id="logMsg" class="small muted"></span><button class="btn sm" id="logRef">↻ Muat ulang</button></div></div><div id="logT"></div></section>
     <section class="card"><div class="card-h"><h3>Hapus data</h3><p class="small muted">Untuk data yang salah upload</p></div>
       <div class="filters"><select id="delS" class="inp">${allCodes.map(c => `<option value="${esc(c)}">${esc(sName(c))} (${esc(c)})</option>`).join('')}</select>
       <select id="delM" class="inp">${months.map(m => `<option value="${m}">${fmtMonth(m)}</option>`).join('')}</select>
       <button class="btn danger" id="delBtn" ${codes.length && months.length ? '' : 'disabled'}>Hapus penjualan toko di bulan ini</button></div></section>
   </div>`;
   renderPending(); renderCoverage(cm);
-  $('#logT').innerHTML = tbl('log', { rows: App.log.slice().reverse(), limit: 15, empty: 'Belum ada upload.', cols: [
+  renderLog(); refreshLog();
+}
+/* riwayat upload: diambil langsung dari sheet Log setiap halaman dibuka (selalu terbaru) */
+async function refreshLog(force) {
+  if (!force && App.logAt && Date.now() - App.logAt < 10000) return;
+  App.logAt = Date.now(); const m = $('#logMsg'); if (m) m.textContent = 'memuat…';
+  try { const R = await api('log'); if (R && Array.isArray(R.log)) { App.log = R.log; if (App.page === 'admin') renderLog(); } }
+  catch (e) { const m2 = $('#logMsg'); if (m2) m2.textContent = 'gagal memuat: ' + errMsg(e); }
+}
+function renderLog() {
+  const el = $('#logT'); if (!el) return;
+  const m = $('#logMsg'); if (m) m.textContent = App.logAt ? 'diperbarui ' + new Date(App.logAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '';
+  el.innerHTML = tbl('log', { rows: App.log.slice().sort((a, b) => String(b.at).localeCompare(String(a.at))), limit: 15, empty: 'Belum ada upload.', cols: [
     { k: 'at', label: 'Waktu', h: r => esc(new Date(r.at).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })) },
     { k: 'kind', label: 'Jenis', h: r => ({ DSR: 'Penjualan', INV: 'Stok', TGT: 'Target', OMT: 'Target Omni', EAC: 'Target EAC', LST: 'Lost Sales', DLY: 'Sales harian', HO: 'Stok gudang HO', JUK: 'Juknis promo', BC: 'Blind counting', WGT: 'Bobot harian', SR: 'Sales Report', RAT: 'Target per head', MST: 'Master artikel', PHO: 'Master foto', PRM: 'List promo', DEL: 'Hapus' }[r.kind] || r.kind) }, { k: 'file', label: 'File', h: r => `<span class="small">${esc(r.file)}</span>` },
     { k: 'stores', label: 'Toko', r: 1 }, { k: 'info', label: 'Isi', h: r => esc(r.info) + (r.removed ? ' <span class="badge b-DS">sudah dihapus</span>' : '') },
@@ -5385,7 +5406,7 @@ async function saveAll() {
       logs.push({ id: uid(), scope: { month: p.month }, at: now, kind: 'WGT', file: p.file, stores: '–', info: 'bobot harian ' + fmtMonth(p.month) + ', ' + p.days + ' hari' });
     }
     say('Mencatat riwayat…');
-    await withRetry(() => apiPost({ a: 'log', entries: logs }));
+    { const R = await withRetry(() => apiPost({ a: 'log', entries: logs })); logs.length = 0; if (R && Array.isArray(R.log)) { App.log = R.log; App.logAt = Date.now(); } }
     App.pending = [];
     say('Memuat ulang dashboard…');
     await loadAll();
@@ -5740,6 +5761,7 @@ document.addEventListener('click', async e => {
   const upw = t.closest('[data-uspw]'); if (upw) { const np = prompt('Password baru untuk ' + upw.dataset.uspw + ' (min. 6 karakter):'); if (np) userAction(upw.dataset.uspw, { newPw: np }, 'Password direset — beritahu pemilik akun'); return; }
   const udel = t.closest('[data-usdel]'); if (udel) { if (confirm('Hapus akun ' + udel.dataset.usdel + ' permanen?')) userAction(udel.dataset.usdel, { del: 1 }, 'Akun dihapus'); return; }
   if (t.id === 'rebuildBtn') { rebuildCache(); return; }
+  if (t.id === 'logRef') { refreshLog(true); return; }
   { const rx = t.closest && t.closest('[data-reidx]'); if (rx) {
     const ms = rx.dataset.reidx.split(',').filter(Boolean), box = rx.parentNode.querySelector('[data-reidxmsg]'), say = x => { if (box) box.innerHTML = x; };
     rx.disabled = true;

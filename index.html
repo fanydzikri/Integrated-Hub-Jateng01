@@ -3904,8 +3904,11 @@ function uploadChecklist() {
   const stDue = lastWork(today), stPrev = lastWork(addDays(stDue, -1)), wkEnd = stDue !== today;
   const dueTxt = d => 'Wajib ada: data ' + (d === today ? 'hari ini' : d === yest ? 'kemarin' : fmtDateS(d)) + ' · ' + fmtDateS(d);
   const dsrLast = App.lastDate, dsrMiss = act.filter(c => (lastDateOf(c) || '') < yest);
-  const stDates = Object.values(App.stock || {}).map(x => x.date).filter(Boolean), stLast = stDates.length ? stDates.reduce((a, d) => d > a ? d : a) : null;
-  const stOld = codes.filter(c => App.stock[c] || act.includes(c)).filter(c => !App.stock[c] || App.stock[c].date < stDue);
+  /* tanggal stok per toko dari indeks server (selalu tersedia, tidak perlu menunggu data stok dimuat) */
+  const stDate = c => { const a = (App.index.stock || {})[c], b = (App.stock || {})[c]; const x = a && a.date, y = b && b.date; return x && y ? (x > y ? x : y) : x || y || null; };
+  const stCodes = [...new Set([...Object.keys(App.index.stock || {}), ...Object.keys(App.stock || {})])];
+  const stDates = stCodes.map(stDate).filter(Boolean), stLast = stDates.length ? stDates.reduce((a, d) => d > a ? d : a) : null;
+  const stOld = codes.filter(c => stDate(c) || act.includes(c)).filter(c => !stDate(c) || stDate(c) < stDue);
   const lostLast = (App.lost || []).reduce((a, x) => x.d > a ? x.d : a, '') || null, hoLast = App.hoInfo && App.hoInfo.date;
   const bcLast = (App.bc || []).reduce((a, r) => r[0] > a ? r[0] : a, '') || null;
   const h1 = (n, d, last, extra) => ({ n, d, last, due: yest, s: st(last >= yest, last >= addDays(yest, -1)), extra });

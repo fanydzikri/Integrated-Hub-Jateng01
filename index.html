@@ -738,6 +738,11 @@ button.pd-sz:hover{box-shadow:0 0 0 3px rgba(15,49,146,.12)}
 .asof{font:inherit;font-size:12.5px;font-weight:700;color:#fff;background:#2F6BFF;border:1px solid rgba(255,255,255,.45);border-radius:999px;padding:5px 12px;cursor:default;opacity:1;box-shadow:0 2px 8px rgba(0,0,0,.18);white-space:nowrap}
 .asof:disabled{color:#fff;opacity:1}
 @media (max-width:640px){.asof{font-size:12px;padding:4px 10px;white-space:normal;text-align:left}}
+
+.pcat{display:inline-block;border-radius:999px;padding:1px 9px;font-size:11.5px;font-weight:800;background:#EEF1F7;color:var(--muted)}
+.pcat.s{background:#E7F0FF;color:#0F3192}.pcat.d{background:#FDEDE7;color:#B4451F}
+.pnew{display:inline-block;background:var(--ok);color:#fff;border-radius:6px;padding:0 6px;font-size:10.5px;font-weight:800;vertical-align:1px}
+.seg button small{font-weight:600;opacity:.75}
 </style>
 </head>
 <body>
@@ -847,6 +852,10 @@ function dateFromFilename(name) {
 function detectSheet(rows, fileName) {
   for (let i = 0; i < Math.min(rows.length, 60); i++) {
     const h = (rows[i] || []).map(normH);
+    /* master katalog */
+    if (h.includes('sellersku') && h.some(x => /^gambar\d+$/.test(x))) return parsePhoto(rows, i, h, fileName);
+    if ((h.includes('disc') || h.includes('diskon') || h.includes('discount')) && (h.includes('article') || h.includes('sku')) && !h.includes('orderno')) return parsePromoList(rows, i, h, fileName);
+    if (h.includes('article') && h.includes('crosssite') && h.includes('locamount') && (h.includes('descgeneric') || h.includes('genericcode'))) return parseMasterArt(rows, i, h, fileName);
     if (h.includes('articlenumber') && h.some(x => x.includes('availability'))) return parseHO(rows, i, h, fileName);
     if (h[0] === 'lokasi' && (rows[i + 1] || []).map(normH).includes('stockaccurate')) return parseBC(rows, i, fileName);
     if (h.includes('createdat') && h.includes('reason') && h.includes('locationcode')) return parseLost(rows, i, h, fileName);
@@ -864,13 +873,21 @@ function detectSheet(rows, fileName) {
 }
 /* membaca semua sheet: satu file boleh berisi target sales, target OmniChannel, dan bobot harian sekaligus */
 function parseWorkbookAll(buf, fileName) {
-  const wb = XLSX.read(buf, { type: 'array', cellDates: true });
-  const out = [], errs = [];
+  /* dense + tanpa teks/HTML sel: memori ±50% lebih kecil (penting untuk Master Artikel ±23 MB) */
+  const wb = XLSX.read(buf, { type: 'array', cellDates: true, dense: true, cellText: false, cellHTML: false, cellNF: false });
+  const out = [], errs = [], miss = [];
   for (const sn of wb.SheetNames) {
     const rows = XLSX.utils.sheet_to_json(wb.Sheets[sn], { header: 1, raw: true, defval: null, blankrows: false });
     const label = wb.SheetNames.length > 1 ? fileName + ' › ' + sn : fileName;
-    try { const r = detectSheet(rows, label); if (r && !(r.kind === 'DLY' && /kumulatif|cumulative|akumulasi/i.test(sn))) { r.sheet = sn; out.push(r); } }
+    try { const r = detectSheet(rows, label); if (r && !(r.kind === 'DLY' && /kumulatif|cumulative|akumulasi/i.test(sn))) { r.sheet = sn; out.push(r); } else if (!r) miss.push(rows); }
     catch (e) { errs.push({ file: label, err: e.message || String(e) }); }
+  }
+  /* master foto: sheet lanjutan tanpa judul kolom ikut dibaca (kolom A SKU, B artikel.warna, D–K Gambar1–8), semua sheet jadi satu */
+  const phs = out.filter(p => p.kind === 'PHO');
+  if (phs.length) {
+    const P = phs[0]; for (const q of phs.slice(1)) mergePhoto(P, q);
+    for (const rows of miss) addPhotoRows(P, rows, 0, { cs: 1, img: [3, 4, 5, 6, 7, 8, 9, 10] });
+    return [P, ...out.filter(p => p.kind !== 'PHO')];
   }
   if (!out.length) { if (errs.length) return errs; throw new Error('Bukan file Item DSR, Export by Bin, target, target OmniChannel, atau bobot harian.'); }
   /* file Breakdown Target: hanya ambil target per head (sheet RECAP bila ada); bulan diambil dari sheet TARGET V.1 */
@@ -890,6 +907,116 @@ function parseWorkbookAll(buf, fileName) {
   return out;
 }
 function parseWorkbook(buf, fileName) { const r = parseWorkbookAll(buf, fileName); return r[0]; }
+/* ================= master katalog dari file HO: Master Artikel, Link Foto, List Artikel Promo ================= */
+const MST_IMG_BASE = 'https://id-live.slatic.net/p/';
+const encImg = u => { const m = /^https:\/\/id-live\.slatic\.net\/p\/([0-9a-f]{32})\.jpg$/i.exec(u); return m ? m[1].toLowerCase() : u; };
+const cellStr = v => String(v ?? '').replace(/\s+/g, ' ').trim();
+const cellISO = v => { if (v instanceof Date && !isNaN(v)) { const w = new Date(v.getTime() + 12 * 3600e3); return w.getFullYear() + '-' + pad(w.getMonth() + 1) + '-' + pad(w.getDate()); } const s = cellStr(v); let m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s); if (m) return m[0]; m = /^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})$/.exec(s); return m ? m[3] + '-' + pad(+m[2]) + '-' + pad(+m[1]) : ''; };
+/* kunci artikel-warna: kolom Cross-Site (910000001.BLU); bila kosong diambil dari deskripsi "NAMA, WARNA, UKURAN" */
+function mstKey(cs, sku, desc) { cs = cellStr(cs).toUpperCase(); if (/^\d{9}\.[A-Z0-9]/.test(cs)) return cs; const p = cellStr(desc).split(','); return sku.slice(0, 9) + '.' + (p.length >= 3 ? p[p.length - 2].trim().toUpperCase() : 'NOS'); }
+const sizeOfDesc = d => { const p = cellStr(d).split(','); return p.length >= 2 ? p[p.length - 1].trim() : ''; };
+/* bulan dari nama file: "2026.11", "2026-11", atau "NOV 2026" */
+function monthOfName(name) {
+  const s = String(name || ''); let m = /(20\d{2})[._-](0[1-9]|1[0-2])(?!\d)/.exec(s); if (m) return m[1] + '-' + m[2];
+  m = /(jan|feb|mar|apr|mei|may|jun|jul|agu|agt|aug|sep|okt|oct|nov|des|dec)[a-z]*[\s._-]*(20\d{2})/i.exec(s); return m ? m[2] + '-' + pad(MON_KEY[m[1].toLowerCase()]) : '';
+}
+function parseMasterArt(rows, hi, h, fileName) {
+  const C = { sku: colIdx(h, 'article'), cs: colIdx(h, 'crosssite'), d: colIdx(h, 'articledescription'), g: colIdx(h, 'descgeneric'), l2: colIdx(h, 'lv2description'), l3: colIdx(h, 'lv3description'), l4: colIdx(h, 'lv4description'), p: colIdx(h, 'locamount'), gd: colIdx(h, 'gender'), pt: colIdx(h, 'producttype') };
+  const g = (r, i) => i >= 0 ? cellStr(r[i]) : '';
+  const items = {}; let n = 0;
+  for (let i = hi + 1; i < rows.length; i++) {
+    const r = rows[i]; if (!r) continue;
+    const sku = cellStr(r[C.sku]); if (!/^\d{12}$/.test(sku)) continue;
+    const d = g(r, C.d), key = mstKey(r[C.cs], sku, d), pr = numV(r[C.p]);
+    /* [nama, Lv2, Lv3, Lv4, product type, gender, harga, {akhiran SKU: ukuran}] */
+    const x = items[key] || (items[key] = [g(r, C.g) || d.split(',')[0].trim(), g(r, C.l2), g(r, C.l3), g(r, C.l4), g(r, C.pt), g(r, C.gd), pr, {}]);
+    if (pr > x[6]) x[6] = pr;
+    x[7][sku.slice(0, 9) === key.slice(0, 9) ? sku.slice(9) : sku] = sizeOfDesc(d); n++;
+  }
+  if (!n) throw new Error('Tidak ada baris artikel 12 digit di Master Artikel.');
+  return { kind: 'MST', file: fileName, items, rows: n, keys: Object.keys(items).length, month: monthOfName(fileName) || todayISO().slice(0, 7) };
+}
+function addPhotoRows(P, rows, from, C) {
+  for (let i = from; i < rows.length; i++) {
+    const r = rows[i]; if (!r) continue;
+    const m = /^(\d{9})\.(.+)$/.exec(cellStr(r[C.cs]).toUpperCase()); if (!m) continue;
+    const urls = C.img.map(j => cellStr(r[j])).filter(u => /^https?:\/\//i.test(u)); if (!urls.length) continue;
+    const A = P.items[m[1]] || (P.items[m[1]] = { c: {} }), cur = A.c[m[2]];
+    if (!cur || urls.length > cur.length) A.c[m[2]] = urls.map(encImg);
+    P.rows++;
+  }
+}
+function mergePhoto(P, Q) { for (const a in Q.items) { const A = P.items[a] || (P.items[a] = { c: {} }); for (const c in Q.items[a].c) if (!A.c[c] || Q.items[a].c[c].length > A.c[c].length) A.c[c] = Q.items[a].c[c]; } P.rows += Q.rows; }
+function parsePhoto(rows, hi, h, fileName) {
+  const C = { cs: colIdx(h, 'color', 'crosssite', 'artikelwarna'), img: h.map((x, i) => /^gambar\d+$/.test(x) ? i : -1).filter(i => i >= 0) };
+  if (C.cs < 0) throw new Error('Kolom Color (artikel.warna) tidak ditemukan di file foto.');
+  let date = ''; for (let i = 0; i < hi; i++) { const r = rows[i] || []; if (/tanggal|update/i.test(cellStr(r[0]))) date = cellISO(r[1]) || date; }
+  const P = { kind: 'PHO', file: fileName, items: {}, rows: 0, date: date || todayISO() };
+  addPhotoRows(P, rows, hi + 1, C);
+  if (!P.rows) throw new Error('Tidak ada baris foto yang bisa dibaca.');
+  return P;
+}
+/* kategori list promo: SMDS = Selected EIGER; DCNP = Selected DC / Selected Outlive (template: tulis SMDS atau DCNP) */
+const promoCat = v => { const s = cellStr(v).toUpperCase(); if (/SMDS|EIGER/.test(s)) return 'S'; if (/DCNP|(^|[^A-Z])DC([^A-Z]|$)|OUTLIVE|(^|[^A-Z])ND([^A-Z]|$)/.test(s)) return 'D'; return ''; };
+const PCAT = { S: 'SMDS', D: 'DCNP', '': 'Tanpa kategori' };
+function parsePromoList(rows, hi, h, fileName) {
+  const C = { sku: colIdx(h, 'sku', 'article', 'kodesku', 'skucode'), cs: colIdx(h, 'artikelwarna', 'crosssite'), n: colIdx(h, 'namaartikel', 'articledescription', 'nama', 'deskripsi'),
+    l2: colIdx(h, 'mclv2', 'lv2description', 'lv2'), l3: colIdx(h, 'mclv3', 'lv3description', 'lv3'), l4: colIdx(h, 'mclv4', 'lv4description', 'lv4'),
+    p: colIdx(h, 'harganormal', 'locamount', 'harga', 'price'), d: colIdx(h, 'diskon', 'disc', 'discount'), c: colIdx(h, 'kategori', 'remark', 'remarks', 'category'), s: colIdx(h, 'mulaiberlaku', 'tanggalmulai', 'startdate') };
+  if (C.sku < 0 || C.d < 0) throw new Error('Kolom SKU / Diskon tidak ditemukan di list promo.');
+  const g = (r, i) => i >= 0 ? cellStr(r[i]) : '';
+  let title = ''; for (let i = 0; i < hi && !title; i++) title = (rows[i] || []).map(cellStr).find(v => v.length > 10) || '';
+  const skus = {}, cnt = { S: 0, D: 0, '': 0 }; let n = 0, bad = 0;
+  for (let i = hi + 1; i < rows.length; i++) {
+    const r = rows[i]; if (!r) continue;
+    const sku = cellStr(r[C.sku]); if (!/^\d{12}$/.test(sku)) continue;
+    let d = numV(r[C.d]); if (d > 0 && d <= 1) d *= 100; d = Math.round(d * 10) / 10; if (!(d > 0 && d < 100)) { bad++; continue; }
+    const nm = g(r, C.n), c = promoCat(r[C.c]), dup = sku in skus; if (dup) cnt[skus[sku].c]--;
+    skus[sku] = { key: mstKey(C.cs >= 0 ? r[C.cs] : '', sku, nm), d, p: numV(r[C.p]), c, n: nm.split(',')[0].trim(), l2: g(r, C.l2), l3: g(r, C.l3), l4: g(r, C.l4), s: C.s >= 0 ? cellISO(r[C.s]) : '' };
+    cnt[c]++; if (!dup) n++;
+  }
+  if (!n) throw new Error('Tidak ada baris SKU 12 digit dengan diskon di list promo.');
+  return { kind: 'PRM', file: fileName, skus, rows: n, bad, cnt, title, month: monthOfName(fileName) || todayISO().slice(0, 7), mode: '' };
+}
+/* ---- logika update list promo ----
+   replace = list bulan baru (list lama diganti seluruhnya)
+   merge   = tambahan / update pertengahan bulan: SKU baru ditambahkan, diskon yang berubah diperbarui (diskon lama dicatat), SKU yang tidak ada di file tetap berlaku */
+function promoSkuMap() {
+  const P = App.mst.promo; if (!P || P.src !== 'hub') return {};
+  const out = {}; for (const key in P.items) { const it = P.items[key]; for (const sku in it.a) out[sku] = { key, d: it.a[sku] || it.d, p: it.p, c: it.c || '', s: it.s || '', pd: it.pd ?? null, u: it.u || '', n: it.n, l2: it.l2, l3: it.l3, l4: it.l4 }; }
+  return out;
+}
+const promoDefaultMode = p => { const P = App.mst.promo; return P && P.src === 'hub' && P.month === p.month ? 'merge' : 'replace'; };
+function promoMerge(old, nw, mode, today, id) {
+  const map = mode === 'replace' ? {} : Object.assign({}, old), st = { add: 0, up: 0, down: 0, same: 0, del: 0 }, mg = mode === 'merge';
+  for (const sku in nw) {
+    const n = nw[sku], o = old[sku];
+    if (!o) { map[sku] = Object.assign({}, n, { s: n.s || today, pd: null, u: mg ? id : '' }); st.add++; }
+    else if (Math.abs(n.d - o.d) > 0.01) { map[sku] = Object.assign({}, n, { s: n.s || today, pd: mg ? o.d : null, u: mg ? id : '' }); n.d > o.d ? st.up++ : st.down++; }
+    else { map[sku] = Object.assign({}, n, { s: mg ? (o.s || n.s || today) : (n.s || today), pd: mg ? o.pd : null, u: mg ? o.u : '' }); st.same++; }
+  }
+  if (!mg) for (const sku in old) if (!nw[sku]) st.del++;
+  return { map, st };
+}
+/* dikemas per artikel-warna: a = {akhiran SKU: 0 (diskon sama) | diskon khusus SKU itu} */
+function promoPack(map, meta) {
+  const items = {};
+  for (const sku in map) {
+    const x = map[sku], it = items[x.key] || (items[x.key] = { d: x.d, p: x.p, c: x.c, s: x.s, pd: x.pd ?? null, u: x.u || '', n: x.n, l2: x.l2, l3: x.l3, l4: x.l4, a: {} });
+    if (x.p > it.p) it.p = x.p; if (x.s > it.s) it.s = x.s; if (x.u) it.u = x.u; if (x.pd != null && it.pd == null) it.pd = x.pd; if (!it.c && x.c) it.c = x.c;
+    it.a[sku.slice(0, 9) === x.key.slice(0, 9) ? sku.slice(9) : sku] = x.d === it.d ? 0 : x.d;
+  }
+  return Object.assign({}, meta, { items });
+}
+/* simpan satu master ke server: dipotong 40.000 karakter, dikirim 24 potong per permintaan */
+async function mstSave(k, obj, info, say) {
+  const txt = JSON.stringify(obj), parts = []; for (let i = 0; i < txt.length; i += 40000) parts.push(txt.slice(i, i + 40000));
+  const v = Date.now().toString(36);
+  for (let i = 0; i < parts.length; i += 24) { say(`${info.label}: mengirim ${Math.min(100, Math.round((i + 24) / parts.length * 100))}%…`); await withRetry(() => apiPost({ a: 'mstPart', k, v, i, parts: parts.slice(i, i + 24) })); }
+  const r = await withRetry(() => apiPost({ a: 'mstDone', k, v, n: parts.length, info }));
+  await IDB.put('mst:' + k, { v, d: obj });
+  return r;
+}
 function parseDSR(rows, hi, h, fileName) {
   const C = {
     o: colIdx(h, 'orderno', 'ordernumber'), dt: colIdx(h, 'orderdate', 'transactiondate'), sku: colIdx(h, 'skucode', 'sku'),
@@ -1333,7 +1460,8 @@ async function loadAll(opt) {
   App.tgtDetail = M.targets || {}; App.tgtBasis = M.tgtBasis || 'total'; App.targets = targetsFromDetail();
   App.pendingUsers = M.pendingUsers || 0;
   App.omni = M.omni || {}; App.eac = M.eac || {}; App.hoInfo = M.hoInfo || null; App.juknis = M.juknis || {}; App.bc = M.bc || []; App.aiReady = !!M.aiReady;
-  App.log = M.log || []; App.books = M.books || []; App.cells = M.cells || 0; App.raTgt = M.raTarget || {};
+  App.log = M.log || []; App.books = M.books || []; App.cells = M.cells || 0;
+  { const prev = JSON.stringify(App.mstInfo || null); App.mstInfo = M.mst || {}; if (App.mst && App.mst.status === 'ok' && prev !== 'null' && prev !== JSON.stringify(App.mstInfo)) setTimeout(() => loadMaster(true), 0); } App.raTgt = M.raTarget || {};
   App.saBin = null; App.binCache = {}; App.lines = []; App.loaded = new Set(); App.sku = {}; App.dsrSku = {}; App.stock = {}; App.stockLoaded = false; App.cache = {}; App.sr = {};
   computeLastDate();
   App.loadWarn = [];
@@ -1511,13 +1639,38 @@ async function fetchKatalog(file) {
   for (const b of KATALOG_BASE) { try { const r = await fetch(b + file, { cache: 'default' }); if (r.ok) return await r.json(); last = new Error('HTTP ' + r.status); } catch (e) { last = e; } }
   throw last || new Error('gagal');
 }
+/* ambil satu master dari server; disimpan di browser per versi, jadi hanya diunduh ulang bila ada upload baru */
+async function mstFetch(k) {
+  const info = (App.mstInfo || {})[k]; if (!info || !info.v) return null;
+  const hit = await IDB.get('mst:' + k); if (hit && hit.v === info.v && hit.d) return hit.d;
+  const r = await api('mst', { k }); if (!r || !r.data) return null;
+  IDB.put('mst:' + k, { v: info.v, d: r.data }); return r.data;
+}
+function mstExpandMaster(items) {
+  const out = {};
+  for (const key in items) { const x = items[key], art = key.split('.')[0], a = {}; for (const sx in x[7]) a[sx.length === 3 ? art + sx : sx] = x[7][sx]; out[key] = { n: x[0], l2: x[1], l3: x[2], l4: x[3], pt: x[4], gd: x[5], p: x[6], a }; }
+  return out;
+}
+function mstExpandPromo(d) {
+  const items = {};
+  for (const key in d.items) { const it = d.items[key], art = key.split('.')[0], a = {}; for (const sx in it.a) a[sx.length === 3 ? art + sx : sx] = it.a[sx]; items[key] = Object.assign({}, it, { a }); }
+  const cnt = { S: 0, D: 0 }; for (const k in items) if (items[k].c) cnt[items[k].c] = (cnt[items[k].c] || 0) + 1;
+  return { src: 'hub', source: 'Integrated Hub', title: d.title, month: d.month, period: fmtMonth(d.month), upd: d.upd || [], items, cnt };
+}
 async function loadMaster(force) {
   if (!force && (App.mst.status === 'loading' || App.mst.status === 'ok')) return;
   App.mst = { status: 'loading' };
-  const [m, g, pr] = await Promise.allSettled([fetchKatalog('master.json'), fetchKatalog('gambar.json'), fetchKatalog('promo.json')]);
-  const M = { status: 'ok', master: m.status === 'fulfilled' ? m.value : null, photo: g.status === 'fulfilled' ? g.value : null, promo: pr.status === 'fulfilled' ? pr.value : null, err: [] };
+  /* sumber utama: data yang diupload di Kelola data (disimpan di server Integrated Hub); Katalog Produk hanya cadangan */
+  const one = async (k, file) => { const hub = await mstFetch(k).catch(() => null); if (hub) return { src: 'hub', d: hub }; return { src: 'katalog', d: await fetchKatalog(file) }; };
+  const [m, g, pr] = await Promise.allSettled([one('master', 'master.json'), one('photo', 'gambar.json'), one('promo', 'promo.json')]);
+  const val = x => x.status === 'fulfilled' ? x.value : null, MI = App.mstInfo || {};
+  const M = { status: 'ok', master: null, photo: null, promo: null, err: [] };
+  const vm = val(m), vg = val(g), vp = val(pr);
+  if (vm) M.master = vm.src === 'hub' ? { source: 'Integrated Hub', generated: fmtMonth(vm.d.month) + ' · upload ' + fmtDateS(((MI.master || {}).at || '').slice(0, 10)), month: vm.d.month, items: mstExpandMaster(vm.d.items) } : Object.assign({ source: 'Katalog Produk' }, vm.d);
+  if (vg) M.photo = vg.src === 'hub' ? Object.assign({ source: 'Integrated Hub', generated: fmtDate(vg.d.date) }, vg.d) : Object.assign({ source: 'Katalog Produk' }, vg.d);
+  if (vp) M.promo = vp.src === 'hub' ? mstExpandPromo(vp.d) : Object.assign({ source: 'Katalog Produk', src: 'katalog' }, vp.d);
   M.psku = new Map();
-  if (M.promo && M.promo.items) for (const key in M.promo.items) { const it = M.promo.items[key]; for (const sku in (it.a || {})) M.psku.set(sku, { key, d: it.d || 0, p: it.p || 0 }); }
+  if (M.promo && M.promo.items) for (const key in M.promo.items) { const it = M.promo.items[key]; for (const sku in (it.a || {})) M.psku.set(sku, { key, d: (M.promo.src === 'hub' && it.a[sku]) || it.d || 0, p: it.p || 0, c: it.c || '' }); }
   if (!M.master) M.err.push('master artikel'); if (!M.photo) M.err.push('foto');
   if (!M.master && !M.photo) M.status = 'err';
   M.sku = new Map(); M.art = new Map();
@@ -2820,8 +2973,8 @@ async function exportLost() {
 /* ================= halaman: Stok DCNP/SMDS (list promo Katalog Produk) ================= */
 function pagePromoStock(view) {
   const U = App.ui, MS = App.mst;
-  setHead('Stok DCNP/SMDS', MS.promo ? `${MS.promo.title || 'List promo'} · ${MS.promo.period || ''} · sumber Katalog Produk` : 'List promo dari Katalog Produk');
-  if (MS.status !== 'ok' || !MS.promo) { view.innerHTML = `<div class="empty-state"><h2>${MS.status === 'loading' || MS.status === 'idle' ? 'Memuat list promo…' : 'List promo belum bisa dimuat'}</h2><p class="muted">List artikel DCNP/SMDS diambil dari repo Katalog Produk.</p></div>`; if (MS.status === 'idle') loadMaster(); return; }
+  setHead('Stok DCNP/SMDS', MS.promo ? `${MS.promo.title || 'List promo'} · ${MS.promo.period || ''} · sumber ${MS.promo.source || 'Katalog Produk'}` : 'List artikel promo (upload di Kelola data)');
+  if (MS.status !== 'ok' || !MS.promo) { view.innerHTML = `<div class="empty-state"><h2>${MS.status === 'loading' || MS.status === 'idle' ? 'Memuat list promo…' : 'List promo belum bisa dimuat'}</h2><p class="muted">Upload <b>List Artikel Promo</b> di Kelola data (file HO atau Template List Promo).</p></div>`; if (MS.status === 'idle') loadMaster(); return; }
   const codes = activeStores().filter(c => App.stock[c]), st = U.psStore && codes.includes(U.psStore) ? U.psStore : '';
   const R = periodRange();
   /* stok promo per sku */
@@ -2830,7 +2983,11 @@ function pagePromoStock(view) {
   for (const c of st ? [st] : codes) { const S = App.stock[c]; if (!S) continue;
     for (const sku in S.items) { const t = S.items[sku][0]; if (t <= 0) continue; if (!isPB(sku)) allPcs += t; const pr = MS.psku.get(sku); if (!pr) continue;
       const it = MS.promo.items[pr.key], mk = MS.sku.get(sku), mi = mk && mItem(mk);
-      rowsSku.push({ c, sku, art: artOf(sku), key: pr.key, d: pr.d, p: pr.p || (mi && mi.p) || 0, t, l2: it.l2 || (mi && mi.l2) || '–', l3: it.l3 || (mi && mi.l3) || '–', l4: (mi && mi.l4) || (App.sku[sku] || [])[2] || '–', n: it.n }); } }
+      rowsSku.push({ c, sku, art: artOf(sku), key: pr.key, d: pr.d, p: pr.p || (mi && mi.p) || 0, t, l2: it.l2 || (mi && mi.l2) || '–', l3: it.l3 || (mi && mi.l3) || '–', l4: (mi && mi.l4) || it.l4 || (App.sku[sku] || [])[2] || '–', n: it.n || (mi && mi.n) || '', cat: pr.c || it.c || '', pd: it.pd ?? null, u: it.u || '' }); } }
+  /* kategori SMDS / DCNP & update terakhir di tengah bulan */
+  const lastUpd = ((MS.promo.upd || []).filter(x => x.mode === 'merge').pop()) || null;
+  const catPcs = k => rowsSku.filter(r => r.cat === k).reduce((a, r) => a + r.t, 0);
+  const rowsAll = rowsSku.length; for (let i = rowsSku.length - 1; i >= 0; i--) { const r = rowsSku[i]; if ((U.psCat && r.cat !== U.psCat) || (U.psNew && !(lastUpd && r.u === lastUpd.id))) rowsSku.splice(i, 1); }
   /* filter diskon & lv2 */
   const discs = [...new Set(rowsSku.map(r => r.d))].sort((a, b) => a - b), l2s = [...new Set(rowsSku.map(r => r.l2))].sort();
   const F = rowsSku.filter(r => (!U.psD || r.d === +U.psD) && (!U.psL2 || r.l2 === U.psL2));
@@ -2856,14 +3013,16 @@ function pagePromoStock(view) {
   const byS = new Map(); for (const r of F) { const x = byS.get(r.c) || { pcs: 0, val: 0, keys: new Set() }; x.pcs += r.t; x.val += r.t * r.p; x.keys.add(r.key); byS.set(r.c, x); }
   const storePcs = c => { let t = 0; const S = App.stock[c]; if (S) for (const k in S.items) if (!isPB(k) && S.items[k][0] > 0) t += S.items[k][0]; return t; };
   /* per artikel-warna */
-  const byK = new Map(); for (const r of F) { const x = byK.get(r.key) || { key: r.key, art: r.art, n: r.n, color: r.key.split('.').slice(1).join('.'), d: r.d, p: r.p, l4: r.l4, pcs: 0, stores: new Set(), rs: [] }; x.pcs += r.t; x.stores.add(r.c); x.rs.push(r); byK.set(r.key, x); }
+  const byK = new Map(); for (const r of F) { const x = byK.get(r.key) || { key: r.key, art: r.art, n: r.n, color: r.key.split('.').slice(1).join('.'), d: r.d, p: r.p, l4: r.l4, cat: r.cat, pd: r.pd, nw: !!(lastUpd && r.u === lastUpd.id && r.pd == null), pcs: 0, stores: new Set(), rs: [] }; x.pcs += r.t; x.stores.add(r.c); x.rs.push(r); byK.set(r.key, x); }
   view.innerHTML = `<div class="stack">
     <div class="filters" style="margin:0"><label class="small muted" for="psStore">Toko</label><select id="psStore" class="inp"><option value="">Semua toko</option>${codes.map(c => `<option value="${esc(c)}" ${c === st ? 'selected' : ''}>${esc(c)} - ${esc(sName(c))}</option>`).join('')}</select>
       <label class="small muted" for="psD">Diskon</label><select id="psD" class="inp"><option value="">Semua</option>${discs.map(d => `<option value="${d}" ${String(d) === String(U.psD) ? 'selected' : ''}>${d}%</option>`).join('')}</select>
       <label class="small muted" for="psL2">MC Lv2</label><select id="psL2" class="inp"><option value="">Semua</option>${l2s.map(x => `<option ${x === U.psL2 ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select>
       <span class="small muted">Terjual = ${esc(R.label.toLowerCase())}</span></div>
+    <div class="filters" style="margin:0"><div class="seg" role="group" aria-label="Kategori promo">${[['', 'Semua'], ['S', 'SMDS'], ['D', 'DCNP']].map(([k, l]) => `<button data-pscat="${k}" class="${(U.psCat || '') === k ? 'on' : ''}">${l}${k ? ` <small>${fmtN(catPcs(k))} pcs</small>` : ''}</button>`).join('')}</div>
+      ${lastUpd ? `<label class="small" style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="psNew" ${U.psNew ? 'checked' : ''}> Hanya artikel baru / diskon berubah di update ${esc(fmtDateS(lastUpd.at))} <span class="muted">(${fmtN(lastUpd.add)} baru · ${fmtN(lastUpd.up)} naik${lastUpd.down ? ' · ' + fmtN(lastUpd.down) + ' turun' : ''})</span></label>` : ''}</div>
     <div class="pt-tiles" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr))">
-      <div class="pt-tile"><span>Stok DCNP/SMDS</span><b>${fmtN(tot.pcs)} pcs</b><small>${fmtPct(allPcs ? tot.pcs / allPcs : null, 1)} dari total stok</small></div>
+      <div class="pt-tile"><span>Stok ${U.psCat ? PCAT[U.psCat] : 'DCNP/SMDS'}</span><b>${fmtN(tot.pcs)} pcs</b><small>${fmtPct(allPcs ? tot.pcs / allPcs : null, 1)} dari total stok</small></div>
       <div class="pt-tile"><span>Artikel-warna</span><b>${fmtN(tot.keys.size)}</b><small>dari ${fmtN(Object.keys(MS.promo.items).length)} di list promo</small></div>
       <div class="pt-tile"><span>Nilai stok (harga normal)</span><b>${fmtRpS(tot.val)}</b><small>setelah diskon ${fmtRpS(tot.net)}</small></div>
       <div class="pt-tile"><span>Terjual periode ini</span><b>${fmtN(S0.q)} pcs</b><small>${fmtRpS(S0.v)} gross</small></div>
@@ -2877,14 +3036,15 @@ function pagePromoStock(view) {
       <section class="card"><div class="card-h"><h3>Per toko</h3><p class="small muted">klik untuk filter</p></div><div id="psStoreT"></div></section>
     </div>` : `<section class="card"><div class="card-h"><h3>Stok per besaran diskon</h3></div><div class="chart-box" style="height:240px"><canvas id="psDisc"></canvas></div></section>`}
     <section class="card"><div class="card-h"><h3>Artikel DCNP/SMDS</h3><p class="small muted">${fmtN(byK.size)} artikel-warna · klik untuk detail</p></div><div id="psArtT"></div></section>
-    <p class="small muted">List promo diambil otomatis dari Katalog Produk (${esc(MS.promo.source || '')}, dibuat ${esc(MS.promo.generated || '')}). Stok = stok terakhir per toko dari Export by Bin. Cover = stok ÷ rata-rata terjual per bulan pada periode terpilih.</p>
+    <p class="small muted">List promo: ${esc(MS.promo.source || '')}${MS.promo.src === 'hub' ? ' · bulan ' + esc(MS.promo.period || '') + ' · SMDS = Selected EIGER, DCNP = Selected DC & Selected Outlive' : ', dibuat ' + esc(MS.promo.generated || '')}. Stok = stok terakhir per toko dari Export by Bin. Cover = stok ÷ rata-rata terjual per bulan pada periode terpilih.</p>
   </div>`;
   if (typeof Chart !== 'undefined') { const ds = [...byD.keys()].sort((a, b) => a - b); App.charts.length; mkDual($('#psDisc'), ds.map(d => d + '%'), ds.map(d => byD.get(d).pcs), ds.map(d => byD.get(d).val), 'Stok (pcs)', 'Nilai stok', v => fmtN(v), v => fmtRpS(v)); }
   if ($('#psStoreT')) $('#psStoreT').innerHTML = tbl('psStore', { rows: [...byS.entries()].map(([c, x]) => ({ c, name: sName(c), pcs: x.pcs, val: x.val, n: x.keys.size, share: storePcs(c) ? x.pcs / storePcs(c) : null })), sort: { k: 'pcs', dir: 'desc' }, limit: 40, onRow: r => { App.ui.psStore = r.c; render(); window.scrollTo(0, 0); }, cols: [
     { k: 'name', label: 'Toko', h: r => `<span class="nm">${esc(r.name)}</span><span class="sub">${esc(r.c)}</span>` }, { k: 'n', label: 'Artikel', r: 1, h: r => fmtN(r.n) }, { k: 'pcs', label: 'Stok', r: 1, h: r => fmtN(r.pcs) },
     { k: 'share', label: '% stok toko', r: 1, h: r => fmtPct(r.share, 1) }, { k: 'val', label: 'Nilai', r: 1, h: r => fmtRpS(r.val) }] });
-  $('#psArtT').innerHTML = tbl('psArt', { rows: [...byK.values()].map(x => { const sd = soldOf(x.rs); return { art: x.art, n: x.n, color: x.color, d: x.d, p: x.p, l4: x.l4, pcs: x.pcs, ns: x.stores.size, q: sd.q, val: x.pcs * x.p }; }), sort: { k: 'pcs', dir: 'desc' }, limit: 30, onRow: r => openProduct(r.art, st || null), cols: [
-    { k: 'n', label: 'Artikel', h: r => prodCell(r.art, r.n + ' · ' + r.color, r.art + ' · ' + r.l4) }, { k: 'd', label: 'Diskon', r: 1, h: r => `<span class="disc">${r.d}%</span>` },
+  $('#psArtT').innerHTML = tbl('psArt', { rows: [...byK.values()].map(x => { const sd = soldOf(x.rs); return { art: x.art, n: x.n, color: x.color, d: x.d, p: x.p, l4: x.l4, cat: x.cat, pd: x.pd, nw: x.nw, pcs: x.pcs, ns: x.stores.size, q: sd.q, val: x.pcs * x.p }; }), sort: { k: 'pcs', dir: 'desc' }, limit: 30, onRow: r => openProduct(r.art, st || null), cols: [
+    { k: 'n', label: 'Artikel', h: r => prodCell(r.art, r.n + ' · ' + r.color, r.art + ' · ' + r.l4) }, { k: 'cat', label: 'Kategori', h: r => `<span class="pcat ${r.cat === 'S' ? 's' : r.cat === 'D' ? 'd' : ''}">${esc(PCAT[r.cat || ''])}</span>` },
+    { k: 'd', label: 'Diskon', r: 1, h: r => `${r.nw ? '<span class="pnew">BARU</span> ' : ''}${r.pd != null ? `<s class="muted small">${r.pd}%</s> → ` : ''}<span class="disc">${r.d}%</span>` },
     { k: 'p', label: 'Harga', r: 1, h: r => `<span style="text-decoration:line-through;color:var(--muted)">${fmtRpS(r.p)}</span><span class="sub">${fmtRpS(r.p * (1 - r.d / 100))}</span>` },
     { k: 'pcs', label: 'Stok', r: 1, h: r => `<b>${fmtN(r.pcs)}</b>` }, { k: 'ns', label: 'Toko', r: 1, h: r => fmtN(r.ns) }, { k: 'q', label: 'Terjual', r: 1, h: r => fmtN(r.q) }, { k: 'val', label: 'Nilai stok', r: 1, h: r => fmtRpS(r.val) }] });
 }
@@ -3727,7 +3887,12 @@ function uploadChecklist() {
     { n: 'Target OmniChannel', d: 'sheet Target OmniChannel di template', s: st(has(App.omni[tm]), has(App.omni[m])), extra: lbl + (has(App.omni[tm]) ? ' sudah ada' : ' belum ada') },
     { n: 'Target Sales Member EAC', d: 'sheet Target EAC (bisa sekaligus Jan–Des)', s: st(has(App.eac[tm]), has(App.eac[m])), extra: lbl + (has(App.eac[tm]) ? ' sudah ada' : ' belum ada') },
     { n: 'Juknis promo (PDF)', d: 'termasuk versi update di tengah bulan', s: st(!!(App.juknis || {})[tm], !!(App.juknis || {})[m]), extra: lbl + ((App.juknis || {})[tm] ? ' sudah ada' : ' belum ada') },
-    { n: 'Master artikel, foto & list promo', d: 'diupdate di admin Katalog Produk (otomatis ikut)', s: App.mst.status === 'ok' && App.mst.master ? 'info' : 'warn', extra: App.mst.master ? 'master ' + (App.mst.master.generated || '') : 'cek Katalog' }
+    ...(() => { const MI = App.mstInfo || {}, up = x => x && x.at ? ' · upload ' + fmtDateS(x.at.slice(0, 10)) : '';
+      return [
+        { n: 'Master Artikel', d: 'file Master Artikel HO (rutin ±tanggal 5)', s: MI.master ? (MI.master.month >= m ? 'ok' : 'warn') : 'bad', extra: MI.master ? 'versi ' + fmtMonth(MI.master.month) + up(MI.master) : 'belum diupload' },
+        { n: 'Master Foto', d: 'file Link Foto (update tidak rutin, ±3 bulan)', s: MI.photo ? (ago(MI.photo.date) > 120 ? 'warn' : 'ok') : 'bad', extra: MI.photo ? 'data foto ' + fmtDateS(MI.photo.date) + ' · ' + fmtN(MI.photo.arts) + ' artikel' : 'belum diupload' },
+        { n: 'List Artikel Promo (DCNP/SMDS)', d: 'awal bulan + tambahan / update diskon di tengah bulan', s: MI.promo ? (MI.promo.month >= m ? 'ok' : 'warn') : 'bad', extra: MI.promo ? fmtMonth(MI.promo.month) + ' · artikel-warna SMDS ' + fmtN(MI.promo.smds) + ' · DCNP ' + fmtN(MI.promo.dcnp) + up(MI.promo) : 'belum diupload' }];
+    })()
   ];
   const yearly = [{ n: 'Sales harian tahun lalu', d: 'Report Daily Sales (sekali setahun, untuk Growth)', s: 'info' }];
   const icon = { ok: '✅', warn: '⚠️', bad: '❌', info: 'ℹ️' };
@@ -3736,7 +3901,7 @@ function uploadChecklist() {
   const todo = [...daily, ...mon].filter(x => x.s === 'bad' || x.s === 'warn').length;
   return `<section class="card"><div class="card-h"><h3>Checklist upload</h3><p class="small muted">${todo ? `<b style="color:var(--bad)">${todo} item perlu diperhatikan</b>` : '<b style="color:var(--ok)">Semua data terbaru ✓</b>'}</p></div>
     <div class="ck-grid">${col('Harian', 'setiap pagi', daily)}${col('Mingguan', 'cek ringan', weekly)}${col('Bulanan', late ? 'mulai tgl 20: siapkan ' + fmtMonth(nm) : 'awal bulan / bila ada perubahan', mon)}${col('Tahunan', 'sekali setahun', yearly)}</div>
-    <p class="small muted" style="margin:10px 0 0">Tip: target, bobot, OmniChannel & EAC cukup lewat <b>Download template</b> di bawah, diisi, lalu diupload sekali. Semua file bisa diupload bersamaan.</p></section>`;
+    <p class="small muted" style="margin:10px 0 0">Tip: target, bobot, OmniChannel & EAC cukup lewat <b>Download template</b> di bawah, diisi, lalu diupload sekali. Master Artikel & Master Foto diupload apa adanya dari HO. List promo bisa dari file HO atau <b>Template List Promo</b>. Semua file bisa diupload bersamaan.</p></section>`;
 }
 
 /* ================= login akun (wajib setiap membuka / refresh link) ================= */
@@ -4822,10 +4987,12 @@ function pageAdmin(view) {
     ${uploadChecklist()}
     <section class="card"><div class="card-h"><h3>Akun pengguna</h3><p class="small muted">${App.pendingUsers ? `<b style="color:var(--bad)">${App.pendingUsers} pendaftaran menunggu persetujuan</b>` : 'setujui pendaftaran & atur akses'}</p></div><div id="usersBox"></div></section>
     <section class="card"><div class="card-h"><h3>Upload data</h3><p class="small muted">Item DSR Report, Lost Sale Report, Export by Bin (stok), dan file target. Semua tersimpan di spreadsheet master.</p></div>
-      <label class="drop" id="drop"><input type="file" id="fileIn" multiple accept=".xlsx,.xls,.csv,.pdf"><b>Pilih file</b><span class="small muted">atau seret file ke sini. Toko dikenali otomatis dari kolom Location.</span></label>
+      <label class="drop" id="drop"><input type="file" id="fileIn" multiple accept=".xlsx,.xls,.xlsb,.csv,.pdf"><b>Pilih file</b><span class="small muted">atau seret file ke sini. Toko dikenali otomatis dari kolom Location.</span></label>
       <div class="pend" id="pend"></div>
       <div class="note" style="margin-top:12px;display:flex;flex-wrap:wrap;gap:10px;align-items:center"><span><b>Template target bulanan</b> — satu file berisi sheet Target Sales, Target OmniChannel, Bobot Harian, dan Target EAC (Jan–Des), sudah terisi daftar toko & tanggal. Isi angkanya, lalu upload sekali.</span>
         <input type="month" id="tplM" class="inp sm" value="${esc(addMonths((App.lastDate || todayISO()).slice(0, 7), (+(App.lastDate || todayISO()).slice(8)) >= 20 ? 1 : 0))}"><button class="btn sm primary" id="tplBtn">Download template</button></div>
+      <div class="note" style="margin-top:8px;display:flex;flex-wrap:wrap;gap:10px;align-items:center"><span><b>List Artikel Promo (DCNP/SMDS)</b> — file HO bisa langsung diupload. Bila formatnya berbeda, salin ke template ini (kolom wajib: <b>SKU</b>, <b>Diskon (%)</b>, <b>Kategori</b> SMDS/DCNP). Saat upload, pilih <b>Ganti seluruh list</b> untuk list bulan baru atau <b>Tambahan / update diskon</b> untuk susulan di tengah bulan.</span>
+        <button class="btn sm primary" id="tplPromo">Template List Promo</button>${App.mst.promo && App.mst.promo.src === 'hub' ? '<button class="btn sm" id="dlPromo">Download list promo aktif</button>' : ''}</div>
       <div class="row-act"><button class="btn primary" id="saveBtn" ${App.pending.some(p => !p.err) ? '' : 'disabled'}>Simpan ke database</button><button class="btn" id="clrBtn" ${App.pending.length ? '' : 'disabled'}>Kosongkan daftar</button><span id="saveMsg" class="small muted"></span></div>
       <p class="small muted" style="margin-top:10px">File yang diupload bersamaan digabung otomatis, jadi DSR boleh dipecah per toko, per tanggal, atau per bagian. Tanggal yang sama untuk toko yang sama di upload berikutnya akan diganti dengan data baru, jadi aman upload ulang. Untuk stok, yang disimpan hanya snapshot terbaru tiap toko.</p></section>
     <section class="card"><div class="card-h"><h3>Kelengkapan data</h3><select id="covM" class="inp sm">${months.map(m => `<option value="${m}" ${m === cm ? 'selected' : ''}>${fmtMonth(m)}</option>`).join('') || '<option>Belum ada</option>'}</select></div><div id="cov" style="overflow-x:auto"></div></section>
@@ -4874,7 +5041,7 @@ function pageAdmin(view) {
   renderPending(); renderCoverage(cm);
   $('#logT').innerHTML = tbl('log', { rows: App.log.slice().reverse(), limit: 15, empty: 'Belum ada upload.', cols: [
     { k: 'at', label: 'Waktu', h: r => esc(new Date(r.at).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })) },
-    { k: 'kind', label: 'Jenis', h: r => ({ DSR: 'Penjualan', INV: 'Stok', TGT: 'Target', OMT: 'Target Omni', EAC: 'Target EAC', LST: 'Lost Sales', DLY: 'Sales harian', HO: 'Stok gudang HO', JUK: 'Juknis promo', BC: 'Blind counting', WGT: 'Bobot harian', SR: 'Sales Report', RAT: 'Target per head', DEL: 'Hapus' }[r.kind] || r.kind) }, { k: 'file', label: 'File', h: r => `<span class="small">${esc(r.file)}</span>` },
+    { k: 'kind', label: 'Jenis', h: r => ({ DSR: 'Penjualan', INV: 'Stok', TGT: 'Target', OMT: 'Target Omni', EAC: 'Target EAC', LST: 'Lost Sales', DLY: 'Sales harian', HO: 'Stok gudang HO', JUK: 'Juknis promo', BC: 'Blind counting', WGT: 'Bobot harian', SR: 'Sales Report', RAT: 'Target per head', MST: 'Master artikel', PHO: 'Master foto', PRM: 'List promo', DEL: 'Hapus' }[r.kind] || r.kind) }, { k: 'file', label: 'File', h: r => `<span class="small">${esc(r.file)}</span>` },
     { k: 'stores', label: 'Toko', r: 1 }, { k: 'info', label: 'Isi', h: r => esc(r.info) + (r.removed ? ' <span class="badge b-DS">sudah dihapus</span>' : '') },
     { k: 'x', label: '', ns: 1, h: r => r.id && r.scope && !r.removed ? `<button class="btn sm danger" data-dellog="${esc(r.id)}">Hapus data file ini</button>` : '' }] });
 }
@@ -4894,6 +5061,15 @@ function renderPending() {
     if (p.kind === 'SR') {
       const st = Object.values(p.stores); const b = st.reduce((a, x) => a + x.v[1], 0);
       return `<div class="pend-i"><span class="k dsr">Sales Report</span><div><div class="f">${esc(p.file)}</div><div class="d">${p.daily ? 'Harian ' + fmtDate(p.from) : 'Kumulatif ' + fmtDateS(p.from) + ' – ' + fmtDate(p.to)} · ${p.rows} site ${esc(p.region)} · bruto ${fmtRp(b)}</div></div><button class="btn sm" data-rmp="${i}">Hapus</button></div>`;
+    }
+    if (p.kind === 'MST') return `<div class="pend-i"><span class="k" style="background:#0F3192;color:#fff">Master Artikel</span><div><div class="f">${esc(p.file)}</div><div class="d">${fmtN(p.keys)} artikel-warna · ${fmtN(p.rows)} SKU · versi <input type="month" class="inp sm" data-pmonth="${i}" value="${esc(p.month)}"> · menggantikan master sebelumnya</div></div><button class="btn sm" data-rmp="${i}">Hapus</button></div>`;
+    if (p.kind === 'PHO') { const nc = Object.values(p.items).reduce((a, x) => a + Object.keys(x.c).length, 0); return `<div class="pend-i"><span class="k" style="background:#0F7C8C;color:#fff">Master Foto</span><div><div class="f">${esc(p.file)}</div><div class="d">${fmtN(Object.keys(p.items).length)} artikel · ${fmtN(nc)} warna · ${fmtN(p.rows)} baris SKU · tanggal update ${esc(fmtDate(p.date))} · menggantikan foto sebelumnya</div></div><button class="btn sm" data-rmp="${i}">Hapus</button></div>`; }
+    if (p.kind === 'PRM') {
+      const mode = p.mode || promoDefaultMode(p), old = promoSkuMap(), R = promoMerge(old, p.skus, mode, todayISO(), ''), st = R.st, keys = new Set(Object.values(p.skus).map(x => x.key)).size;
+      return `<div class="pend-i"><span class="k" style="background:#C0392B;color:#fff">List Promo</span><div><div class="f">${esc(p.file)}</div>
+        <div class="d">${fmtN(keys)} artikel-warna · ${fmtN(p.rows)} SKU · <b>SMDS ${fmtN(p.cnt.S)}</b> · <b>DCNP ${fmtN(p.cnt.D)}</b>${p.cnt[''] ? ` · <b style="color:var(--warn)">${fmtN(p.cnt[''])} tanpa kategori</b>` : ''}${p.bad ? ` · ${fmtN(p.bad)} baris diskon kosong dilewati` : ''} · bulan <input type="month" class="inp sm" data-pmonth="${i}" value="${esc(p.month)}"></div>
+        <div class="d" style="margin-top:6px"><select class="inp sm" data-pmode="${i}"><option value="merge" ${mode === 'merge' ? 'selected' : ''}>➕ Tambahan / update diskon (pertengahan bulan)</option><option value="replace" ${mode === 'replace' ? 'selected' : ''}>🔄 Ganti seluruh list (list bulan baru)</option></select>
+        <span>Dibanding list sekarang: <b style="color:var(--ok)">${fmtN(st.add)} baru</b> · <b style="color:#1B5FD6">${fmtN(st.up)} diskon naik</b> · ${fmtN(st.down)} diskon turun · ${fmtN(st.same)} sama${mode === 'replace' ? ` · <b style="color:var(--bad)">${fmtN(st.del)} dihapus</b>` : ' · artikel lain tetap berlaku'}</span></div></div><button class="btn sm" data-rmp="${i}">Hapus</button></div>`;
     }
     if (p.kind === 'RAT') {
       const R0 = raTargetRows(p), stN = new Set(R0.map(r => r[1])).size, tt = R0.reduce((a, r) => a + r[3], 0);
@@ -5074,6 +5250,26 @@ async function saveAll() {
       }
       logs.push({ id: uid(), scope: { months: ms, codes: Object.keys(p.names) }, at: now, kind: 'TGT', file: p.file, stores: p.rows, info: 'target ' + ms.map(fmtMonth).join(', ') });
     }
+    /* --- master katalog: artikel, foto, list promo --- */
+    let mstSaved = false;
+    for (const p of items.filter(p => p.kind === 'MST' || p.kind === 'PHO' || p.kind === 'PRM')) {
+      if (p.kind === 'MST') {
+        await mstSave('master', { month: p.month, file: p.file, items: p.items }, { label: 'Master artikel', file: p.file, month: p.month, keys: p.keys, rows: p.rows }, say);
+        logs.push({ id: uid(), scope: {}, at: now, kind: 'MST', file: p.file, stores: '–', info: 'master artikel ' + fmtMonth(p.month) + ', ' + fmtN(p.keys) + ' artikel-warna' });
+      } else if (p.kind === 'PHO') {
+        const arts = Object.keys(p.items).length;
+        await mstSave('photo', { date: p.date, file: p.file, bases: [MST_IMG_BASE], items: p.items }, { label: 'Master foto', file: p.file, date: p.date, arts, rows: p.rows }, say);
+        logs.push({ id: uid(), scope: {}, at: now, kind: 'PHO', file: p.file, stores: '–', info: 'master foto ' + fmtDate(p.date) + ', ' + fmtN(arts) + ' artikel' });
+      } else {
+        const mode = p.mode || promoDefaultMode(p), id = uid(), R = promoMerge(promoSkuMap(), p.skus, mode, todayISO(), id), P0 = App.mst.promo && App.mst.promo.src === 'hub' ? App.mst.promo : null;
+        const upd = (mode === 'merge' && P0 ? (P0.upd || []) : []).concat([Object.assign({ id, at: todayISO(), file: p.file, mode }, R.st)]).slice(-15);
+        const obj = promoPack(R.map, { month: p.month, title: (mode === 'merge' && P0 && P0.title) || p.title || 'List artikel promo', upd });
+        const cnt = { S: 0, D: 0 }; for (const k in obj.items) if (obj.items[k].c) cnt[obj.items[k].c] = (cnt[obj.items[k].c] || 0) + 1;
+        await mstSave('promo', obj, { label: 'List promo', file: p.file, month: p.month, mode, keys: Object.keys(obj.items).length, smds: cnt.S, dcnp: cnt.D, add: R.st.add, up: R.st.up }, say);
+        logs.push({ id: uid(), scope: {}, at: now, kind: 'PRM', file: p.file, stores: '–', info: 'list promo ' + fmtMonth(p.month) + (mode === 'merge' ? ` (tambahan: ${R.st.add} baru, ${R.st.up} naik, ${R.st.down} turun)` : ` (list baru: ${Object.keys(obj.items).length} artikel-warna)`) });
+      }
+      mstSaved = true;
+    }
     /* --- target tagging per head --- */
     for (const p of items.filter(p => p.kind === 'RAT')) {
       say('Menyimpan target tagging per head…'); const rows = raTargetRows(p);
@@ -5139,6 +5335,7 @@ async function saveAll() {
     App.pending = [];
     say('Memuat ulang dashboard…');
     await loadAll();
+    if (mstSaved) { say('Memuat ulang master artikel, foto & promo…'); await loadMaster(true); }
     toast('Data tersimpan di spreadsheet. Semua yang membuka link sekarang melihat data ini.');
     render();
   } catch (e) {
@@ -5172,6 +5369,36 @@ async function deleteStoreMonth() {
   catch (e) { toast('Gagal menghapus: ' + errMsg(e)); }
 }
 /* template target bulanan: Target Sales + Target OmniChannel + Bobot Harian dalam satu file */
+/* template list promo (atau list promo aktif untuk diedit lalu diupload ulang) */
+async function promoTemplate(withData) {
+  if (!(await needXLSX())) return;
+  const head = ['SKU', 'Artikel-Warna', 'Nama Artikel', 'MC Lv2', 'MC Lv3', 'MC Lv4', 'Harga Normal', 'Diskon (%)', 'Kategori', 'Mulai Berlaku'];
+  let rows;
+  if (withData) { const M = promoSkuMap(); rows = Object.keys(M).sort().map(sku => { const x = M[sku]; return [sku, x.key, x.n, x.l2, x.l3, x.l4, x.p, x.d, PCAT[x.c] === 'Tanpa kategori' ? '' : PCAT[x.c], x.s || '']; }); }
+  else rows = [['910001201006', '910001201.KHK', 'C.1989 FREE WAY, KHK, L', 'LIFESTYLE', 'APPAREL', 'PANTS', 419000, 40, 'SMDS', ''], ['910001567016', '910001567.OLI', 'K.POLO NEW LOGO, OLI, S', 'MOUNTAINEERING', 'APPAREL', 'TOP', 249000, 20, 'DCNP', ''], ['910008424001', '910008424.OLI', 'LACERTA MEN, OLI, 41', 'MOUNTAINEERING', 'FOOTWEAR', 'SANDAL', 579000, 30, 'DCNP', todayISO()]];
+  const ws = XLSX.utils.aoa_to_sheet([head, ...rows]); ws['!cols'] = [16, 16, 34, 16, 14, 14, 13, 11, 11, 13].map(w => ({ wch: w }));
+  for (let r = 1; r <= rows.length; r++) { const c = XLSX.utils.encode_cell({ r, c: 0 }); if (ws[c]) { ws[c].t = 's'; ws[c].v = String(ws[c].v); } }
+  const info = XLSX.utils.aoa_to_sheet([
+    ['Petunjuk Template List Artikel Promo'], [],
+    ['Kolom', 'Wajib?', 'Keterangan'],
+    ['SKU', 'Wajib', 'Kode artikel lengkap 12 digit, satu baris per SKU (per ukuran). Format kolom Text supaya angka tidak berubah.'],
+    ['Artikel-Warna', 'Opsional', 'Contoh 910001201.KHK. Bila kosong diambil dari nama artikel (bagian warna).'],
+    ['Nama Artikel', 'Opsional', 'Format "NAMA, WARNA, UKURAN" seperti di sistem.'],
+    ['MC Lv2 / Lv3 / Lv4', 'Opsional', 'Kategori produk. Bila kosong diambil dari Master Artikel.'],
+    ['Harga Normal', 'Opsional', 'Harga sebelum diskon. Bila kosong diambil dari Master Artikel.'],
+    ['Diskon (%)', 'Wajib', 'Boleh 30 atau 0,3 (sama-sama 30%).'],
+    ['Kategori', 'Wajib', 'SMDS (Selected EIGER) atau DCNP (Selected DC / Selected Outlive). File HO dengan kolom Remark juga dikenali otomatis.'],
+    ['Mulai Berlaku', 'Opsional', 'Tanggal mulai diskon (YYYY-MM-DD). Bila kosong = tanggal upload.'], [],
+    ['Cara upload'],
+    ['1. Awal bulan: upload list lengkap, pilih "Ganti seluruh list (list bulan baru)".'],
+    ['2. Tengah bulan (artikel tambahan / diskon naik): cukup upload SKU yang baru atau berubah, pilih "Tambahan / update diskon".'],
+    ['   SKU baru ditambahkan, diskon yang berubah diperbarui (diskon lama dicatat), artikel lain tetap berlaku.'],
+    ['3. Nama file sebaiknya memuat bulan, misal 2026.11_LIST_PROMO.xlsx, supaya bulan terisi otomatis.']]);
+  info['!cols'] = [{ wch: 22 }, { wch: 10 }, { wch: 110 }];
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'List Promo'); XLSX.utils.book_append_sheet(wb, info, 'Petunjuk');
+  const nm = withData ? `List_Promo_Aktif_${(App.mst.promo && App.mst.promo.month) || todayISO().slice(0, 7)}.xlsx` : `Template_List_Promo_${todayISO().slice(0, 7)}.xlsx`;
+  (await getDownloads()).save({ filename: nm, data: new Blob([XLSX.write(wb, { bookType: 'xlsx', type: 'array' })]) });
+}
 async function downloadTemplate(m) {
   if (!m || !(await needXLSX())) return;
   const codes = storeCodes().filter(c => sType(c) !== 'bz' || (App.tgtDetail[m] || {})[c] || (App.omni[m] || {})[c]);
@@ -5406,6 +5633,7 @@ document.addEventListener('click', async e => {
   const dtml = t.closest('[data-dtml]'); if (dtml) { App.ui.dtMcLv = dtml.dataset.dtml; render(); return; }
   const dtl = t.closest('[data-dtl]'); if (dtl) { App.ui.dtLvl = dtl.dataset.dtl; render(); return; }
   const pst = t.closest('[data-pstog]'); if (pst) { const o = App.ui.psOpen || (App.ui.psOpen = {}); o[pst.dataset.pstog] = !o[pst.dataset.pstog]; render(); return; }
+  { const pc = t.closest && t.closest('[data-pscat]'); if (pc) { App.ui.psCat = pc.dataset.pscat; App.ui.more = {}; render(); return; } }
   if (t.id === 'psAll' || t.id === 'psNone') { const o = App.ui.psOpen = {}; if (t.id === 'psAll') $$('[data-pstog]').forEach(x => { o[x.dataset.pstog] = true; }); if (t.id === 'psAll') { render(); $$('[data-pstog]').forEach(x => { o[x.dataset.pstog] = true; }); } render(); return; }
   const rpf = t.closest('[data-rpf]'); if (rpf) { App.ui.rpFull = rpf.dataset.rpf === '1'; render(); return; }
   const rpv = t.closest('[data-rpv]'); if (rpv) { App.ui.rpVal = rpv.dataset.rpv; render(); return; }
@@ -5456,6 +5684,7 @@ document.addEventListener('click', async e => {
   const rms = t.closest('[data-rmstore]'); if (rms) { const c = rms.dataset.rmstore; if (!confirm(`Hapus ${c} - ${sName(c)} dari daftar toko area? Data penjualannya tidak ikut terhapus.`)) return; try { await apiPost({ a: 'storeRemove', code: c }); await loadAll(); toast('Dihapus dari daftar'); render(); } catch (er) { toast('Gagal: ' + errMsg(er)); } return; }
   if (t.id === 'mstReload') { toast('Memuat master & foto dari Katalog Produk…'); loadMaster(true); render(); return; }
   if (t.id === 'tplBtn') { downloadTemplate(($('#tplM') || {}).value); return; }
+  if (t.id === 'tplPromo' || t.id === 'dlPromo') { promoTemplate(t.id === 'dlPromo'); return; }
   if (t.id === 'scopeBtn') { openScope(false); return; }
   const scb = t.closest('[data-scope]'); if (scb && t.closest('#scOv')) { setScope(''); return; }
   if (t.id === 'scGo') { const v = ($('#scSel') || {}).value; if (!v) { toast('Pilih toko dulu'); return; } setScope(v); return; }
@@ -5513,6 +5742,7 @@ document.addEventListener('change', async e => {
   if (t.id === 'gwComp') { App.ui.gwComp = t.checked; render(); return; }
   if (t.id === 'raStore') { App.ui.raStore = t.value; App.ui.more = {}; render(); return; }
   if (['saDays', 'saDate', 'saSt', 'saSign'].includes(t.id)) { App.ui[t.id] = t.id === 'saDays' ? +t.value : t.value; App.ui.more = {}; render(); return; }
+  if (t.id === 'psNew') { App.ui.psNew = t.checked; render(); return; }
   if (t.id === 'saAllSt') { App.ui.saAllSt = t.checked; render(); return; }
   if (t.id === 'raRet') { App.ui.raRet = t.checked; render(); return; }
   if (t.id === 'raMin') { App.ui.raMin = Math.max(0, +t.value || 0); render(); return; }
@@ -5536,7 +5766,8 @@ document.addEventListener('change', async e => {
   if (t.id === 'rpDate') { if (t.value) { App.ui.rpDate = t.value; render(); } return; }
   if (t.id === 'fileIn') { const fs = [...t.files]; t.value = ''; await addFiles(fs); return; }
   if (t.dataset && t.dataset.pyear !== undefined) { const p = App.pending[+t.dataset.pyear]; if (p && +t.value > 2000) { p.year = +t.value; renderPending(); } return; }
-  if (t.dataset && t.dataset.pmonth !== undefined) { const p = App.pending[+t.dataset.pmonth]; if (p) p.month = t.value; return; }
+  if (t.dataset && t.dataset.pmonth !== undefined) { const p = App.pending[+t.dataset.pmonth]; if (p) { p.month = t.value; if (p.kind === 'PRM') renderPending(); } return; }
+  if (t.dataset && t.dataset.pmode !== undefined) { const p = App.pending[+t.dataset.pmode]; if (p) { p.mode = t.value; renderPending(); } return; }
   if (t.id === 'tgtB') { saveBasis(t.value); return; }
   if (t.dataset && t.dataset.pxadd !== undefined) { const p = App.pending[+t.dataset.pxadd]; if (p && t.value && t.value !== p.date) { p.extra = [...new Set([...(p.extra || []), t.value])].sort(); renderPending(); } return; }
   if (t.dataset && t.dataset.pdate !== undefined) { const p = App.pending[+t.dataset.pdate]; if (p && t.value) { p.date = t.value; p.dateFromName = true; } return; }

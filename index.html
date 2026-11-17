@@ -811,8 +811,8 @@ function chipGrowth(x, suffix = '') {
   const cls = x > 0.005 ? 'up' : x < -0.005 ? 'down' : 'flat';
   return `<span class="chip ${cls}">${x > 0 ? '+' : ''}${fmtPct(x)}${suffix}</span>`;
 }
-/* barang siap jual: SKU berawalan 91, 92, 94, 99 (dipakai di monitoring SA-TR & SA-BO) */
-const isReady = sku => /^(91|92|94|99)/.test(String(sku || '').trim());
+/* barang siap jual untuk monitoring SA-TR & SA-BO: SKU berawalan 91, 94, 99 (92 = brand Bodypack, tidak dihitung) */
+const isReady = sku => /^(91|94|99)/.test(String(sku || '').trim());
 const artOf = sku => (/^\d{12}$/.test(sku) ? sku.slice(0, 9) : sku);
 const artName = n => String(n || '').split(',')[0].trim();
 const varName = n => String(n || '').split(',').slice(1).join(',').trim();
@@ -4588,7 +4588,7 @@ function saHeat(stores, dates, val, neg) {
 }
 function pageSaBin(view, T) {
   const U = App.ui, isTR = T === 'TR', pg = App.page, bin = isTR ? 'SA-TR-01-00' : 'SA-BO-01-00';
-  setHead(isTR ? 'SA-TR · Bin Transit' : 'SA-BO · Bin Booking', `Monitoring qty di bin ${bin} per toko per hari${isTR ? ' · plus & minus' : ''} · hanya barang siap jual (SKU 91/92/94/99)`);
+  setHead(isTR ? 'SA-TR · Bin Transit' : 'SA-BO · Bin Booking', `Monitoring qty di bin ${bin} per toko per hari${isTR ? ' · plus & minus' : ''} · hanya barang siap jual (SKU 91/94/99, tanpa Bodypack 92)`);
   if (!App.saBin) {
     view.innerHTML = '<div class="loading"><span class="spin"></span>Memuat data bin SA…</div>';
     loadSaBin().then(() => { if (App.page === pg) render(); }, loadFail); return;

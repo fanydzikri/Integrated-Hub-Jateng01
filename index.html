@@ -599,7 +599,7 @@ table.rp{border-collapse:separate;border-spacing:0;font-size:12px;width:100%;min
 .nav button.menu-btn:hover{color:#fff;filter:brightness(1.05)}
 /* ===== tampilan HP: semua menu pas di layar ===== */
 @media (max-width:640px){
-  html,body{overflow-x:hidden;max-width:100%}
+  html,body{overflow-x:clip;max-width:100%}
   input,select,textarea,.inp,.inp.sm{font-size:16px!important}
   .brandbar .row1{gap:6px;min-width:0}
   .brandbar .row1>svg{display:none}
@@ -731,6 +731,13 @@ button.pd-sz:hover{box-shadow:0 0 0 3px rgba(15,49,146,.12)}
 .pd-sz.sel{background:var(--navy);border-color:var(--navy);opacity:1}.pd-sz.sel b,.pd-sz.sel small{color:#fff}
 .pd-bins{border:1px solid var(--line);border-left:5px solid var(--orange);border-radius:12px;padding:12px 14px;background:var(--surface)}
 .pd-bins .card-h{margin-bottom:6px}.pd-bins h3{font-size:15px}
+
+/* penanda tanggal data (tombol non-aktif biru) */
+.asof-row{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.asof-row:empty{display:none}
+.asof{font:inherit;font-size:12.5px;font-weight:700;color:#fff;background:#2F6BFF;border:1px solid rgba(255,255,255,.45);border-radius:999px;padding:5px 12px;cursor:default;opacity:1;box-shadow:0 2px 8px rgba(0,0,0,.18);white-space:nowrap}
+.asof:disabled{color:#fff;opacity:1}
+@media (max-width:640px){.asof{font-size:12px;padding:4px 10px;white-space:normal;text-align:left}}
 </style>
 </head>
 <body>
@@ -749,7 +756,7 @@ button.pd-sz:hover{box-shadow:0 0 0 3px rgba(15,49,146,.12)}
   </div>
 </header>
 <section class="phead"><div class="wrap">
-  <div><div class="crumb" id="crumb"></div><h1 id="pageTitle">Integrated Hub Jateng 01</h1><p id="pageSub"></p></div>
+  <div><div class="crumb" id="crumb"></div><h1 id="pageTitle">Integrated Hub Jateng 01</h1><p id="pageSub"></p><div class="asof-row" id="asof"></div></div>
   <div class="period" id="periodBox"></div>
 </div></section>
 <div class="wrap subnav" id="subnav"></div>
@@ -1698,7 +1705,43 @@ const NAV = [
   { k: 'settings', label: 'Pengaturan', icon: 'settings', admin: 1 }
 ];
 const pageGroup = pg => (NAV.find(g => g.items && g.items.some(i => i[0] === pg)) || {}).k || (pg === 'toko' ? 'sales' : pg);
+/* ===== penanda "data per tanggal" di setiap menu ===== */
+function dataAsOf(pg) {
+  const fd = d => d ? fmtDate(d) : '–', out = [];
+  const maxD = arr => arr.filter(Boolean).sort().pop() || '';
+  const sales = () => { if (App.lastDate) out.push(['🧾 Penjualan s/d ' + fd(App.lastDate), 'Tanggal terakhir Item DSR yang sudah diupload']); };
+  const stock = () => {
+    const ds = Object.entries(App.index.stock || {}).filter(([c]) => typeOk(c)).map(([, x]) => x && x.date).filter(Boolean).sort(); if (!ds.length) return;
+    out.push(['📦 Stok per ' + fd(ds[ds.length - 1]), ds[0] !== ds[ds.length - 1] ? `Export by Bin terakhir. Tanggal stok antar toko berbeda: ${fmtDateS(ds[0])} – ${fmtDateS(ds[ds.length - 1])}` : 'Export by Bin terakhir yang diupload']);
+  };
+  const live = what => out.push(['🔄 ' + what + ' · real-time', 'Data langsung dari server' + (App.hubAt ? ', dimuat jam ' + omsTime(App.hubAt) + ' WIB' : '')]);
+  switch (pg) {
+    case 'home': sales(); stock(); break;
+    case 'report': case 'trend': case 'promo': case 'omni': case 'eac': case 'ra': case 'pareto': case 'growth': sales(); break;
+    case 'toko': case 'area': case 'produk': case 'transfer': case 'pica': sales(); stock(); break;
+    case 'promostock': stock(); break;
+    case 'ro': stock(); if (App.hoInfo && App.hoInfo.date) out.push(['🏭 Stok gudang HO per ' + fd(App.hoInfo.date), 'Data stok gudang HO terakhir']); break;
+    case 'detention': { const d = maxD((App.detHist || []).filter(r => typeOk(r.c)).map(r => r.d)); if (d) out.push(['🗄️ Detention per ' + fd(d), 'Ringkasan detention harian terakhir']); else stock(); break; }
+    case 'bc': { const d = maxD((App.bc || []).filter(r => typeOk(r[1])).map(r => r[0])); if (d) out.push(['🔢 Blind Counting per ' + fd(d), 'Data blind counting terakhir yang diupload']); break; }
+    case 'lost': { const d = maxD((App.lost || []).filter(r => typeOk(r.s)).map(r => r.d)); if (d) out.push(['⚠️ Lost Sales s/d ' + fd(d), 'Tanggal terakhir di Lost Sale Report']); break; }
+    case 'satr': case 'sabo': { const d = maxD((App.saBin || []).filter(r => typeOk(r[1])).map(r => r[0])); if (d) out.push([(pg === 'satr' ? '🚚 SA-TR' : '📌 SA-BO') + ' per ' + fd(d), 'Export by Bin terakhir yang diupload']); else stock(); break; }
+    case 'omset': { const D = App.ui.omsDate || todayISO(), sn = (App.oms || {})[D] || [], last = sn.length ? sn[sn.length - 1] : null;
+      out.push(last ? ['⏱ Update ' + fmtDateS(D) + ' jam ' + omsTime(last.at) + ' WIB', 'Upload Sales Report CARE terakhir oleh toko piket'] : ['⏱ Belum ada update ' + fmtDateS(D), 'Belum ada upload Sales Report CARE untuk tanggal ini']); break; }
+    case 'juknis': { const ms = Object.keys(App.juknis || {}).sort(); if (ms.length) out.push(['🏷️ Juknis s/d ' + fmtMonth(ms[ms.length - 1]), 'Bulan juknis promo terakhir yang diupload']); break; }
+    case 'ops_approval': live('Approval'); break;
+    case 'ops_task': live('Task'); break;
+    case 'ops_info': live('Informasi'); break;
+    case 'ops_ess': { const d = (App.ess && App.ess.d) || todayISO(); out.push(['📝 Isian ESS ' + fd(d) + ' · real-time', 'Isian self assessment RA langsung dari server']); break; }
+  }
+  return out;
+}
+function renderAsOf() {
+  const el = $('#asof'); if (!el) return;
+  const L = App.user ? dataAsOf(App.page) : [];
+  el.innerHTML = L.map(([t, tip]) => `<button type="button" class="asof" disabled title="${esc(tip)}" aria-label="${esc(t + '. ' + tip)}">${esc(t)}</button>`).join('');
+}
 function renderNav() {
+  renderAsOf();
   const G = groupOf(App.page), open = App.ui.navOpen, logged = !!App.user;
   const svg = k => `<svg viewBox="0 0 24 24" aria-hidden="true">${ICON[k] || ''}</svg>`;
   const item = x => { const bd = menuBadge(x.k); return `<button role="menuitem" data-menu="${x.k}" class="${App.page === x.k ? 'on' : ''}"><span class="ic">${MENU_IC[x.k] || '•'}</span><span class="tx"><b>${esc(x.l)}</b><small>${esc(x.d)}</small></span>${bd ? `<span class="bd">${bd}</span>` : ''}</button>`; };
@@ -1799,7 +1842,7 @@ function render() {
     return;
   }
   const fn = { satr: v => pageSaBin(v, 'TR'), sabo: v => pageSaBin(v, 'BO'), area: pageArea, report: pageReport, trend: pageTrend, promo: pagePromo, omni: pageOmni, eac: pageEac, ra: pageRA, pareto: pagePareto, lost: pageLost, promostock: pagePromoStock, detention: pageDetention, growth: pageGrowth, transfer: pageTransfer, ro: pageRO, pica: pagePica, juknis: pageJuknis, home: pageHome, bc: pageBC, omset: pageOmset, ops_approval: pageApproval, ops_task: pageTask, ops_info: pageInfo, ops_ess: pageEss, toko: pageStore, produk: pageProduct, stok: pageStock, admin: pageAdmin, settings: pageSettings }[App.page] || pageReport;
-  try { fn(view); lockScopedSelects(view); if (App.page === 'admin') renderUsers(); if ((App.loadWarn || []).length) view.insertAdjacentHTML('afterbegin', `<div class="note" style="margin-bottom:14px">Sebagian data belum termuat (${esc(App.loadWarn.join(', '))}). Tekan <b>Muat ulang</b> di kanan atas untuk mencoba lagi.</div>`); } catch (e) { console.error(e); view.innerHTML = `<div class="empty-state"><h2>Halaman gagal ditampilkan</h2><p class="muted">${esc(e.message)}</p></div>`; }
+  try { fn(view); renderAsOf(); lockScopedSelects(view); if (App.page === 'admin') renderUsers(); if ((App.loadWarn || []).length) view.insertAdjacentHTML('afterbegin', `<div class="note" style="margin-bottom:14px">Sebagian data belum termuat (${esc(App.loadWarn.join(', '))}). Tekan <b>Muat ulang</b> di kanan atas untuk mencoba lagi.</div>`); } catch (e) { console.error(e); view.innerHTML = `<div class="empty-state"><h2>Halaman gagal ditampilkan</h2><p class="muted">${esc(e.message)}</p></div>`; }
 }
 
 /* ================= komponen ================= */
@@ -3836,7 +3879,7 @@ const isOps = pg => /^ops_/.test(pg || '');
 const hubName = c => (App.stores && App.stores[c] && (App.stores[c].alias || App.stores[c].name)) || ((App.hub && App.hub.stores || []).find(r => r[0] === c) || [])[1] || c;
 const hubStores = () => { const L = (App.hub && App.hub.stores) || Object.keys(App.stores || {}).map(c => [c, hubName(c), '']); return L.filter(r => r[0]).sort((a, b) => a[0].localeCompare(b[0])); };
 const hubReg = () => { const L = hubStores().filter(r => !/^9/.test(r[0]) && r[2] !== 'bz').map(r => r[0]); if (L.length) return L; const T = (App.hub && App.hub.task) || []; return [...new Set(T.flatMap(t => t.stores || []))].sort(); };
-async function loadHub(force) { if (App.hub && !force) return App.hub; App.hub = await api('hub'); return App.hub; }
+async function loadHub(force) { if (App.hub && !force) return App.hub; App.hub = await api('hub'); App.hubAt = new Date().toISOString(); return App.hub; }
 async function hubPost(col, body, okMsg) {
   try { const r = await apiPost(Object.assign({ a: 'hub', col }, body)); App.hub[col] = r.items || []; if (okMsg) toast(okMsg); render(); return true; }
   catch (e) { toast('Gagal: ' + errMsg(e)); return false; }

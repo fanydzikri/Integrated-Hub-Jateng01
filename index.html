@@ -2352,15 +2352,16 @@ function pageTrend(view) {
       ${DOW_ORDER.map(w => `<tr><th class="d">${DOW[w]}</th>${hours.map(h => { const v = (HM.get(w + '|' + h) || 0) / (dCount.get(w) || 1); const a = hmMax ? v / hmMax : 0; return `<td title="${DOW[w]} ${pad(h)}.00: ${fmtX(v, 1)} trx/hari" style="background:rgba(15,49,146,${(a * .9).toFixed(2)});color:${a > .5 ? '#fff' : 'var(--ink)'}">${v ? fmtX(v, v < 10 ? 1 : 0) : ''}</td>`; }).join('')}</tr>`).join('')}
       </tbody></table></div></section>
     <section class="card"><div class="card-h"><h3>UPT & basket size harian${st ? ' · ' + esc(sName(st)) : ' · semua toko'}</h3><p class="small muted">pilih toko di atas untuk melihat per toko</p></div><div class="chart-box"><canvas id="cUpt"></canvas></div></section>
-    <section class="card"><div class="card-h"><h3>Per toko</h3><p class="small muted">klik toko untuk melihat grafiknya</p></div><div id="tdT"></div></section>
+    <section class="card"><div class="card-h"><h3>Per toko</h3><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><p class="small muted" style="margin:0">klik toko untuk melihat grafiknya</p><button class="btn sm" id="trXls">Download Excel</button></div></div><div id="tdT"></div></section>
   </div>`;
   mkDual($('#cHour'), hours.map(h => pad(h) + '.00'), hours.map(h => (H.get(h) || {}).n || 0), hours.map(h => (H.get(h) || {}).v || 0), 'Transaksi', VLL(), v => fmtN(v), v => fmtRpS(v));
   mkDual($('#cDow'), DOW_ORDER.map(w => DOW[w]), DOW_ORDER.map(w => Dw.get(w) ? Dw.get(w).n / (dCount.get(w) || 1) : null), DOW_ORDER.map(w => Dw.get(w) ? Dw.get(w).v / (dCount.get(w) || 1) : null), 'Rata-rata transaksi', 'Rata-rata ' + VLL().toLowerCase(), v => fmtX(v, 0), v => fmtRpS(v));
   mkDual($('#cUpt'), dl.map(fmtDateS), dl.map(d => { const x = Dd.get(d); return x && x.n ? x.v / x.n : null; }), dl.map(d => { const x = Dd.get(d); return x && x.n ? x.q / x.n : null; }), 'Basket size', 'UPT', v => fmtRpS(v), v => fmtX(v, 2));
+  App.ui.trLast = { srows, R, st, hours, H, Dw, dCount };
   $('#tdT').innerHTML = tbl('trendT', { rows: srows, sort: { k: 'v', dir: 'desc' }, limit: 40, onRow: r => { App.ui.tdStore = r.c; render(); window.scrollTo(0, 0); }, cols: [
     { k: 'name', label: 'Toko', h: r => `<span class="nm">${esc(r.name)}</span><span class="sub">${esc(r.c)}</span>` },
-    { k: 'n', label: 'Transaksi', r: 1, h: r => fmtN(r.n) }, { k: 'q', label: 'Qty', r: 1, h: r => fmtN(r.q) }, { k: 'v', label: VL(), r: 1, h: r => fmtRpS(r.v) },
-    { k: 'upt', label: 'UPT', r: 1, h: r => fmtX(r.upt, 2) }, { k: 'bs', label: 'Basket size', r: 1, h: r => fmtRpS(r.bs) },
+    { k: 'n', label: 'Transaksi', r: 1, h: r => fmtN(r.n) }, { k: 'q', label: 'Qty', r: 1, h: r => fmtN(r.q) }, { k: 'v', label: VL(), r: 1, h: r => fmtRp(r.v) },
+    { k: 'upt', label: 'UPT', r: 1, h: r => fmtX(r.upt, 2) }, { k: 'bs', label: 'Basket size', r: 1, h: r => r.bs == null ? '–' : fmtRp(Math.round(r.bs)) },
     { k: 'ph', label: 'Jam tersibuk', r: 1, h: r => r.ph == null ? '–' : pad(r.ph) + '.00' }, { k: 'pw', label: 'Hari tersibuk', h: r => r.pw == null ? '–' : DOW[r.pw] }] });
 }
 
@@ -4805,6 +4806,20 @@ function pageSaBin(view, T) {
     { k: 'st', label: 'Toko', h: r => `<b class="tn">${esc(r.c)}</b> ${esc(r.st)}` }, { k: 'sku', label: 'SKU', h: r => `<span class="tn">${esc(r.sku)}</span>` }, { k: 'n', label: 'Nama artikel', h: r => esc(r.n) },
     { k: 'q', label: 'Qty', r: 1, h: r => `<b style="color:${r.q < 0 ? 'var(--bad)' : 'var(--ink)'}">${fmtN(r.q)}</b>` }] });
 }
+async function exportTrend() {
+  const X = App.ui.trLast; if (!X || !(await needXLSX())) return;
+  const wb = XLSX.utils.book_new(), per = `${X.R.label}${X.st ? ' · ' + sName(X.st) : ' · semua toko'}`;
+  const a1 = [['Sales Trend per toko', per], [], ['Kode Toko', 'Nama Toko', 'Transaksi', 'Qty', VL(), 'UPT', 'Basket Size', 'Jam Tersibuk', 'Hari Tersibuk'],
+    ...X.srows.slice().sort((a, b) => b.v - a.v).map(r => [r.c, r.name, r.n, r.q, Math.round(r.v), r.upt == null ? null : Math.round(r.upt * 100) / 100, r.bs == null ? null : Math.round(r.bs), r.ph == null ? '' : pad(r.ph) + '.00', r.pw == null ? '' : DOW[r.pw]])];
+  const w1 = XLSX.utils.aoa_to_sheet(a1); w1['!cols'] = [10, 34, 11, 9, 16, 7, 14, 13, 13].map(w => ({ wch: w }));
+  for (let i = 3; i < a1.length; i++) { [4, 6].forEach(c => { const a = XLSX.utils.encode_cell({ r: i, c }); if (w1[a]) w1[a].z = '#,##0'; }); const u = XLSX.utils.encode_cell({ r: i, c: 5 }); if (w1[u]) w1[u].z = '0.00'; }
+  XLSX.utils.book_append_sheet(wb, w1, 'Per toko');
+  const a2 = [['Jam', 'Transaksi', VL()], ...X.hours.map(h => { const x = X.H.get(h) || {}; return [pad(h) + '.00', x.n || 0, Math.round(x.v || 0)]; })];
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(a2), 'Per jam');
+  const a3 = [['Hari', 'Rata-rata transaksi', 'Rata-rata ' + VL()], ...DOW_ORDER.map(w => { const x = X.Dw.get(w), c = X.dCount.get(w) || 1; return [DOW[w], x ? Math.round(x.n / c * 10) / 10 : 0, x ? Math.round(x.v / c) : 0]; })];
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(a3), 'Per hari');
+  (await getDownloads()).save({ filename: `Sales_Trend_${X.st || 'semua_toko'}_${X.R.from}_${X.R.to}.xlsx`, data: new Blob([XLSX.write(wb, { bookType: 'xlsx', type: 'array' })]) });
+}
 async function exportSaBin() {
   const X = App.ui.saLast; if (!X || !(await needXLSX())) return;
   const aoa = [['Tanggal', 'Kode Toko', 'Nama Toko', 'Bin', 'SKU', 'Nama Artikel', 'Qty'], ...X.det.map(r => [r.d, r.c, r.st, X.T === 'TR' ? 'SA-TR-01-00' : 'SA-BO-01-00', r.sku, r.n, r.q])];
@@ -5628,6 +5643,7 @@ document.addEventListener('click', async e => {
   const gwb = t.closest('[data-gwb]'); if (gwb) { App.ui.gwBasis = gwb.dataset.gwb; render(); return; }
   if (t.id === 'raXls') { exportRA(); return; }
   if (t.id === 'saXls') { exportSaBin(); return; }
+  if (t.id === 'trXls') { exportTrend(); return; }
   { const ss = t.closest && t.closest('[data-sast]'); if (ss) { App.ui.saSt = ss.dataset.sast; App.ui.more = {}; render(); const d = $('#saDet'); if (d) d.scrollIntoView({ behavior: 'smooth', block: 'start' }); return; } }
   if (t.id === 'spXls') { (async () => { const X = App.ui.spLast; if (!X || !(await needXLSX())) return; const aoa = [['Tanggal', 'Jam', 'Order No', 'Sales Person', 'Bill Status', 'Tipe Transaksi', 'SKU', 'Item', 'Customer', 'Qty', 'Nilai']].concat(X.L.slice().sort((a, b) => (a.d + a.o).localeCompare(b.d + b.o)).map(l => [l.d, hhmm(l.t), l.o, spName(l.sp), l.st || '', l.ty || '', l.sku, (App.sku[l.sku] || [])[0] || '', l.cn || '', l.q, Math.round(VAL(l))])); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), 'Transaksi RA'); (await getDownloads()).save({ filename: `Transaksi_RA_${X.st}_${X.R.from}_${X.R.to}.xlsx`, data: new Blob([XLSX.write(wb, { bookType: 'xlsx', type: 'array' })]) }); })(); return; }
   if (t.id === 'poolXls') { (async () => { const X = App.ui.poolLast; if (!X || !(await needXLSX())) return; const det = [['Tanggal', 'Order No', 'Komponen', 'Tipe Transaksi', 'Bill Status', 'Sales Person', 'SKU', 'Nama Item', 'Kategori Lv4', 'Qty', 'Nilai', 'Dihitung?']]; X.O.forEach(y => y.items.forEach(i => det.push([y.d, y.o, y.c, y.ty, y.bs, y.sp, i.sku, i.n, i.c4, i.q, Math.round(i.v), i.nc ? 'tidak' : 'ya'])));

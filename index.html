@@ -755,6 +755,10 @@ button.pd-sz:hover{box-shadow:0 0 0 3px rgba(15,49,146,.12)}
 .chat-ph{display:flex;flex-wrap:wrap;gap:5px;align-items:center;margin-top:6px}
 .chat-ph button{font:inherit;font-family:var(--font-mono);font-size:11.5px;border:1px solid var(--line-strong);background:var(--navy-tint);color:var(--navy);border-radius:7px;padding:2px 7px;cursor:pointer}
 .chat-ph button:hover{border-color:var(--navy)}
+  .pt-cat{border:0;text-align:left;cursor:pointer;font:inherit;color:#fff;display:flex;flex-direction:column;gap:2px}.pt-cat *{color:#fff}.pt-cat:hover{filter:brightness(1.12)}
+  .pt-cat.on{outline:3px solid var(--orange,#F26B21);outline-offset:-3px}
+  .psc{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:700}
+  .psc-S{background:#E8F0FF;color:#0F3192}.psc-D{background:#FFF0E6;color:#C2410C}.psc-P{background:#EEF2F6;color:#475569}
 </style>
 </head>
 <body>
@@ -1862,7 +1866,7 @@ const ICON = {
 };
 const NAV = [
   { k: 'sales', label: 'Sales Performance', icon: 'area', items: [['omset', 'Share Omset Harian', 'Update sales per 2 jam dari toko piket'], ['report', 'Monitoring Sales', 'Achievement, UPT & basket size'], ['trend', 'Sales Trend', 'Jam, hari, UPT & basket harian'], ['promo', 'Kontribusi Promo', 'Porsi tiap promo terhadap sales'], ['omni', 'Monitoring OmniChannel', 'EA, Eigerindo Voucher, Tax Invoice, EASAP'], ['eac', 'Sales Member EAC', 'KPI penjualan ke member'], ['ra', 'RA Performance', 'Transaksi, UPT & basket per sales person'], ['pareto', 'Product Pareto', 'Kontribusi kategori & produk (80/20)'], ['growth', 'Growth vs Tahun Lalu', 'Harian, MTD & YTD dibanding tahun lalu']] },
-  { k: 'inv', label: 'Inventory', icon: 'produk', items: [['produk', 'Produk', 'Penjualan & stok per artikel'], ['transfer', 'Saran Transfer Stok', 'Pindahkan stok dari toko yang menumpuk ke toko yang butuh'], ['ro', 'Saran Repeat Order', 'Order ke gudang HO untuk stok yang menipis'], ['promostock', 'Stok DCNP/SMDS', 'Stok barang diskon per MC Lv2–Lv4'], ['detention', 'Detention Stock', '% generic & varian terdisplay per toko'], ['bc', 'Blind Counting', 'Progres stock opname harian per toko'], ['satr', 'SA-TR', 'Bin transit SA-TR-01-00 harian · plus & minus'], ['sabo', 'SA-BO', 'Bin booking SA-BO-01-00 harian']] },
+  { k: 'inv', label: 'Inventory', icon: 'produk', items: [['produk', 'Produk', 'Stok qty & value per MC Lv2–Lv4, artikel, SKU, SMDS/DCNP'], ['transfer', 'Saran Transfer Stok', 'Pindahkan stok dari toko yang menumpuk ke toko yang butuh'], ['ro', 'Saran Repeat Order', 'Order ke gudang HO untuk stok yang menipis'], ['promostock', 'Stok DCNP/SMDS', 'Stok barang diskon per MC Lv2–Lv4'], ['detention', 'Detention Stock', '% generic & varian terdisplay per toko'], ['bc', 'Blind Counting', 'Progres stock opname harian per toko'], ['satr', 'SA-TR', 'Bin transit SA-TR-01-00 harian · plus & minus'], ['sabo', 'SA-BO', 'Bin booking SA-BO-01-00 harian']] },
   { k: 'lost', label: 'Lost Sales', icon: 'lost' },
   { k: 'pica', label: 'Analisa PICA', icon: 'pica' },
   { k: 'juknis', label: 'Promo', icon: 'tag' },
@@ -4769,43 +4773,119 @@ function pageStore(view) {
 }
 
 /* ================= halaman: produk ================= */
+/* ================= Produk: fokus stok (qty & value per MC Lv2/Lv3/Lv4, artikel, SKU, SMDS/DCNP) ================= */
+const PSC = { S: 'SMDS', D: 'DCNP', P: 'Promo', N: 'Normal' };
+const pscBadge = k => k === 'N' ? '<span class="muted small">Normal</span>' : `<span class="psc psc-${k}">${PSC[k]}</span>`;
+/* cadangan harga bila SKU belum ada di Master Artikel: harga jual normal (gross ÷ qty) dari DSR yang sudah dimuat */
+function salePx(sku) {
+  let M = App.cache.salePx; if (!M || App.cache.salePxN !== (App.lines || []).length) { App.cache.salePxN = (App.lines || []).length; M = App.cache.salePx = new Map(); for (const l of App.lines || []) if (l.q > 0 && l.g > 0) { const u = l.g / l.q, o = M.get(l.sku) || 0; if (u > o) M.set(l.sku, u); } }
+  return M.get(sku) || 0;
+}
+function prodStockBase(codes) {
+  const key = 'pstk|' + codes.join(','); if (App.cache[key]) return App.cache[key];
+  const MS = App.mst, m = new Map();
+  for (const c of codes) { const S = App.stock[c]; if (!S) continue;
+    for (const sku in S.items) { const t = S.items[sku][0]; if (!(t > 0) || isPB(sku)) continue;
+      const a = artOf(sku); let x = m.get(a);
+      if (!x) { const inf = artInfo(a), ms = App.mst.status === 'ok' ? artMaster(a) : null;
+        x = { art: a, name: inf.name, l2: (ms && ms.l2) || inf.c2 || '–', l3: (ms && ms.l3) || inf.c3 || '–', l4: (ms && ms.l4) || inf.c4 || '–', gd: inf.gd || '', price: inf.price || 0, q: 0, v: 0, sk: new Set(), st: new Set(), cq: { S: 0, D: 0, P: 0, N: 0 }, cv: { S: 0, D: 0, P: 0, N: 0 }, d: 0, noP: 0 }; m.set(a, x); }
+      const pr = MS.psku && MS.psku.get(sku), k = pr ? (pr.c === 'S' || pr.c === 'D' ? pr.c : 'P') : 'N', p = priceOfSku(sku) || x.price || salePx(sku);
+      if (!p) x.noP += t;
+      x.q += t; x.v += t * p; x.sk.add(sku); x.st.add(c); x.cq[k] += t; x.cv[k] += t * p; if (pr && pr.d > x.d) x.d = pr.d;
+    } }
+  const rows = [...m.values()].map(x => { const ks = ['S', 'D', 'P'].filter(k => x.cq[k] > 0); x.cat = ks.length ? ks[0] : 'N'; x.part = ks.length && x.cq.N > 0; x.nSku = x.sk.size; x.nSt = x.st.size; return x; });
+  return (App.cache[key] = rows);
+}
 function pageProduct(view) {
-  const R = periodRange(); const U = App.ui;
-  setHead('Produk', R.label + (U.prodStore ? ' · ' + sName(U.prodStore) : ' · semua toko'));
-  const cur = linesIn(R.from, R.to, U.prodStore || null);
-  const m = new Map();
-  for (const l of cur) { if (isPB(l.sku)) continue; const a = artOf(l.sku); const x = m.get(a) || { art: a, q: 0, n: 0, st: new Set() }; x.q += l.q; x.n += VAL(l); if (l.q > 0) x.st.add(l.s); m.set(a, x); }
-  const codes = U.prodStore ? [U.prodStore] : activeStores();
-  const stockA = new Map(); for (const c of codes) for (const [a, s] of stockByArt(c)) stockA.set(a, (stockA.get(a) || 0) + s.t);
-  const H = health();
-  const q90 = new Map(); for (const c of codes) { const S = H.stores[c]; if (S) for (const it of S.items.values()) q90.set(it.art, (q90.get(it.art) || 0) + it.rate); }
-  let rows = [...m.values()].map(x => { const inf = artInfo(x.art); const st = stockA.get(x.art) || 0, rate = q90.get(x.art) || 0; return { art: x.art, name: inf.name, c3: inf.c3, c4: inf.c4, l2: inf.c2 || '', gd: inf.gd || '', price: inf.price || 0, q: x.q, n: x.n, stores: x.st.size, stock: st, cover: rate > 0 ? st / rate : null }; });
-  const c3s = [...new Set(rows.map(r => r.c3))].sort();
-  const l2s = [...new Set(rows.map(r => r.l2).filter(Boolean))].sort(), gds = [...new Set(rows.map(r => r.gd).filter(Boolean))].sort();
-  if (U.prodC3) rows = rows.filter(r => r.c3 === U.prodC3);
-  if (U.prodL2) rows = rows.filter(r => r.l2 === U.prodL2);
-  if (U.prodGd) rows = rows.filter(r => r.gd === U.prodGd);
+  const U = App.ui;
+  const codes = U.prodStore ? [U.prodStore] : activeStores().filter(c => App.stock[c]);
+  const sd = codes.map(c => App.stock[c] && App.stock[c].date).filter(Boolean).sort(), asOf = sd.length ? sd[sd.length - 1] : null;
+  setHead('Produk · Stok', (U.prodStore ? sName(U.prodStore) : 'semua toko') + (asOf ? ' · stok per ' + fmtDate(asOf) : ''));
+  const base = prodStockBase(codes);
+  const lv = U.prodLv || 'l2', LVN = { l2: 'MC Lv2', l3: 'MC Lv3', l4: 'MC Lv4' };
+  /* filter */
   const sku12 = /^\d{12}$/.test(String(U.prodQ || '').trim()) ? String(U.prodQ).trim() : '';
-  if (sku12) rows = rows.filter(r => r.art === artOf(sku12));
-  else if (U.prodQ) { const q = U.prodQ.toLowerCase(); rows = rows.filter(r => (r.name + ' ' + r.art + ' ' + r.c4).toLowerCase().includes(q)); }
+  const fQ = r => { if (sku12) return r.art === artOf(sku12); if (!U.prodQ) return true; const q = U.prodQ.toLowerCase(); return (r.name + ' ' + r.art + ' ' + r.l4).toLowerCase().includes(q); };
+  const pre = base.filter(r => (!U.prodGd || r.gd === U.prodGd) && fQ(r));
+  const opt = (f, k) => [...new Set(pre.filter(f).map(r => r[k]))].sort();
+  const l2s = opt(() => true, 'l2'), l3s = opt(r => !U.prodL2 || r.l2 === U.prodL2, 'l3'), l4s = opt(r => (!U.prodL2 || r.l2 === U.prodL2) && (!U.prodL3 || r.l3 === U.prodL3), 'l4');
+  const gds = [...new Set(base.map(r => r.gd).filter(Boolean))].sort();
+  const mc = pre.filter(r => (!U.prodL2 || r.l2 === U.prodL2) && (!U.prodL3 || r.l3 === U.prodL3) && (!U.prodL4 || r.l4 === U.prodL4));
+  const pc = U.prodCat || '', inCat = r => !pc || r.cq[pc] > 0;
+  const rows = mc.filter(inCat);
+  /* ringkasan: bila filter status dipakai, qty & value hanya bagian status itu */
+  const qOf = r => pc ? r.cq[pc] : r.q, vOf = r => pc ? r.cv[pc] : r.v;
+  const sum = (L, f) => L.reduce((a, r) => a + f(r), 0);
+  const T = { q: sum(rows, qOf), v: sum(rows, vOf), a: rows.length, s: sum(rows, r => r.nSku) };
+  const catT = k => { const L = mc.filter(r => r.cq[k] > 0); return { q: sum(L, r => r.cq[k]), v: sum(L, r => r.cv[k]), a: L.length }; };
+  const CT = { S: catT('S'), D: catT('D'), N: catT('N'), P: catT('P') }, allQ = sum(mc, r => r.q);
+  const noP = sum(rows, r => r.noP);
+  /* breakdown per level */
+  const g = new Map(); for (const r of rows) { const k = r[lv]; const x = g.get(k) || { k, a: 0, s: 0, q: 0, v: 0, qS: 0, qD: 0, qN: 0 }; x.a++; x.s += r.nSku; x.q += qOf(r); x.v += vOf(r); x.qS += r.cq.S; x.qD += r.cq.D; x.qN += r.cq.N; g.set(k, x); }
+  const grp = [...g.values()];
+  App.ui.prodLast = { rows, grp, lv, LVN, T, pc, codes, asOf, qOf, vOf };
+  const sel = (id, label, list, cur) => `<select id="${id}" class="inp"><option value="">${label}</option>${list.map(c => `<option ${c === cur ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select>`;
+  const chips = [['prodL2', 'Lv2', U.prodL2], ['prodL3', 'Lv3', U.prodL3], ['prodL4', 'Lv4', U.prodL4]].filter(x => x[2]).map(([k, l, v]) => `<button class="btn sm" data-pclr="${k}">${l}: ${esc(v)} ✕</button>`).join('');
+  const tile = (k, lab, t) => `<button class="pt-tile pt-cat ${pc === k ? 'on' : ''}" data-pcat="${pc === k ? '' : k}" title="Klik untuk filter ${lab}"><span>${lab}</span><b>${fmtN(t.q)} pcs</b><small>${fmtRpS(t.v)} · ${fmtN(t.a)} artikel · ${fmtPct(allQ ? t.q / allQ : null, 1)}</small></button>`;
   view.innerHTML = `<div class="stack"><div id="binBox" data-sku="${esc(sku12)}"></div><section class="card"><div class="filters">
       <input id="pq" class="inp" type="search" inputmode="search" placeholder="Cari nama / kode artikel · ketik SKU 12 digit untuk lokasi bin semua toko" value="${esc(U.prodQ)}" style="flex:1 1 260px">
-      <select id="pc3" class="inp"><option value="">Semua kategori</option>${c3s.map(c => `<option ${c === U.prodC3 ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select>
-      ${l2s.length ? `<select id="pl2" class="inp"><option value="">Semua MC Lv2</option>${l2s.map(c => `<option ${c === U.prodL2 ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select>` : ''}
-      ${gds.length ? `<select id="pgd" class="inp"><option value="">Semua gender</option>${gds.map(c => `<option ${c === U.prodGd ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select>` : ''}
+      ${sel('pl2', 'Semua MC Lv2', l2s, U.prodL2)}${sel('pl3', 'Semua MC Lv3', l3s, U.prodL3)}${sel('pl4', 'Semua MC Lv4', l4s, U.prodL4)}
+      ${gds.length ? sel('pgd', 'Semua gender', gds, U.prodGd) : ''}
       <select id="pst" class="inp"><option value="">Semua toko</option>${storeCodes().map(c => `<option value="${esc(c)}" ${c === U.prodStore ? 'selected' : ''}>${esc(sName(c))}</option>`).join('')}</select>
-    </div>${sku12 ? '' : /^\d{6,11}$|^\d{13,}$/.test(String(U.prodQ || '').trim()) ? `<p class="small" style="margin:0 0 8px;color:var(--orange-deep)">💡 Lokasi bin muncul untuk <b>SKU lengkap 12 digit</b>. Yang diketik sekarang ${String(U.prodQ).trim().length} digit.</p>` : '<p class="small muted" style="margin:0 0 8px">💡 Ketik <b>SKU lengkap 12 digit</b> untuk melihat stok & lokasi bin artikel itu di semua toko.</p>'}<div id="pT"></div><p class="small muted" style="margin-top:10px">Cover = stok ÷ rata-rata penjualan per bulan (90 hari terakhir). Paper bag tidak dihitung.</p></section></div>`;
+    </div>${sku12 ? '' : /^\d{6,11}$|^\d{13,}$/.test(String(U.prodQ || '').trim()) ? `<p class="small" style="margin:0 0 8px;color:var(--orange-deep)">💡 Lokasi bin muncul untuk <b>SKU lengkap 12 digit</b>. Yang diketik sekarang ${String(U.prodQ).trim().length} digit.</p>` : '<p class="small muted" style="margin:0 0 8px">💡 Ketik <b>SKU lengkap 12 digit</b> untuk melihat stok & lokasi bin artikel itu di semua toko. Penjualan per artikel ada di <b>Produk Pareto</b>.</p>'}
+    ${chips ? `<div class="filters" style="margin:0 0 8px">${chips}</div>` : ''}
+    <div class="pt-tiles" style="grid-template-columns:repeat(auto-fit,minmax(165px,1fr))">
+      <div class="pt-tile" style="background:#0B1B4A"><span>Total stok${pc ? ' ' + PSC[pc] : ''}</span><b>${fmtN(T.q)} pcs</b><small>${fmtRp(Math.round(T.v))}</small></div>
+      <div class="pt-tile"><span>Artikel · SKU</span><b>${fmtN(T.a)} artikel</b><small>${fmtN(T.s)} SKU (ukuran/warna) · ${codes.length} toko</small></div>
+      ${tile('S', 'SMDS', CT.S)}${tile('D', 'DCNP', CT.D)}${CT.P.a ? tile('P', 'Promo lain', CT.P) : ''}${tile('N', 'Normal (non promo)', CT.N)}
+    </div>
+    <p class="small muted" style="margin:6px 0 0">Value = qty stok × harga normal (Master Artikel; bila belum ada, harga jual normal dari DSR). SMDS/DCNP dari List Artikel Promo aktif${App.mst.promo ? '' : ' (belum diupload)'} · klik kotak kategori untuk filter.${noP ? ` <span style="color:var(--orange-deep)">${fmtN(noP)} pcs belum ada harganya di Master Artikel (value dihitung 0).</span>` : ''}${App.mst.status !== 'ok' ? ' <span style="color:var(--orange-deep)">Master Artikel belum termuat, Lv2–Lv4 & value bisa belum lengkap.</span>' : ''}</p></section>
+    <section class="card"><div class="card-h"><h3>Stok per ${LVN[lv]}</h3><div class="row-act" style="margin:0"><div class="seg" role="group" aria-label="Level MC">${['l2', 'l3', 'l4'].map(k => `<button data-plv="${k}" class="${lv === k ? 'on' : ''}">${LVN[k].replace('MC ', '')}</button>`).join('')}</div><button class="btn sm" id="prXls">⬇ Excel</button></div></div>
+      <p class="small muted" style="margin:0 0 8px">Klik baris untuk menyaring ke ${LVN[lv]} tersebut.</p><div id="pG"></div></section>
+    <section class="card"><div class="card-h"><h3>Stok per artikel</h3><p class="small muted">${fmtN(rows.length)} artikel · klik untuk detail ukuran, warna & lokasi bin</p></div><div id="pT"></div></section></div>`;
   if (sku12) showBinCard(sku12);
-  $('#pT').innerHTML = tbl('prod', {
-    rows, sort: { k: 'n', dir: 'desc' }, limit: 30, onRow: r => openProduct(r.art, U.prodStore || null),
+  const pctQ = x => fmtPct(T.q ? x.q / T.q : null, 1), pctV = x => fmtPct(T.v ? x.v / T.v : null, 1);
+  $('#pG').innerHTML = tbl('prodG' + lv, {
+    rows: grp, sort: { k: 'v', dir: 'desc' }, limit: 15, onRow: x => { const f = { l2: 'prodL2', l3: 'prodL3', l4: 'prodL4' }[lv]; App.ui[f] = x.k; if (lv === 'l2') App.ui.prodLv = 'l3'; else if (lv === 'l3') App.ui.prodLv = 'l4'; render(); },
     cols: [
-      { k: 'name', label: 'Produk', h: r => prodCell(r.art, r.name, r.art + ' · ' + r.c3 + ' › ' + r.c4) },
-      { k: 'q', label: 'Qty', r: 1, h: r => fmtN(r.q) }, { k: 'n', label: VLL(), r: 1, h: r => fmtRp(r.n) },
-      ...(U.prodStore ? [] : [{ k: 'stores', label: 'Toko terjual', r: 1, h: r => r.stores + ' / ' + activeStores().length }]),
-      { k: 'price', label: 'Harga', r: 1, h: r => r.price ? fmtRpS(r.price) : '–' },
-      { k: 'stock', label: 'Stok', r: 1, h: r => fmtN(r.stock) }, { k: 'cover', label: 'Cover (bln)', r: 1, h: r => r.cover == null ? '–' : fmtX(r.cover) }
+      { k: 'k', label: LVN[lv], h: x => `<b>${esc(x.k)}</b>` },
+      { k: 'a', label: 'Artikel', r: 1, h: x => fmtN(x.a) }, { k: 's', label: 'SKU', r: 1, h: x => fmtN(x.s) },
+      { k: 'q', label: 'Qty stok', r: 1, h: x => `<b>${fmtN(x.q)}</b>` }, { k: 'pq', label: '% qty', r: 1, v: x => x.q, h: pctQ },
+      { k: 'v', label: 'Value stok', r: 1, h: x => `<b>${fmtRp(Math.round(x.v))}</b>` }, { k: 'pv', label: '% value', r: 1, v: x => x.v, h: pctV },
+      ...(pc ? [] : [{ k: 'qS', label: 'SMDS', r: 1, h: x => x.qS ? fmtN(x.qS) : '–' }, { k: 'qD', label: 'DCNP', r: 1, h: x => x.qD ? fmtN(x.qD) : '–' }, { k: 'qN', label: 'Normal', r: 1, h: x => x.qN ? fmtN(x.qN) : '–' }])
     ]
   });
+  $('#pT').innerHTML = tbl('prod', {
+    rows, sort: { k: 'v', dir: 'desc' }, limit: 30, onRow: r => openProduct(r.art, U.prodStore || null),
+    cols: [
+      { k: 'name', label: 'Produk', h: r => prodCell(r.art, r.name, r.art + ' · ' + r.l2 + ' › ' + r.l3 + ' › ' + r.l4) },
+      { k: 'cat', label: 'Status', h: r => pscBadge(r.cat) + (r.d ? ` <small class="muted">${r.d}%</small>` : '') + (r.part ? '<br><small class="muted">sebagian warna</small>' : '') },
+      { k: 'nSku', label: 'SKU', r: 1, h: r => fmtN(r.nSku) },
+      ...(U.prodStore ? [] : [{ k: 'nSt', label: 'Toko ada stok', r: 1, h: r => r.nSt + ' / ' + codes.length }]),
+      { k: 'price', label: 'Harga normal', r: 1, h: r => r.price ? fmtRpS(r.price) : '–' },
+      { k: 'q', label: 'Qty stok', r: 1, v: qOf, h: r => `<b>${fmtN(qOf(r))}</b>` }, { k: 'v', label: 'Value stok', r: 1, v: vOf, h: r => fmtRp(Math.round(vOf(r))) }
+    ]
+  });
+}
+async function exportProdStock() {
+  const X = App.ui.prodLast; if (!X || !(await needXLSX())) return;
+  const wb = XLSX.utils.book_new(), per = `Stok ${X.codes.length === 1 ? sName(X.codes[0]) : 'semua toko'}${X.asOf ? ' per ' + X.asOf : ''}${X.pc ? ' · ' + PSC[X.pc] : ''}`;
+  const money = (ws, cols, from) => { const r = XLSX.utils.decode_range(ws['!ref']); for (let i = from; i <= r.e.r; i++) cols.forEach(c => { const a = XLSX.utils.encode_cell({ r: i, c }); if (ws[a] && typeof ws[a].v === 'number') ws[a].z = '#,##0'; }); };
+  for (const lv of ['l2', 'l3', 'l4']) {
+    const g = new Map(); for (const r of X.rows) { const k = r[lv]; const x = g.get(k) || { a: 0, s: 0, q: 0, v: 0, qS: 0, vS: 0, qD: 0, vD: 0, qN: 0, vN: 0 }; x.a++; x.s += r.nSku; x.q += X.qOf(r); x.v += X.vOf(r); x.qS += r.cq.S; x.vS += r.cv.S; x.qD += r.cq.D; x.vD += r.cv.D; x.qN += r.cq.N; x.vN += r.cv.N; g.set(k, x); }
+    const L = [...g.entries()].sort((a, b) => b[1].v - a[1].v);
+    const a = [[X.LVN[lv], per], [], [X.LVN[lv], 'Artikel', 'SKU', 'Qty stok', '% qty', 'Value stok', '% value', 'Qty SMDS', 'Value SMDS', 'Qty DCNP', 'Value DCNP', 'Qty Normal', 'Value Normal'],
+      ...L.map(([k, x]) => [k, x.a, x.s, x.q, X.T.q ? x.q / X.T.q : 0, Math.round(x.v), X.T.v ? x.v / X.T.v : 0, x.qS, Math.round(x.vS), x.qD, Math.round(x.vD), x.qN, Math.round(x.vN)]),
+      ['TOTAL', X.T.a, X.T.s, X.T.q, 1, Math.round(X.T.v), 1]];
+    const ws = XLSX.utils.aoa_to_sheet(a); ws['!cols'] = [28, 9, 9, 11, 8, 16, 8, 10, 14, 10, 14, 10, 14].map(w => ({ wch: w }));
+    money(ws, [5, 8, 10, 12, 3, 7, 9, 11], 3); for (let i = 3; i < a.length; i++) [4, 6].forEach(c => { const ad = XLSX.utils.encode_cell({ r: i, c }); if (ws[ad]) ws[ad].z = '0.0%'; });
+    XLSX.utils.book_append_sheet(wb, ws, 'Per ' + X.LVN[lv].replace('MC ', ''));
+  }
+  const a = [['Artikel', 'Nama', 'MC Lv2', 'MC Lv3', 'MC Lv4', 'Gender', 'Status', 'Diskon %', 'SKU', 'Toko ada stok', 'Harga normal', 'Qty stok', 'Value stok', 'Qty SMDS', 'Qty DCNP', 'Qty Normal'],
+    ...X.rows.slice().sort((p, q) => X.vOf(q) - X.vOf(p)).map(r => [r.art, r.name, r.l2, r.l3, r.l4, r.gd, PSC[r.cat] + (r.part ? ' (sebagian warna)' : ''), r.d || null, r.nSku, r.nSt, r.price || null, X.qOf(r), Math.round(X.vOf(r)), r.cq.S, r.cq.D, r.cq.N])];
+  const ws = XLSX.utils.aoa_to_sheet(a); ws['!cols'] = [12, 34, 18, 18, 18, 9, 22, 8, 6, 9, 13, 9, 15, 9, 9, 9].map(w => ({ wch: w })); money(ws, [10, 12, 11], 1);
+  XLSX.utils.book_append_sheet(wb, ws, 'Per artikel');
+  (await getDownloads()).save({ filename: `Stok_Produk_${X.codes.length === 1 ? X.codes[0] : 'semua_toko'}_${X.asOf || todayISO()}.xlsx`, data: new Blob([XLSX.write(wb, { bookType: 'xlsx', type: 'array' })]) });
 }
 /* ================= SA-TR & SA-BO: monitoring bin harian (dari Export by Bin) ================= */
 async function loadSaBin(force) { if (App.saBin && !force) return App.saBin; const r = await api('sabin'); App.saBin = r.rows || []; return App.saBin; }
@@ -5751,6 +5831,10 @@ document.addEventListener('click', async e => {
   const dtml = t.closest('[data-dtml]'); if (dtml) { App.ui.dtMcLv = dtml.dataset.dtml; render(); return; }
   const dtl = t.closest('[data-dtl]'); if (dtl) { App.ui.dtLvl = dtl.dataset.dtl; render(); return; }
   const pst = t.closest('[data-pstog]'); if (pst) { const o = App.ui.psOpen || (App.ui.psOpen = {}); o[pst.dataset.pstog] = !o[pst.dataset.pstog]; render(); return; }
+  { const pp = t.closest && t.closest('[data-pcat]'); if (pp) { App.ui.prodCat = pp.dataset.pcat; App.ui.more = {}; render(); return; } }
+  { const pv = t.closest && t.closest('[data-plv]'); if (pv) { App.ui.prodLv = pv.dataset.plv; render(); return; } }
+  { const pz = t.closest && t.closest('[data-pclr]'); if (pz) { const k = pz.dataset.pclr; App.ui[k] = ''; if (k === 'prodL2') { App.ui.prodL3 = ''; App.ui.prodL4 = ''; } if (k === 'prodL3') App.ui.prodL4 = ''; render(); return; } }
+  if (t.id === 'prXls') { exportProdStock(); return; }
   { const pc = t.closest && t.closest('[data-pscat]'); if (pc) { App.ui.psCat = pc.dataset.pscat; App.ui.more = {}; render(); return; } }
   if (t.id === 'psAll' || t.id === 'psNone') { const o = App.ui.psOpen = {}; if (t.id === 'psAll') $$('[data-pstog]').forEach(x => { o[x.dataset.pstog] = true; }); if (t.id === 'psAll') { render(); $$('[data-pstog]').forEach(x => { o[x.dataset.pstog] = true; }); } render(); return; }
   const rpf = t.closest('[data-rpf]'); if (rpf) { App.ui.rpFull = rpf.dataset.rpf === '1'; render(); return; }
@@ -5885,7 +5969,9 @@ document.addEventListener('change', async e => {
   if (t.id === 'prDate') { if (t.value) { App.ui.prDate = t.value; render(); } return; }
   if (t.id === 'stSel') { App.ui.store = t.value; App.ui.more = {}; render(); return; }
   if (t.id === 'pc3') { App.ui.prodC3 = t.value; render(); return; }
-  if (t.id === 'pl2') { App.ui.prodL2 = t.value; render(); return; }
+  if (t.id === 'pl2') { App.ui.prodL2 = t.value; App.ui.prodL3 = ''; App.ui.prodL4 = ''; render(); return; }
+  if (t.id === 'pl3') { App.ui.prodL3 = t.value; App.ui.prodL4 = ''; render(); return; }
+  if (t.id === 'pl4') { App.ui.prodL4 = t.value; render(); return; }
   if (t.id === 'pgd') { App.ui.prodGd = t.value; render(); return; }
   if (t.id === 'pst') { App.ui.prodStore = t.value; render(); return; }
   if (t.id === 'hst') { App.ui.stStore = t.value; App.ui.more = {}; render(); return; }

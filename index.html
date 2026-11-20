@@ -788,6 +788,8 @@ button.pd-sz:hover{box-shadow:0 0 0 3px rgba(15,49,146,.12)}
   .lk-add{width:100%;border-style:dashed}
   .upd-bar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom));z-index:90;background:#0B1B4A;color:#fff;padding:10px 14px;border-radius:12px;box-shadow:0 10px 30px rgba(11,27,74,.35);display:flex;gap:10px;align-items:center;font-size:13.5px;max-width:calc(100% - 32px)}
   @media (min-width:900px){.upd-bar{bottom:24px}}
+  .promo-go{text-align:center;padding:40px 20px;max-width:620px;margin:0 auto;width:100%}.promo-go h2{margin:6px 0;font-size:24px;font-weight:800;color:var(--navy,#0F3192)}
+  .pg-ic{font-size:52px}.pg-btn{display:inline-flex;margin-top:14px;padding:14px 26px;font-size:16px;text-decoration:none}
 </style>
 </head>
 <body>
@@ -3873,7 +3875,16 @@ function promoCard(p, S) {
     <span class="jk-meta">📅 ${esc(rangeTxt(p.ranges))}${p.exact ? '' : ' (lihat ketentuan)'}</span>
     ${p.minTrx && !/tidak ada/i.test(p.minTrx) ? `<span class="jk-meta">🧾 Min. ${esc(p.minTrx)}</span>` : ''}<span class="jk-meta">🏬 ${esc(p.berlaku || '–')}</span>${p.produk ? `<span class="jk-meta">🏷️ ${esc(p.produk)}</span>` : ''}</button>`;
 }
+const PROMO_URL = 'https://promo-eigerindo.github.io/Promo/';
 function pageJuknis(view) {
+  setHead('Info Promo', 'Info promo yang sedang & akan berjalan ada di website Promo Eigerindo');
+  view.innerHTML = `<div class="stack"><section class="card promo-go">
+    <div class="pg-ic">🎁</div><h2>Info Promo Eigerindo</h2>
+    <p class="muted">Semua promo yang sedang & akan berjalan, juknis, periode, ketentuan dan produk yang berlaku ada di website Promo.</p>
+    <a class="btn primary pg-btn" href="${PROMO_URL}" target="_blank" rel="noopener">Buka website Promo ↗</a>
+    <p class="small muted" style="margin:10px 0 0">${PROMO_URL.replace(/^https:\/\//, '')}</p></section></div>`;
+}
+function pageJuknisOld(view) {
   const U = App.ui, all = juknisAll(), today = todayISO();
   const D = U.jkDate || today;
   setHead('Promo', 'Reminder promo yang sedang & akan berjalan dari juknis promo');
@@ -3969,7 +3980,8 @@ function uploadChecklist() {
     { n: 'Bobot harian', d: 'sheet Bobot Harian di template', s: st(!!wOf(tm), !!wOf(m)), extra: lbl + (wOf(tm) ? ' sudah ada' : ' belum ada') },
     { n: 'Target OmniChannel', d: 'sheet Target OmniChannel di template', s: st(has(App.omni[tm]), has(App.omni[m])), extra: lbl + (has(App.omni[tm]) ? ' sudah ada' : ' belum ada') },
     { n: 'Target Sales Member EAC', d: 'sheet Target EAC (bisa sekaligus Jan–Des)', s: st(has(App.eac[tm]), has(App.eac[m])), extra: lbl + (has(App.eac[tm]) ? ' sudah ada' : ' belum ada') },
-    { n: 'Juknis promo (PDF)', d: 'termasuk versi update di tengah bulan', s: st(!!(App.juknis || {})[tm], !!(App.juknis || {})[m]), extra: lbl + ((App.juknis || {})[tm] ? ' sudah ada' : ' belum ada') },
+    (() => { const R = (App.raTgt || {})[tm] || {}, ids = Object.keys(R), nSt = new Set(ids.map(i => R[i].c)).size;
+      return { n: 'Target tagging per head (RA)', d: 'file Breakdown Target per RA · upload di Kelola data', s: st(ids.length > 0, has((App.raTgt || {})[m])), extra: lbl + (ids.length ? ` sudah ada · ${ids.length} RA · ${nSt} toko` : ' belum ada') }; })(),
     ...(() => { const MI = App.mstInfo || {}, up = x => x && x.at ? ' · upload ' + fmtDateS(x.at.slice(0, 10)) : '';
       return [
         { n: 'Master Artikel', pic: 'IC', d: 'file Master Artikel HO (rutin ±tanggal 5)', s: MI.master ? (MI.master.month >= m ? 'ok' : 'warn') : 'bad', extra: MI.master ? 'versi ' + fmtMonth(MI.master.month) + up(MI.master) : 'belum diupload' },
@@ -4165,7 +4177,7 @@ const APST = { Menunggu: ['⏳', 'or'], 'Proses Review': ['🔍', 'or'], Revisi:
 /* ---------- beranda: pilih hub ---------- */
 /* ===== katalog menu: satu pintu untuk Store Management & Operational Hub ===== */
 const MENU_IC = { links: '🔗', bm_target: '🎯', bm_dinas: '🧾', omset: '💬', report: '🎯', trend: '📈', promo: '🏷️', omni: '🛒', eac: '👥', ra: '🧑‍💼', pareto: '📊', growth: '📅', produk: '👕', transfer: '🔁', ro: '📦', promostock: '💸', detention: '🗄️', bc: '🔢', satr: '🚚', sabo: '📌', lost: '⚠️', pica: '💡', juknis: '🎁', admin: '⬆️', settings: '⚙️', ops_approval: '✅', ops_task: '📋', ops_info: '📢', ops_ess: '📝' };
-const MENU_EXTRA = { links: ['Kumpulan Link', 'Link kerja daily, weekly, monthly & lainnya'], bm_target: ['Setting Target Store', 'Bagi target HO ke toko, adjust per toko, terapkan'], bm_dinas: ['Rekap Dinas', 'Transport bulanan & dinas luar kota dari foto nota'], lost: ['Lost Sales', 'Barang dicari customer tapi tidak tersedia'], pica: ['Analisa PICA', 'Cari masalah & tindakan perbaikan toko'], juknis: ['Info Promo (Juknis)', 'Promo yang sedang & akan berjalan'], admin: ['Kelola data', 'Upload data, akun & daftar toko'], settings: ['Pengaturan', 'Pengaturan dashboard'],
+const MENU_EXTRA = { links: ['Kumpulan Link', 'Link kerja daily, weekly, monthly & lainnya'], bm_target: ['Setting Target Store', 'Bagi target HO ke toko, adjust per toko, terapkan'], bm_dinas: ['Rekap Dinas', 'Transport bulanan & dinas luar kota dari foto nota'], lost: ['Lost Sales', 'Barang dicari customer tapi tidak tersedia'], pica: ['Analisa PICA', 'Cari masalah & tindakan perbaikan toko'], juknis: ['Info Promo', 'Buka website Promo Eigerindo'], admin: ['Kelola data', 'Upload data, akun & daftar toko'], settings: ['Pengaturan', 'Pengaturan dashboard'],
   ops_approval: ['Approval', 'Ajukan & pantau persetujuan BM'], ops_task: ['Task', 'Checklist tugas tiap toko'], ops_info: ['Informasi', 'Info & materi terbaru dari HO'], ops_ess: ['ESS Self Assessment', 'Self assessment RA saat briefing siang'] };
 const MENU_KW = { links: 'link url form daily weekly monthly sop lembur ipm vm sga memo materi', satr: 'sa tr satr transit bin plus minus', sabo: 'sa bo sabo booking bin', produk: 'artikel sku lokasi bin cek stok toko lain', omset: 'piket share omset per 2 jam sales report care', report: 'achievement target daily report pencapaian', ra: 'sales person karyawan upt basket tagging target per head', transfer: 'pindah stok antar toko', ro: 'order gudang ho repeat', detention: 'display gudang pajang', bc: 'stock opname so', ops_ess: 'briefing journey', ops_task: 'tugas checklist', ops_approval: 'pengajuan memo lembur', juknis: 'promo diskon', lost: 'kosong tidak ada stok' };
 /* ===== SATU struktur menu untuk semua tempat (menu atas PC, bar bawah HP, beranda, pencarian, sub-menu) =====

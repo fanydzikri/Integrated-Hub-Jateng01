@@ -1508,7 +1508,7 @@ async function loadAll(opt) {
   App.pendingUsers = M.pendingUsers || 0;
   App.omni = M.omni || {}; App.eac = M.eac || {}; App.hoInfo = M.hoInfo || null; App.juknis = M.juknis || {}; App.bc = M.bc || []; App.aiReady = !!M.aiReady;
   App.log = M.log || []; App.logAt = 0; App.books = M.books || []; App.cells = M.cells || 0;
-  { const prev = JSON.stringify(App.mstInfo || null); App.mstInfo = M.mst || {}; App.links = M.links || null; if (App.mst && App.mst.status === 'ok' && prev !== 'null' && prev !== JSON.stringify(App.mstInfo)) setTimeout(() => loadMaster(true), 0); } App.raTgt = M.raTarget || {};
+  { const prev = JSON.stringify(App.mstInfo || null); App.mstInfo = M.mst || {}; App.links = M.links || null; if (App.mst && prev !== 'null' && prev !== JSON.stringify(App.mstInfo)) { if (App.mst.status === 'loading') App.mstStale = true; else if (App.mst.status === 'ok' || App.mst.status === 'err') setTimeout(() => loadMaster(true), 0); } } App.raTgt = M.raTarget || {};
   App.saBin = null; App.binCache = {}; App.lines = []; App.loaded = new Set(); App.sku = {}; App.dsrSku = {}; App.stock = {}; App.stockLoaded = false; App.cache = {}; App.sr = {};
   computeLastDate();
   App.loadWarn = [];
@@ -1690,7 +1690,7 @@ async function fetchKatalog(file) {
 async function mstFetch(k) {
   const info = (App.mstInfo || {})[k]; if (!info || !info.v) return null;
   const hit = await IDB.get('mst:' + k); if (hit && hit.v === info.v && hit.d) return hit.d;
-  const r = await api('mst', { k }); if (!r || !r.data) return null;
+  const r = await api('mst', { mk: k }); if (!r || !r.data) return null;
   IDB.put('mst:' + k, { v: info.v, d: r.data }); return r.data;
 }
 function mstExpandMaster(items) {
@@ -1706,12 +1706,22 @@ function mstExpandPromo(d) {
 }
 async function loadMaster(force) {
   if (!force && (App.mst.status === 'loading' || App.mst.status === 'ok')) return;
-  App.mst = { status: 'loading' };
+  App.mst = { status: 'loading' }; App.mstStale = false;
   /* sumber utama: data yang diupload di Kelola data (disimpan di server Integrated Hub); Katalog Produk hanya cadangan */
-  const one = async (k, file) => { const hub = await mstFetch(k).catch(() => null); if (hub) return { src: 'hub', d: hub }; return { src: 'katalog', d: await fetchKatalog(file) }; };
+  /* bila data sudah pernah diupload di Integrated Hub, JANGAN pakai Katalog Produk (datanya lama & tanpa kategori SMDS/DCNP):
+     coba ambil dari server sampai 3x, bila tetap gagal tampilkan alasannya */
+  const errs = {};
+  const one = async (k, file) => {
+    if ((App.mstInfo || {})[k] && (App.mstInfo || {})[k].v) {
+      let last = null;
+      for (let i = 0; i < 2; i++) { try { const d = await mstFetch(k); if (d) return { src: 'hub', d }; last = new Error('data kosong di server'); } catch (e) { last = e; } if (!i) await sleep(1500); }
+      errs[k] = errMsg(last); throw last;
+    }
+    return { src: 'katalog', d: await fetchKatalog(file) };
+  };
   const [m, g, pr] = await Promise.allSettled([one('master', 'master.json'), one('photo', 'gambar.json'), one('promo', 'promo.json')]);
   const val = x => x.status === 'fulfilled' ? x.value : null, MI = App.mstInfo || {};
-  const M = { status: 'ok', master: null, photo: null, promo: null, err: [] };
+  const M = { status: 'ok', master: null, photo: null, promo: null, err: [], errs };
   const vm = val(m), vg = val(g), vp = val(pr);
   if (vm) M.master = vm.src === 'hub' ? { source: 'Integrated Hub', generated: fmtMonth(vm.d.month) + ' · upload ' + fmtDateS(((MI.master || {}).at || '').slice(0, 10)), month: vm.d.month, items: mstExpandMaster(vm.d.items) } : Object.assign({ source: 'Katalog Produk' }, vm.d);
   if (vg) M.photo = vg.src === 'hub' ? Object.assign({ source: 'Integrated Hub', generated: fmtDate(vg.d.date) }, vg.d) : Object.assign({ source: 'Katalog Produk' }, vg.d);
@@ -1719,7 +1729,7 @@ async function loadMaster(force) {
   M.psku = new Map();
   if (M.promo && M.promo.items) for (const key in M.promo.items) { const it = M.promo.items[key]; for (const sku in (it.a || {})) M.psku.set(sku, { key, d: (M.promo.src === 'hub' && it.a[sku]) || it.d || 0, p: it.p || 0, c: it.c || '' }); }
   if (!M.master) M.err.push('master artikel'); if (!M.photo) M.err.push('foto');
-  if (!M.master && !M.photo) M.status = 'err';
+  if (!M.master && !M.photo && !M.promo) M.status = 'err';
   M.sku = new Map(); M.art = new Map();
   if (M.master && M.master.items) for (const key in M.master.items) {
     const it = M.master.items[key], art = key.split('.')[0];
@@ -1727,6 +1737,8 @@ async function loadMaster(force) {
     const a = M.art.get(art) || []; a.push(key); M.art.set(art, a);
   }
   App.mst = M; App.cache = {};
+  /* info master berubah saat sedang memuat (mis. data lama dari cache HP lalu data server terbaru masuk): muat ulang sekali lagi */
+  if (App.mstStale) { App.mstStale = false; setTimeout(() => loadMaster(true), 0); }
   if (['produk', 'stok', 'toko', 'admin', 'promostock', 'lost', 'pareto'].includes(App.page) && !$('#ov')) render();
 }
 const mItem = key => App.mst.master && App.mst.master.items ? App.mst.master.items[key] : null;
@@ -1897,7 +1909,7 @@ const ICON = {
 };
 const NAV = [
   { k: 'sales', label: 'Sales Performance', icon: 'area', items: [['omset', 'Share Omset Harian', 'Update sales per 2 jam dari toko piket'], ['report', 'Monitoring Sales', 'Achievement, UPT & basket size'], ['trend', 'Sales Trend', 'Jam, hari, UPT & basket harian'], ['promo', 'Kontribusi Promo', 'Porsi tiap promo terhadap sales'], ['omni', 'Monitoring OmniChannel', 'EA, Eigerindo Voucher, Tax Invoice, EASAP'], ['eac', 'Sales Member EAC', 'KPI penjualan ke member'], ['ra', 'RA Performance', 'Transaksi, UPT & basket per sales person'], ['pareto', 'Product Pareto', 'Kontribusi kategori & produk (80/20)'], ['growth', 'Growth vs Tahun Lalu', 'Harian, MTD & YTD dibanding tahun lalu']] },
-  { k: 'inv', label: 'Inventory', icon: 'produk', items: [['produk', 'Produk', 'Stok qty & value per MC Lv2–Lv4, artikel, SKU, SMDS/DCNP'], ['transfer', 'Saran Transfer Stok', 'Pindahkan stok dari toko yang menumpuk ke toko yang butuh'], ['ro', 'Saran Repeat Order', 'Order ke gudang HO untuk stok yang menipis'], ['promostock', 'Stok DCNP/SMDS', 'Stok barang diskon per MC Lv2–Lv4'], ['detention', 'Detention Stock', '% generic & varian terdisplay per toko'], ['bc', 'Blind Counting', 'Progres stock opname harian per toko'], ['satr', 'SA-TR', 'Bin transit SA-TR-01-00 harian · plus & minus'], ['sabo', 'SA-BO', 'Bin booking SA-BO-01-00 harian']] },
+  { k: 'inv', label: 'Inventory', icon: 'produk', items: [['produk', 'Stock Inventory', 'Stok qty & value per MC Lv2–Lv4, artikel, SKU, SMDS/DCNP'], ['transfer', 'Saran Transfer Stok', 'Pindahkan stok dari toko yang menumpuk ke toko yang butuh'], ['ro', 'Saran Repeat Order', 'Order ke gudang HO untuk stok yang menipis'], ['promostock', 'Stok DCNP/SMDS', 'Stok barang diskon per MC Lv2–Lv4'], ['detention', 'Detention Stock', '% generic & varian terdisplay per toko'], ['bc', 'Blind Counting', 'Progres stock opname harian per toko'], ['satr', 'SA-TR', 'Bin transit SA-TR-01-00 harian · plus & minus'], ['sabo', 'SA-BO', 'Bin booking SA-BO-01-00 harian']] },
   { k: 'lost', label: 'Lost Sales', icon: 'lost' },
   { k: 'pica', label: 'Analisa PICA', icon: 'pica' },
   { k: 'juknis', label: 'Promo', icon: 'tag' },
@@ -3039,7 +3051,7 @@ async function exportLost() {
 function pagePromoStock(view) {
   const U = App.ui, MS = App.mst;
   setHead('Stok DCNP/SMDS', MS.promo ? `${MS.promo.title || 'List promo'} · ${MS.promo.period || ''} · sumber ${MS.promo.source || 'Katalog Produk'}` : 'List artikel promo (upload di Kelola data)');
-  if (MS.status !== 'ok' || !MS.promo) { view.innerHTML = `<div class="empty-state"><h2>${MS.status === 'loading' || MS.status === 'idle' ? 'Memuat list promo…' : 'List promo belum bisa dimuat'}</h2><p class="muted">Upload <b>List Artikel Promo</b> di Kelola data (file HO atau Template List Promo).</p></div>`; if (MS.status === 'idle') loadMaster(); return; }
+  if (MS.status !== 'ok' || !MS.promo) { const er = (MS.errs || {}).promo; view.innerHTML = `<div class="empty-state"><h2>${MS.status === 'loading' || MS.status === 'idle' ? 'Memuat list promo…' : 'List promo belum bisa dimuat'}</h2><p class="muted">${er ? 'Gagal mengambil List Artikel Promo dari server: <b>' + esc(er) + '</b>' : 'Upload <b>List Artikel Promo</b> di Kelola data (file HO atau Template List Promo).'}</p>${MS.status === 'loading' ? '' : '<button class="btn primary" id="mstReload">⟳ Coba lagi</button>'}</div>`; if (MS.status === 'idle') loadMaster(); return; }
   const codes = activeStores().filter(c => App.stock[c]), st = U.psStore && codes.includes(U.psStore) ? U.psStore : '';
   const R = periodRange();
   /* stok promo per sku */
@@ -4844,7 +4856,7 @@ function pageProduct(view) {
   const U = App.ui;
   const codes = U.prodStore ? [U.prodStore] : activeStores().filter(c => App.stock[c]);
   const sd = codes.map(c => App.stock[c] && App.stock[c].date).filter(Boolean).sort(), asOf = sd.length ? sd[sd.length - 1] : null;
-  setHead('Produk · Stok', (U.prodStore ? sName(U.prodStore) : 'semua toko') + (asOf ? ' · stok per ' + fmtDate(asOf) : ''));
+  setHead('Stock Inventory', (U.prodStore ? sName(U.prodStore) : 'semua toko') + (asOf ? ' · stok per ' + fmtDate(asOf) : ''));
   const base = prodStockBase(codes);
   const lv = U.prodLv || 'l2', LVN = { l2: 'MC Lv2', l3: 'MC Lv3', l4: 'MC Lv4' };
   /* filter */
@@ -6379,7 +6391,7 @@ document.addEventListener('click', async e => {
   }
   if (t.id === 'addStore') { const c = ($('#newCode').value || '').trim(), n = ($('#newName').value || '').trim(); if (!/^[0-9A-Za-z]{3,8}$/.test(c)) { toast('Isi kode site yang valid'); return; } if (App.stores[c]) { toast('Kode ' + c + ' sudah ada di daftar'); return; } try { await apiPost({ a: 'storeAdd', code: c, name: n }); await loadAll(); toast('Toko ' + c + ' ditambahkan'); render(); } catch (er) { toast('Gagal: ' + errMsg(er)); } return; }
   const rms = t.closest('[data-rmstore]'); if (rms) { const c = rms.dataset.rmstore; if (!confirm(`Hapus ${c} - ${sName(c)} dari daftar toko area? Data penjualannya tidak ikut terhapus.`)) return; try { await apiPost({ a: 'storeRemove', code: c }); await loadAll(); toast('Dihapus dari daftar'); render(); } catch (er) { toast('Gagal: ' + errMsg(er)); } return; }
-  if (t.id === 'mstReload') { toast('Memuat master & foto dari Katalog Produk…'); loadMaster(true); render(); return; }
+  if (t.id === 'mstReload') { toast('Memuat ulang master artikel, foto & list promo…'); loadMaster(true); render(); return; }
   { const ck = t.closest && t.closest('[data-ckpic]'); if (ck) { App.ui.ckPic = ck.dataset.ckpic; render(); return; } }
   if (t.id === 'tplBtn') { downloadTemplate(($('#tplM') || {}).value); return; }
   if (t.id === 'tplPromo' || t.id === 'dlPromo') { promoTemplate(t.id === 'dlPromo'); return; }

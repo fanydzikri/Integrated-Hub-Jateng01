@@ -775,6 +775,17 @@ button.pd-sz:hover{box-shadow:0 0 0 3px rgba(15,49,146,.12)}
   .dn-sum{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}.dn-sum>div{flex:1 1 150px;background:#F1F5FB;border-radius:10px;padding:10px 12px;display:flex;flex-direction:column}
   .dn-sum span{font-size:12px;color:var(--muted,#64748B)}.dn-sum b{font-size:16px}.dn-sum .ok b{color:var(--ok)}.dn-sum .bad b{color:var(--bad)}
   @media (max-width:760px){.dn-row{grid-template-columns:1fr 1fr}.dn-row .dn-item,.dn-row .dn-ket,.dn-row .dn-act{grid-column:1/-1}}
+  .lk-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:14px;align-items:start}
+  .lk-col{background:var(--surface,#fff);border:1px solid var(--line,#E2E8F0);border-radius:14px;padding:14px;box-shadow:0 1px 2px rgba(11,27,74,.04)}
+  .lk-h{display:flex;align-items:center;gap:8px;padding-bottom:10px;margin-bottom:10px;border-bottom:3px solid var(--orange,#F26B21)}
+  .lk-h h3{margin:0;flex:1;font-size:17px;font-weight:800;color:var(--navy,#0F3192);text-transform:uppercase;letter-spacing:.5px}.lk-ic{font-size:20px}
+  .lk-list{display:flex;flex-direction:column;gap:8px}
+  .lk-a{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;background:#0F3192;color:#fff;text-decoration:none;transition:transform .12s,filter .12s}
+  .lk-a:hover{filter:brightness(1.15);transform:translateY(-1px)}.lk-a .lk-i{font-size:18px;width:26px;text-align:center}
+  .lk-t{display:flex;flex-direction:column;flex:1;min-width:0}.lk-t b{font-size:14px;font-weight:700;line-height:1.25}.lk-t small{font-size:11.5px;opacity:.75;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .lk-go{opacity:.7;font-weight:800}.lk-off{background:#EEF2F6;color:#64748B;cursor:default}.lk-off:hover{filter:none;transform:none}
+  .lk-ed{display:grid;grid-template-columns:1fr;gap:4px;padding:8px;border:1px dashed #C7D2E5;border-radius:10px;background:#F8FAFF}.lk-ed .inp{width:100%}.lk-eb{display:flex;gap:4px;justify-content:flex-end}
+  .lk-add{width:100%;border-style:dashed}
 </style>
 </head>
 <body>
@@ -1493,7 +1504,7 @@ async function loadAll(opt) {
   App.pendingUsers = M.pendingUsers || 0;
   App.omni = M.omni || {}; App.eac = M.eac || {}; App.hoInfo = M.hoInfo || null; App.juknis = M.juknis || {}; App.bc = M.bc || []; App.aiReady = !!M.aiReady;
   App.log = M.log || []; App.logAt = 0; App.books = M.books || []; App.cells = M.cells || 0;
-  { const prev = JSON.stringify(App.mstInfo || null); App.mstInfo = M.mst || {}; if (App.mst && App.mst.status === 'ok' && prev !== 'null' && prev !== JSON.stringify(App.mstInfo)) setTimeout(() => loadMaster(true), 0); } App.raTgt = M.raTarget || {};
+  { const prev = JSON.stringify(App.mstInfo || null); App.mstInfo = M.mst || {}; App.links = M.links || null; if (App.mst && App.mst.status === 'ok' && prev !== 'null' && prev !== JSON.stringify(App.mstInfo)) setTimeout(() => loadMaster(true), 0); } App.raTgt = M.raTarget || {};
   App.saBin = null; App.binCache = {}; App.lines = []; App.loaded = new Set(); App.sku = {}; App.dsrSku = {}; App.stock = {}; App.stockLoaded = false; App.cache = {}; App.sr = {};
   computeLastDate();
   App.loadWarn = [];
@@ -1952,8 +1963,8 @@ function renderNav() {
     bn.innerHTML = !logged ? '' : tab('data-go="home"', 'home', 'Beranda', App.page === 'home')
       + tab('data-bsheet="g_sales"', 'area', 'Penjualan', G && G.k === 'g_sales')
       + tab('data-bsheet="g_stock"', 'produk', 'Stok', G && G.k === 'g_stock')
-      + tab('data-bsheet="g_ops"', 'task', 'Operasional', G && G.k === 'g_ops', opsB)
-      + `<button data-menupal="1" class="${G && G.k === 'g_admin' ? 'on' : ''}"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><span>Cari / Semua</span></button>`;
+      + tab('data-bsheet="g_ops"', 'task', 'Operasional', G && G.k === 'g_ops' && App.page !== 'links', opsB)
+      + `<button data-menu="links" class="${App.page === 'links' ? 'on' : ''}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg><span>Link</span></button>`;
   }
   const L = App.lastDate;
   const RL = repLast();
@@ -2021,14 +2032,14 @@ function render() {
   }
   if (App.page === 'stok') App.page = 'transfer';
   if (BM_ONLY.includes(App.page) && !App.superAdmin) App.page = 'report';
-  if (!isOps(App.page) && App.page !== 'home' && !App.lastDate && !['admin', 'report', 'settings', 'lost', 'detention', 'juknis', 'bc', 'omset', 'satr', 'sabo', 'bm_target', 'bm_dinas'].includes(App.page)) { App.page = srLast() ? 'report' : 'detention'; }
+  if (!isOps(App.page) && App.page !== 'home' && !App.lastDate && !['admin', 'report', 'settings', 'lost', 'detention', 'juknis', 'bc', 'omset', 'satr', 'sabo', 'bm_target', 'bm_dinas', 'links'].includes(App.page)) { App.page = srLast() ? 'report' : 'detention'; }
   const NEED_STOCK = ['produk', 'transfer', 'ro', 'promostock', 'detention', 'pica', 'toko', 'stok', 'area', 'lost', 'settings'];
   if (NEED_STOCK.includes(App.page) && !App.stockLoaded && Object.keys(App.index.stock || {}).length) {
     view.innerHTML = '<div class="loading"><span class="spin"></span>Memuat data stok…</div>';
     const pg = App.page; loadStock().catch(e => { App.stockLoaded = true; toast('Data stok gagal dimuat: ' + (e.message || e.code)); }).then(() => { App.stockLoaded = true; if (App.page === pg) render(); });
     return;
   }
-  const fn = { bm_target: pageBmTarget, bm_dinas: pageBmDinas, satr: v => pageSaBin(v, 'TR'), sabo: v => pageSaBin(v, 'BO'), area: pageArea, report: pageReport, trend: pageTrend, promo: pagePromo, omni: pageOmni, eac: pageEac, ra: pageRA, pareto: pagePareto, lost: pageLost, promostock: pagePromoStock, detention: pageDetention, growth: pageGrowth, transfer: pageTransfer, ro: pageRO, pica: pagePica, juknis: pageJuknis, home: pageHome, bc: pageBC, omset: pageOmset, ops_approval: pageApproval, ops_task: pageTask, ops_info: pageInfo, ops_ess: pageEss, toko: pageStore, produk: pageProduct, stok: pageStock, admin: pageAdmin, settings: pageSettings }[App.page] || pageReport;
+  const fn = { links: pageLinks, bm_target: pageBmTarget, bm_dinas: pageBmDinas, satr: v => pageSaBin(v, 'TR'), sabo: v => pageSaBin(v, 'BO'), area: pageArea, report: pageReport, trend: pageTrend, promo: pagePromo, omni: pageOmni, eac: pageEac, ra: pageRA, pareto: pagePareto, lost: pageLost, promostock: pagePromoStock, detention: pageDetention, growth: pageGrowth, transfer: pageTransfer, ro: pageRO, pica: pagePica, juknis: pageJuknis, home: pageHome, bc: pageBC, omset: pageOmset, ops_approval: pageApproval, ops_task: pageTask, ops_info: pageInfo, ops_ess: pageEss, toko: pageStore, produk: pageProduct, stok: pageStock, admin: pageAdmin, settings: pageSettings }[App.page] || pageReport;
   try { fn(view); renderAsOf(); lockScopedSelects(view); if (App.page === 'admin') renderUsers(); if ((App.loadWarn || []).length) view.insertAdjacentHTML('afterbegin', `<div class="note" style="margin-bottom:14px">Sebagian data belum termuat (${esc(App.loadWarn.join(', '))}). Tekan <b>Muat ulang</b> di kanan atas untuk mencoba lagi.</div>`); } catch (e) { console.error(e); view.innerHTML = `<div class="empty-state"><h2>Halaman gagal ditampilkan</h2><p class="muted">${esc(e.message)}</p></div>`; }
 }
 
@@ -4150,16 +4161,16 @@ const PRIO = { Tinggi: '🔥', Sedang: '⚡', Rendah: '🌿' };
 const APST = { Menunggu: ['⏳', 'or'], 'Proses Review': ['🔍', 'or'], Revisi: ['🔄', 'red'], Disetujui: ['✅', 'ok'], Ditolak: ['❌', 'red'] };
 /* ---------- beranda: pilih hub ---------- */
 /* ===== katalog menu: satu pintu untuk Store Management & Operational Hub ===== */
-const MENU_IC = { bm_target: '🎯', bm_dinas: '🧾', omset: '💬', report: '🎯', trend: '📈', promo: '🏷️', omni: '🛒', eac: '👥', ra: '🧑‍💼', pareto: '📊', growth: '📅', produk: '👕', transfer: '🔁', ro: '📦', promostock: '💸', detention: '🗄️', bc: '🔢', satr: '🚚', sabo: '📌', lost: '⚠️', pica: '💡', juknis: '🎁', admin: '⬆️', settings: '⚙️', ops_approval: '✅', ops_task: '📋', ops_info: '📢', ops_ess: '📝' };
-const MENU_EXTRA = { bm_target: ['Setting Target Store', 'Bagi target HO ke toko, adjust per toko, terapkan'], bm_dinas: ['Rekap Dinas', 'Transport bulanan & dinas luar kota dari foto nota'], lost: ['Lost Sales', 'Barang dicari customer tapi tidak tersedia'], pica: ['Analisa PICA', 'Cari masalah & tindakan perbaikan toko'], juknis: ['Info Promo (Juknis)', 'Promo yang sedang & akan berjalan'], admin: ['Kelola data', 'Upload data, akun & daftar toko'], settings: ['Pengaturan', 'Pengaturan dashboard'],
+const MENU_IC = { links: '🔗', bm_target: '🎯', bm_dinas: '🧾', omset: '💬', report: '🎯', trend: '📈', promo: '🏷️', omni: '🛒', eac: '👥', ra: '🧑‍💼', pareto: '📊', growth: '📅', produk: '👕', transfer: '🔁', ro: '📦', promostock: '💸', detention: '🗄️', bc: '🔢', satr: '🚚', sabo: '📌', lost: '⚠️', pica: '💡', juknis: '🎁', admin: '⬆️', settings: '⚙️', ops_approval: '✅', ops_task: '📋', ops_info: '📢', ops_ess: '📝' };
+const MENU_EXTRA = { links: ['Kumpulan Link', 'Link kerja daily, weekly, monthly & lainnya'], bm_target: ['Setting Target Store', 'Bagi target HO ke toko, adjust per toko, terapkan'], bm_dinas: ['Rekap Dinas', 'Transport bulanan & dinas luar kota dari foto nota'], lost: ['Lost Sales', 'Barang dicari customer tapi tidak tersedia'], pica: ['Analisa PICA', 'Cari masalah & tindakan perbaikan toko'], juknis: ['Info Promo (Juknis)', 'Promo yang sedang & akan berjalan'], admin: ['Kelola data', 'Upload data, akun & daftar toko'], settings: ['Pengaturan', 'Pengaturan dashboard'],
   ops_approval: ['Approval', 'Ajukan & pantau persetujuan BM'], ops_task: ['Task', 'Checklist tugas tiap toko'], ops_info: ['Informasi', 'Info & materi terbaru dari HO'], ops_ess: ['ESS Self Assessment', 'Self assessment RA saat briefing siang'] };
-const MENU_KW = { satr: 'sa tr satr transit bin plus minus', sabo: 'sa bo sabo booking bin', produk: 'artikel sku lokasi bin cek stok toko lain', omset: 'piket share omset per 2 jam sales report care', report: 'achievement target daily report pencapaian', ra: 'sales person karyawan upt basket tagging target per head', transfer: 'pindah stok antar toko', ro: 'order gudang ho repeat', detention: 'display gudang pajang', bc: 'stock opname so', ops_ess: 'briefing journey', ops_task: 'tugas checklist', ops_approval: 'pengajuan memo lembur', juknis: 'promo diskon', lost: 'kosong tidak ada stok' };
+const MENU_KW = { links: 'link url form daily weekly monthly sop lembur ipm vm sga memo materi', satr: 'sa tr satr transit bin plus minus', sabo: 'sa bo sabo booking bin', produk: 'artikel sku lokasi bin cek stok toko lain', omset: 'piket share omset per 2 jam sales report care', report: 'achievement target daily report pencapaian', ra: 'sales person karyawan upt basket tagging target per head', transfer: 'pindah stok antar toko', ro: 'order gudang ho repeat', detention: 'display gudang pajang', bc: 'stock opname so', ops_ess: 'briefing journey', ops_task: 'tugas checklist', ops_approval: 'pengajuan memo lembur', juknis: 'promo diskon', lost: 'kosong tidak ada stok' };
 /* ===== SATU struktur menu untuk semua tempat (menu atas PC, bar bawah HP, beranda, pencarian, sub-menu) =====
    4 kelompok besar, tiap kelompok dibagi beberapa bagian kecil. Semua 24 sub menu tetap ada. */
 const MENU_GROUPS = [
   { k: 'g_sales', t: 'Penjualan', icon: 'area', ic: '📊', d: 'Omset, target, tim, promo & channel', secs: [['Pantau harian', ['omset', 'report']], ['Analisa penjualan', ['trend', 'growth', 'pica']], ['Tim & member', ['ra', 'eac']], ['Promo & channel', ['juknis', 'promo', 'omni']]] },
   { k: 'g_stock', t: 'Stok & Produk', icon: 'produk', ic: '📦', d: 'Produk, kelola stok, display & opname', secs: [['Produk', ['produk', 'pareto', 'lost']], ['Kelola stok', ['transfer', 'ro', 'promostock']], ['Display & opname', ['detention', 'bc']], ['Bin SA', ['satr', 'sabo']]] },
-  { k: 'g_ops', t: 'Operasional', icon: 'task', ic: '📋', d: 'Task, approval, informasi & ESS', secs: [['Tugas harian', ['ops_task', 'ops_approval']], ['Info & briefing', ['ops_info', 'ops_ess']]] },
+  { k: 'g_ops', t: 'Operasional', icon: 'task', ic: '📋', d: 'Task, approval, informasi & ESS', secs: [['Tugas harian', ['ops_task', 'ops_approval']], ['Info & briefing', ['ops_info', 'ops_ess']], ['Link kerja', ['links']]] },
   { k: 'g_admin', t: 'Admin', icon: 'admin', ic: '⚙️', d: 'Kelola data & pengaturan', admin: 1, secs: [['Data & pengaturan', ['admin', 'settings']], ['Kerja BM', ['bm_target', 'bm_dinas']]] }
 ];
 const menuInfo = k => { const n = NAV.flatMap(g => g.items || []).find(i => i[0] === k); if (n) return { k, l: n[1], d: n[2] }; const x = MENU_EXTRA[k]; return x ? { k, l: x[0], d: x[1] } : null; };
@@ -5276,6 +5287,72 @@ document.addEventListener('change', e => {
   if (t.dataset.dnrn || t.dataset.dnfn || t.dataset.dnpfn) { t.value = rpIn(parseRp(t.value)); if (t.dataset.dnrn || t.dataset.dnfn) bmRender(); return; }
   if (t.dataset.dnr && /\|(tgl|cat)$/.test(t.dataset.dnr)) { bmRender(); return; }
   if (t.dataset.dnf === 'month') { bmRender(); return; }
+});
+
+/* ================= Kumpulan Link (semua pengguna; admin bisa tambah / edit) ================= */
+const LINK_DEFAULT = () => [
+  { t: 'Daily', ic: '☀️', items: ['Daily Progress', 'Video Opening & Closing', 'Store Visit', 'Input Lost Sales', 'Stock Gudang HO', 'Cek Memo Promo'] },
+  { t: 'Weekly', ic: '📅', items: ['VM PRC', 'SGA Reporting', 'Weekly MoM', 'Store Activity', 'Progress Sampling', 'Log Book - SA S.H'] },
+  { t: 'Monthly', ic: '🗓️', items: ['Data IPM', 'Jadwal One on One', 'Instant Store', 'Survey Competitor', 'Master Artikel 2026', 'DRP - Repeat Order', 'Set Target Perhead', 'Jadwal SH'] },
+  { t: 'Others', ic: '📎', items: ['Materi Promo', 'Report Matprom', 'Kalkulator Lembur', 'Design Signage', 'Materi dari H.O', 'Kumpulan S.O.P', 'VMS Asset', 'E.A.S.A.P'] }
+].map(g => ({ id: uid(), t: g.t, ic: g.ic, items: g.items.map(n => ({ id: uid(), n, u: '' })) }));
+const linkData = () => (App.links && Array.isArray(App.links.groups) && App.links.groups.length) ? App.links.groups : (App._linkDef || (App._linkDef = LINK_DEFAULT()));
+const linkHost = u => { try { const h = new URL(u).hostname.replace(/^www\./, ''); return /docs\.google/.test(h) ? (/\/spreadsheets\//.test(u) ? 'Google Sheets' : /\/presentation\//.test(u) ? 'Google Slides' : /\/forms\//.test(u) ? 'Google Form' : 'Google Docs') : /drive\.google/.test(h) ? 'Google Drive' : /forms\.gle/.test(h) ? 'Google Form' : /lookerstudio|datastudio/.test(h) ? 'Looker Studio' : h; } catch (e) { return ''; } };
+const linkIc = u => { const h = linkHost(u); return /Sheets/.test(h) ? '📊' : /Form/.test(h) ? '📝' : /Slides/.test(h) ? '📽️' : /Drive/.test(h) ? '📁' : /Docs/.test(h) ? '📄' : /Looker/.test(h) ? '📈' : /youtu/.test(h) ? '▶️' : '🔗'; };
+const linkNorm = u => { u = String(u || '').trim(); return u && !/^https?:\/\//i.test(u) ? 'https://' + u : u; };
+function pageLinks(view) {
+  const U = App.ui, edit = !!(U.lkEdit && App.admin), G = edit ? App.lkDraft : linkData(), q = String(U.lkQ || '').toLowerCase();
+  setHead('Kumpulan Link', 'Link kerja Jateng 01 · daily, weekly, monthly & lainnya' + (App.links && App.links.at ? ' · diperbarui ' + fmtDate(String(App.links.at).slice(0, 10)) : ''));
+  const total = G.reduce((a, g) => a + g.items.length, 0), filled = G.reduce((a, g) => a + g.items.filter(x => x.u).length, 0);
+  const card = (g, gi) => {
+    const items = edit ? g.items : g.items.filter(x => !q || (x.n + ' ' + g.t).toLowerCase().includes(q));
+    if (!edit && q && !items.length) return '';
+    return `<section class="lk-col"><div class="lk-h">${edit ? `<input class="inp sm" data-lkgic="${gi}" value="${esc(g.ic || '')}" style="width:52px;text-align:center"><input class="inp sm" data-lkgt="${gi}" value="${esc(g.t)}" style="flex:1;font-weight:800">
+        <button class="btn sm" data-lkgmv="${gi}|-1" title="Geser kiri">◀</button><button class="btn sm" data-lkgmv="${gi}|1" title="Geser kanan">▶</button><button class="btn sm" data-lkgdel="${gi}" title="Hapus kategori" style="color:var(--bad)">✕</button>`
+      : `<span class="lk-ic">${esc(g.ic || '🔗')}</span><h3>${esc(g.t)}</h3><span class="small muted">${items.length}</span>`}</div>
+      <div class="lk-list">${items.map(x => { const ii = g.items.indexOf(x);
+        if (edit) return `<div class="lk-ed"><input class="inp sm" data-lkn="${gi}|${ii}" value="${esc(x.n)}" placeholder="Nama link"><input class="inp sm" data-lku="${gi}|${ii}" value="${esc(x.u)}" placeholder="https://… (tempel link)" inputmode="url">
+          <div class="lk-eb"><button class="btn sm" data-lkmv="${gi}|${ii}|-1" title="Naik">↑</button><button class="btn sm" data-lkmv="${gi}|${ii}|1" title="Turun">↓</button><button class="btn sm" data-lkdel="${gi}|${ii}" title="Hapus" style="color:var(--bad)">✕</button></div></div>`;
+        return x.u ? `<a class="lk-a" href="${esc(x.u)}" target="_blank" rel="noopener"><span class="lk-i">${linkIc(x.u)}</span><span class="lk-t"><b>${esc(x.n)}</b><small>${esc(linkHost(x.u))}</small></span><span class="lk-go">↗</span></a>`
+          : `<div class="lk-a lk-off" title="Link belum diisi admin"><span class="lk-i">⏳</span><span class="lk-t"><b>${esc(x.n)}</b><small>link belum diisi</small></span></div>`; }).join('')}
+      ${edit ? `<button class="btn sm lk-add" data-lkadd="${gi}">+ Tambah link</button>` : ''}</div></section>`;
+  };
+  view.innerHTML = `<div class="stack">
+    <div class="filters" style="margin:0">${edit ? `<b>✏️ Mode edit</b><span class="small muted">Ubah nama / tempel link, atur urutan, lalu simpan. Link kosong tampil abu-abu untuk tim.</span><span style="flex:1"></span>
+        <button class="btn sm" id="lkGAdd">+ Kategori</button><button class="btn sm" id="lkCancel">Batal</button><button class="btn sm primary" id="lkSave">💾 Simpan</button>`
+      : `<input id="lkQ" class="inp" type="search" placeholder="Cari link… mis. lembur, promo, target" value="${esc(U.lkQ || '')}" style="flex:1 1 260px"><span class="small muted">${filled} dari ${total} link aktif</span>${App.admin ? '<button class="btn sm" id="lkEdit">✏️ Edit / tambah link</button>' : ''}`}</div>
+    <div class="lk-grid">${G.map(card).join('') || '<p class="muted">Tidak ada link yang cocok.</p>'}</div></div>`;
+}
+const lkMove = (arr, i, d) => { const j = i + d; if (j < 0 || j >= arr.length) return; [arr[i], arr[j]] = [arr[j], arr[i]]; };
+document.addEventListener('click', async e => {
+  const t = e.target; if (!t || !t.closest || App.page !== 'links') return;
+  const q = s => t.closest(s), D = App.lkDraft, keep = () => { const y = window.scrollY; render(); window.scrollTo(0, y); };
+  if (t.id === 'lkEdit') { App.lkDraft = JSON.parse(JSON.stringify(linkData())); App.ui.lkEdit = true; render(); return; }
+  if (t.id === 'lkCancel') { App.ui.lkEdit = false; App.lkDraft = null; render(); return; }
+  if (t.id === 'lkGAdd') { D.push({ id: uid(), t: 'Kategori baru', ic: '🔗', items: [{ id: uid(), n: '', u: '' }] }); keep(); return; }
+  if (q('[data-lkadd]')) { D[+q('[data-lkadd]').dataset.lkadd].items.push({ id: uid(), n: '', u: '' }); keep(); const ins = $$('[data-lkn]'); if (ins.length) { const g = +t.closest('[data-lkadd]').dataset.lkadd, mine = ins.filter(x => x.dataset.lkn.startsWith(g + '|')); (mine[mine.length - 1] || ins[ins.length - 1]).focus(); } return; }
+  if (q('[data-lkdel]')) { const [g, i] = q('[data-lkdel]').dataset.lkdel.split('|').map(Number); D[g].items.splice(i, 1); keep(); return; }
+  if (q('[data-lkmv]')) { const [g, i, d] = q('[data-lkmv]').dataset.lkmv.split('|').map(Number); lkMove(D[g].items, i, d); keep(); return; }
+  if (q('[data-lkgmv]')) { const [g, d] = q('[data-lkgmv]').dataset.lkgmv.split('|').map(Number); lkMove(D, g, d); keep(); return; }
+  if (q('[data-lkgdel]')) { const g = +q('[data-lkgdel]').dataset.lkgdel; if (confirm(`Hapus kategori "${D[g].t}" beserta ${D[g].items.length} link di dalamnya?`)) { D.splice(g, 1); keep(); } return; }
+  if (t.id === 'lkSave') {
+    const groups = D.map(g => ({ id: g.id, t: String(g.t || '').trim() || 'Tanpa judul', ic: String(g.ic || '').trim().slice(0, 4), items: g.items.map(x => ({ id: x.id, n: String(x.n || '').trim(), u: linkNorm(x.u) })).filter(x => x.n || x.u).map(x => ({ id: x.id, n: x.n || linkHost(x.u) || 'Link', u: x.u })) }));
+    const bad = groups.flatMap(g => g.items).filter(x => x.u && !/^https?:\/\/[^\s.]+\.[^\s]+$/i.test(x.u));
+    if (bad.length && !confirm(`${bad.length} link sepertinya tidak valid (mis. "${bad[0].n}"). Tetap simpan?`)) return;
+    t.disabled = true; t.textContent = 'Menyimpan…';
+    try { const v = { groups, at: new Date().toISOString(), by: (App.user && App.user.name) || '' }; await withRetry(() => apiPost({ a: 'links', v })); App.links = v; App.ui.lkEdit = false; App.lkDraft = null; render(); toast('✅ Kumpulan link tersimpan'); }
+    catch (er) { t.disabled = false; t.textContent = '💾 Simpan'; toast('Gagal menyimpan: ' + errMsg(er), 4000); }
+    return;
+  }
+});
+document.addEventListener('input', e => {
+  const t = e.target; if (!t || App.page !== 'links') return;
+  if (t.id === 'lkQ') { App.ui.lkQ = t.value; clearTimeout(App._lkT); App._lkT = setTimeout(() => { const pos = t.selectionStart; render(); const n = $('#lkQ'); if (n) { n.focus(); try { n.setSelectionRange(pos, pos); } catch (er) { } } }, 200); return; }
+  const D = App.lkDraft; if (!D) return;
+  if (t.dataset.lkn) { const [g, i] = t.dataset.lkn.split('|').map(Number); D[g].items[i].n = t.value; return; }
+  if (t.dataset.lku) { const [g, i] = t.dataset.lku.split('|').map(Number); D[g].items[i].u = t.value; return; }
+  if (t.dataset.lkgt) { D[+t.dataset.lkgt].t = t.value; return; }
+  if (t.dataset.lkgic) { D[+t.dataset.lkgic].ic = t.value; return; }
 });
 
 /* ================= SA-TR & SA-BO: monitoring bin harian (dari Export by Bin) ================= */

@@ -786,6 +786,8 @@ button.pd-sz:hover{box-shadow:0 0 0 3px rgba(15,49,146,.12)}
   .lk-go{opacity:.7;font-weight:800}.lk-off{background:#EEF2F6;color:#64748B;cursor:default}.lk-off:hover{filter:none;transform:none}
   .lk-ed{display:grid;grid-template-columns:1fr;gap:4px;padding:8px;border:1px dashed #C7D2E5;border-radius:10px;background:#F8FAFF}.lk-ed .inp{width:100%}.lk-eb{display:flex;gap:4px;justify-content:flex-end}
   .lk-add{width:100%;border-style:dashed}
+  .upd-bar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom));z-index:90;background:#0B1B4A;color:#fff;padding:10px 14px;border-radius:12px;box-shadow:0 10px 30px rgba(11,27,74,.35);display:flex;gap:10px;align-items:center;font-size:13.5px;max-width:calc(100% - 32px)}
+  @media (min-width:900px){.upd-bar{bottom:24px}}
 </style>
 </head>
 <body>
@@ -4060,6 +4062,7 @@ async function presPing() {
       toast('Akses akun kamu diperbarui admin, memuat ulang…', 3000); setTimeout(() => location.reload(), 1500); return;
     }
     if (r.dv) { if (PRES.dv && r.dv !== PRES.dv && !own) autoRefresh(); PRES.dv = r.dv; }
+    checkBuild();
   } catch (e) { if (e && e.code === 'auth' && App.user) sessionExpired(); }
 }
 function presStop() { if (PRES.timer) { clearInterval(PRES.timer); PRES.timer = null; } }
@@ -6378,7 +6381,8 @@ document.addEventListener('click', async e => {
   if (t.id === 'clrBtn') { App.pending = []; renderPending(); return; }
   if (t.id === 'tgtSave') { saveTargets(); return; }
   if (t.id === 'delBtn') { deleteStoreMonth(); return; }
-  if (t.id === 'reloadBtn') { t.disabled = true; t.textContent = 'Memuat…'; try { if (isOps(App.page) || App.page === 'home') await loadHub(true); else await loadAll(); toast('Data terbaru dimuat'); } catch (er) { loadFail(er); return; } render(); return; }
+  if (t.id === 'reloadBtn' || t.closest('[data-hardreload]')) { hardReload(); return; }
+  if (t.id === 'reloadBtnOld') { t.disabled = true; t.textContent = 'Memuat…'; try { if (isOps(App.page) || App.page === 'home') await loadHub(true); else await loadAll(); toast('Data terbaru dimuat'); } catch (er) { loadFail(er); return; } render(); return; }
 });
 let qTimer;
 document.addEventListener('input', e => {
@@ -6531,6 +6535,28 @@ async function bgRefresh() {
     toast('🔄 Data terbaru sudah dimuat', 2500);
   } catch (e) { }
 }
+/* Muat ulang = muat ulang tampilan (index.html terbaru dari GitHub, tanpa cache) + semua data.
+   Login tetap (Ingat saya), halaman & posisi scroll dikembalikan, popup pilihan tampilan tidak muncul lagi. */
+function hardReload() {
+  try { sessionStorage.setItem('hub_reload', JSON.stringify({ y: window.scrollY, at: Date.now() })); } catch (e) { }
+  const u = new URL(location.href); u.searchParams.set('r', Date.now().toString(36));
+  const b = $('#reloadBtn'); if (b) { b.disabled = true; b.innerHTML = '⟳ Memuat…'; }
+  location.replace(u.toString());
+}
+const RELOAD = (() => { try { const v = JSON.parse(sessionStorage.getItem('hub_reload') || 'null'); sessionStorage.removeItem('hub_reload'); return v && Date.now() - v.at < 120000 ? v : null; } catch (e) { return null; } })();
+if (RELOAD) { App.ui.scopeAsked = true; }
+try { const u = new URL(location.href); if (u.searchParams.has('r')) { u.searchParams.delete('r'); history.replaceState(null, '', u.pathname + u.search + u.hash); } } catch (e) { }
+/* cek versi tampilan baru (index.html di GitHub) tiap 10 menit; bila berubah, tawarkan Muat ulang */
+const BUILD = { sig: null, at: 0, shown: false };
+async function checkBuild() {
+  if (BUILD.shown || Date.now() - BUILD.at < 10 * 60e3) return; BUILD.at = Date.now();
+  try {
+    const r = await fetch(location.pathname + '?b=' + Date.now(), { cache: 'no-store' }); if (!r.ok) return;
+    const sig = verOf((await r.text()).length + ':' + r.headers.get('etag') + ':' + r.headers.get('last-modified'));
+    if (!BUILD.sig) { BUILD.sig = sig; return; }
+    if (sig !== BUILD.sig) { BUILD.shown = true; const n = document.createElement('div'); n.className = 'upd-bar'; n.innerHTML = '✨ Ada tampilan dashboard versi baru. <button class="btn sm primary" data-hardreload>Muat ulang sekarang</button>'; document.body.appendChild(n); }
+  } catch (e) { }
+}
 async function boot() {
   $('#view').innerHTML = '<div class="loading"><span class="spin"></span>Mengambil data dari spreadsheet…</div>';
   try { await loadAll({ cached: true }); }
@@ -6546,6 +6572,7 @@ async function boot() {
   if (!App.ui.scopeLocked && sv && sv.startsWith('store:')) { const c = sv.slice(6); if (App.stores[c] || storeCodes().includes(c)) { App.ui.scope = c; ['lsStore', 'raStore', 'ptStore', 'tdStore', 'prStore', 'psStore', 'dtStore', 'prodStore', 'stStore', 'trStore'].forEach(k => { App.ui[k] = c; }); App.ui.store = c; } }
   render();
   if (App.fromCache) setTimeout(bgRefresh, 400);
+  if (RELOAD && !RELOAD.done) { RELOAD.done = true; setTimeout(() => window.scrollTo(0, RELOAD.y || 0), 60); toast('✅ Tampilan & data terbaru sudah dimuat', 2500); }
   /* popup pilihan tampilan selalu muncul setiap halaman dibuka / direfresh (sekali per pemuatan halaman) */
   if (!App.ui.scopeAsked && !App.ui.scopeLocked && storeCodes().length) { App.ui.scopeAsked = true; openScope(true); }
   loadMaster();
@@ -6558,7 +6585,8 @@ async function init() {
   LS.set('dash_admin', ''); LS.set('dash_view', '');
   /* sesi tersimpan ("Ingat saya"): langsung masuk tanpa login ulang; bila sesi sudah tidak berlaku, server menolak lalu muncul halaman login */
   const tok = LS.get('dash_tok'); let usr = null; try { usr = JSON.parse(LS.get('dash_usr') || 'null'); } catch (e) { }
-  if (tok && usr && usr.u) { applyUser(tok, usr); try { await routeAfterLogin(); } catch (e) { if (e && e.code === 'auth') sessionExpired(); else loadFail(e); } return; }
+  if (tok && usr && usr.u) { applyUser(tok, usr); try { await routeAfterLogin(); } catch (e) { if (e && e.code === 'auth') sessionExpired(); else loadFail(e); }
+    if (RELOAD && !RELOAD.done) { RELOAD.done = true; setTimeout(() => window.scrollTo(0, RELOAD.y || 0), 60); toast('✅ Tampilan & data terbaru sudah dimuat', 2500); } return; }
   showAuth('login');
 }
 document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target && $('#authWall')) { if (e.target.closest('#authLogin')) { e.preventDefault(); doAuthLogin(); } else if (e.target.closest('#authReg')) { e.preventDefault(); doAuthReg(); } } });

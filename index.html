@@ -759,6 +759,22 @@ button.pd-sz:hover{box-shadow:0 0 0 3px rgba(15,49,146,.12)}
   .pt-cat.on{outline:3px solid var(--orange,#F26B21);outline-offset:-3px}
   .psc{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:700}
   .psc-S{background:#E8F0FF;color:#0F3192}.psc-D{background:#FFF0E6;color:#C2410C}.psc-P{background:#EEF2F6;color:#475569}
+  .tg-wrap{max-height:70vh;overflow:auto}.tg-tbl td,.tg-tbl th{white-space:nowrap}.tg-tbl .tg-st{position:sticky;left:0;background:var(--surface);z-index:1;min-width:220px}
+  .tg-tbl thead th{position:sticky;top:0;z-index:2}.tg-tbl thead .tg-st{z-index:3}.tg-tbl tfoot td{position:sticky;bottom:0;background:#EEF2FB;font-weight:700}
+  .tg-tbl td.tg-in,.tg-tbl th.tg-in{background:#FFF7ED}.tg-tbl .tg-in input{width:140px;text-align:right;font-weight:700}.tg-proj{font-style:italic;color:var(--orange-deep)}
+  .dn-new{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px}
+  .dn-big{border:1px solid var(--line,#E2E8F0);background:#F8FAFF;border-radius:12px;padding:16px;text-align:left;cursor:pointer;display:flex;flex-direction:column;gap:4px;font:inherit}
+  .dn-big b{font-size:16px;color:var(--navy,#0F3192)}.dn-big span{font-size:12.5px;color:var(--muted,#64748B)}.dn-big:hover{border-color:var(--orange,#F26B21)}
+  .dn-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}.dn-grid .inp{width:100%}
+  .dn-drop{display:flex;flex-direction:column;align-items:center;gap:4px;border:2px dashed #C7D2E5;border-radius:12px;padding:18px;cursor:pointer;text-align:center;background:#F8FAFF}
+  .dn-drop b{color:var(--navy,#0F3192);font-size:15px}.dn-drop span{font-size:12.5px;color:var(--muted,#64748B)}
+  .dn-rows{display:flex;flex-direction:column;gap:8px}
+  .dn-row{display:grid;grid-template-columns:150px minmax(160px,1.3fr) 140px 140px minmax(200px,2fr) auto;gap:8px;align-items:end;border:1px solid var(--line,#E2E8F0);border-radius:10px;padding:10px}
+  .dn-row.dk{grid-template-columns:150px minmax(140px,1fr) 140px minmax(260px,2.5fr) auto}.dn-row .inp{width:100%}.dn-row textarea{resize:vertical;font:inherit}.dn-ai{border-color:#F9C9A5;background:#FFFAF5}.dn-flag{grid-column:1/-1;color:var(--orange-deep)}
+  .dn-act{display:flex;gap:4px;flex-wrap:wrap;padding-bottom:2px}.dn-act label.btn{cursor:pointer}
+  .dn-sum{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}.dn-sum>div{flex:1 1 150px;background:#F1F5FB;border-radius:10px;padding:10px 12px;display:flex;flex-direction:column}
+  .dn-sum span{font-size:12px;color:var(--muted,#64748B)}.dn-sum b{font-size:16px}.dn-sum .ok b{color:var(--ok)}.dn-sum .bad b{color:var(--bad)}
+  @media (max-width:760px){.dn-row{grid-template-columns:1fr 1fr}.dn-row .dn-item,.dn-row .dn-ket,.dn-row .dn-act{grid-column:1/-1}}
 </style>
 </head>
 <body>
@@ -2004,14 +2020,15 @@ function render() {
     return;
   }
   if (App.page === 'stok') App.page = 'transfer';
-  if (!isOps(App.page) && App.page !== 'home' && !App.lastDate && !['admin', 'report', 'settings', 'lost', 'detention', 'juknis', 'bc', 'omset', 'satr', 'sabo'].includes(App.page)) { App.page = srLast() ? 'report' : 'detention'; }
+  if (BM_ONLY.includes(App.page) && !App.superAdmin) App.page = 'report';
+  if (!isOps(App.page) && App.page !== 'home' && !App.lastDate && !['admin', 'report', 'settings', 'lost', 'detention', 'juknis', 'bc', 'omset', 'satr', 'sabo', 'bm_target', 'bm_dinas'].includes(App.page)) { App.page = srLast() ? 'report' : 'detention'; }
   const NEED_STOCK = ['produk', 'transfer', 'ro', 'promostock', 'detention', 'pica', 'toko', 'stok', 'area', 'lost', 'settings'];
   if (NEED_STOCK.includes(App.page) && !App.stockLoaded && Object.keys(App.index.stock || {}).length) {
     view.innerHTML = '<div class="loading"><span class="spin"></span>Memuat data stok…</div>';
     const pg = App.page; loadStock().catch(e => { App.stockLoaded = true; toast('Data stok gagal dimuat: ' + (e.message || e.code)); }).then(() => { App.stockLoaded = true; if (App.page === pg) render(); });
     return;
   }
-  const fn = { satr: v => pageSaBin(v, 'TR'), sabo: v => pageSaBin(v, 'BO'), area: pageArea, report: pageReport, trend: pageTrend, promo: pagePromo, omni: pageOmni, eac: pageEac, ra: pageRA, pareto: pagePareto, lost: pageLost, promostock: pagePromoStock, detention: pageDetention, growth: pageGrowth, transfer: pageTransfer, ro: pageRO, pica: pagePica, juknis: pageJuknis, home: pageHome, bc: pageBC, omset: pageOmset, ops_approval: pageApproval, ops_task: pageTask, ops_info: pageInfo, ops_ess: pageEss, toko: pageStore, produk: pageProduct, stok: pageStock, admin: pageAdmin, settings: pageSettings }[App.page] || pageReport;
+  const fn = { bm_target: pageBmTarget, bm_dinas: pageBmDinas, satr: v => pageSaBin(v, 'TR'), sabo: v => pageSaBin(v, 'BO'), area: pageArea, report: pageReport, trend: pageTrend, promo: pagePromo, omni: pageOmni, eac: pageEac, ra: pageRA, pareto: pagePareto, lost: pageLost, promostock: pagePromoStock, detention: pageDetention, growth: pageGrowth, transfer: pageTransfer, ro: pageRO, pica: pagePica, juknis: pageJuknis, home: pageHome, bc: pageBC, omset: pageOmset, ops_approval: pageApproval, ops_task: pageTask, ops_info: pageInfo, ops_ess: pageEss, toko: pageStore, produk: pageProduct, stok: pageStock, admin: pageAdmin, settings: pageSettings }[App.page] || pageReport;
   try { fn(view); renderAsOf(); lockScopedSelects(view); if (App.page === 'admin') renderUsers(); if ((App.loadWarn || []).length) view.insertAdjacentHTML('afterbegin', `<div class="note" style="margin-bottom:14px">Sebagian data belum termuat (${esc(App.loadWarn.join(', '))}). Tekan <b>Muat ulang</b> di kanan atas untuk mencoba lagi.</div>`); } catch (e) { console.error(e); view.innerHTML = `<div class="empty-state"><h2>Halaman gagal ditampilkan</h2><p class="muted">${esc(e.message)}</p></div>`; }
 }
 
@@ -4133,8 +4150,8 @@ const PRIO = { Tinggi: '🔥', Sedang: '⚡', Rendah: '🌿' };
 const APST = { Menunggu: ['⏳', 'or'], 'Proses Review': ['🔍', 'or'], Revisi: ['🔄', 'red'], Disetujui: ['✅', 'ok'], Ditolak: ['❌', 'red'] };
 /* ---------- beranda: pilih hub ---------- */
 /* ===== katalog menu: satu pintu untuk Store Management & Operational Hub ===== */
-const MENU_IC = { omset: '💬', report: '🎯', trend: '📈', promo: '🏷️', omni: '🛒', eac: '👥', ra: '🧑‍💼', pareto: '📊', growth: '📅', produk: '👕', transfer: '🔁', ro: '📦', promostock: '💸', detention: '🗄️', bc: '🔢', satr: '🚚', sabo: '📌', lost: '⚠️', pica: '💡', juknis: '🎁', admin: '⬆️', settings: '⚙️', ops_approval: '✅', ops_task: '📋', ops_info: '📢', ops_ess: '📝' };
-const MENU_EXTRA = { lost: ['Lost Sales', 'Barang dicari customer tapi tidak tersedia'], pica: ['Analisa PICA', 'Cari masalah & tindakan perbaikan toko'], juknis: ['Info Promo (Juknis)', 'Promo yang sedang & akan berjalan'], admin: ['Kelola data', 'Upload data, akun & daftar toko'], settings: ['Pengaturan', 'Pengaturan dashboard'],
+const MENU_IC = { bm_target: '🎯', bm_dinas: '🧾', omset: '💬', report: '🎯', trend: '📈', promo: '🏷️', omni: '🛒', eac: '👥', ra: '🧑‍💼', pareto: '📊', growth: '📅', produk: '👕', transfer: '🔁', ro: '📦', promostock: '💸', detention: '🗄️', bc: '🔢', satr: '🚚', sabo: '📌', lost: '⚠️', pica: '💡', juknis: '🎁', admin: '⬆️', settings: '⚙️', ops_approval: '✅', ops_task: '📋', ops_info: '📢', ops_ess: '📝' };
+const MENU_EXTRA = { bm_target: ['Setting Target Store', 'Bagi target HO ke toko, adjust per toko, terapkan'], bm_dinas: ['Rekap Dinas', 'Transport bulanan & dinas luar kota dari foto nota'], lost: ['Lost Sales', 'Barang dicari customer tapi tidak tersedia'], pica: ['Analisa PICA', 'Cari masalah & tindakan perbaikan toko'], juknis: ['Info Promo (Juknis)', 'Promo yang sedang & akan berjalan'], admin: ['Kelola data', 'Upload data, akun & daftar toko'], settings: ['Pengaturan', 'Pengaturan dashboard'],
   ops_approval: ['Approval', 'Ajukan & pantau persetujuan BM'], ops_task: ['Task', 'Checklist tugas tiap toko'], ops_info: ['Informasi', 'Info & materi terbaru dari HO'], ops_ess: ['ESS Self Assessment', 'Self assessment RA saat briefing siang'] };
 const MENU_KW = { satr: 'sa tr satr transit bin plus minus', sabo: 'sa bo sabo booking bin', produk: 'artikel sku lokasi bin cek stok toko lain', omset: 'piket share omset per 2 jam sales report care', report: 'achievement target daily report pencapaian', ra: 'sales person karyawan upt basket tagging target per head', transfer: 'pindah stok antar toko', ro: 'order gudang ho repeat', detention: 'display gudang pajang', bc: 'stock opname so', ops_ess: 'briefing journey', ops_task: 'tugas checklist', ops_approval: 'pengajuan memo lembur', juknis: 'promo diskon', lost: 'kosong tidak ada stok' };
 /* ===== SATU struktur menu untuk semua tempat (menu atas PC, bar bawah HP, beranda, pencarian, sub-menu) =====
@@ -4143,7 +4160,7 @@ const MENU_GROUPS = [
   { k: 'g_sales', t: 'Penjualan', icon: 'area', ic: '📊', d: 'Omset, target, tim, promo & channel', secs: [['Pantau harian', ['omset', 'report']], ['Analisa penjualan', ['trend', 'growth', 'pica']], ['Tim & member', ['ra', 'eac']], ['Promo & channel', ['juknis', 'promo', 'omni']]] },
   { k: 'g_stock', t: 'Stok & Produk', icon: 'produk', ic: '📦', d: 'Produk, kelola stok, display & opname', secs: [['Produk', ['produk', 'pareto', 'lost']], ['Kelola stok', ['transfer', 'ro', 'promostock']], ['Display & opname', ['detention', 'bc']], ['Bin SA', ['satr', 'sabo']]] },
   { k: 'g_ops', t: 'Operasional', icon: 'task', ic: '📋', d: 'Task, approval, informasi & ESS', secs: [['Tugas harian', ['ops_task', 'ops_approval']], ['Info & briefing', ['ops_info', 'ops_ess']]] },
-  { k: 'g_admin', t: 'Admin', icon: 'admin', ic: '⚙️', d: 'Kelola data & pengaturan', admin: 1, secs: [['', ['admin', 'settings']]] }
+  { k: 'g_admin', t: 'Admin', icon: 'admin', ic: '⚙️', d: 'Kelola data & pengaturan', admin: 1, secs: [['Data & pengaturan', ['admin', 'settings']], ['Kerja BM', ['bm_target', 'bm_dinas']]] }
 ];
 const menuInfo = k => { const n = NAV.flatMap(g => g.items || []).find(i => i[0] === k); if (n) return { k, l: n[1], d: n[2] }; const x = MENU_EXTRA[k]; return x ? { k, l: x[0], d: x[1] } : null; };
 const menuGroups = () => MENU_GROUPS.filter(g => !g.admin || App.admin);
@@ -4151,8 +4168,9 @@ const groupOf = pg => { if (pg === 'toko' || pg === 'stok' || pg === 'area') pg 
 const secOf = pg => { const g = groupOf(pg === 'toko' || pg === 'area' ? 'report' : pg); return g ? (g.secs.find(x => x[1].includes(pg === 'toko' || pg === 'area' ? 'report' : pg)) || [''])[0] : ''; };
 const groupBadge = g => g.secs.reduce((a, x) => a + x[1].reduce((b, k) => b + menuBadge(k), 0), 0);
 const QUICK_MENU = { toko: ['omset', 'report', 'ra', 'ops_task', 'ops_approval', 'ops_ess', 'juknis', 'lost'], other: ['report', 'omset', 'ra', 'pica', 'ops_approval', 'ops_task', 'transfer', 'omni'] };
+const menuOk = k => !(BM_ONLY.includes(k) && !App.superAdmin);
 function menuCatalog() {
-  return menuGroups().map(g => ({ k: g.k, t: g.t, ic: g.ic, d: g.d, secs: g.secs.map(([st, ks]) => [st, ks.map(menuInfo).filter(Boolean)]), items: g.secs.flatMap(x => x[1]).map(menuInfo).filter(Boolean) }));
+  return menuGroups().map(g => ({ k: g.k, t: g.t, ic: g.ic, d: g.d, secs: g.secs.map(([st, ks]) => [st, ks.filter(menuOk).map(menuInfo).filter(Boolean)]).filter(x => x[1].length), items: g.secs.flatMap(x => x[1]).filter(menuOk).map(menuInfo).filter(Boolean) }));
 }
 const menuAll = () => menuCatalog().flatMap(g => g.items.map(x => Object.assign({ g: g.t }, x)));
 const menuFind = k => menuAll().find(x => x.k === k);
@@ -4887,6 +4905,379 @@ async function exportProdStock() {
   XLSX.utils.book_append_sheet(wb, ws, 'Per artikel');
   (await getDownloads()).save({ filename: `Stok_Produk_${X.codes.length === 1 ? X.codes[0] : 'semua_toko'}_${X.asOf || todayISO()}.xlsx`, data: new Blob([XLSX.write(wb, { bookType: 'xlsx', type: 'array' })]) });
 }
+/* ================= MENU KERJA BM (khusus admin utama) =================
+   1. Setting Target Store: bagi target HO ke toko (rata-rata sales → kontribusi → target kasaran → adjustment BM → terapkan)
+   2. Rekap Dinas: transport bulanan (dalam kota) & perjalanan dinas luar kota, nota dibaca AI, output Excel + lampiran PDF */
+const BM_ONLY = ['bm_target', 'bm_dinas'];
+const parseRp = v => { const n = String(v ?? '').replace(/[^\d-]/g, ''); return n === '' || n === '-' ? null : +n; };
+const rpIn = v => v == null || v === '' ? '' : nf.format(Math.round(v));
+async function bmGet(key) { const r = await api('bm', { key }); return r ? r.v : null; }
+const bmTimers = {};
+function bmSaveLater(key, getV, msgSel) {
+  clearTimeout(bmTimers[key]); const m = msgSel && $(msgSel); if (m) m.textContent = 'menyimpan…';
+  bmTimers[key] = setTimeout(async () => {
+    try { await withRetry(() => apiPost({ a: 'bmSave', key, v: getV() })); const m2 = msgSel && $(msgSel); if (m2) m2.textContent = '✓ tersimpan ' + new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }); }
+    catch (e) { const m2 = msgSel && $(msgSel); if (m2) m2.textContent = '⚠ gagal menyimpan: ' + errMsg(e); }
+  }, 1200);
+}
+
+/* ---------- 1. Setting Target Store ---------- */
+/* sales 1 bulan per toko: ringkasan DSR (gross) bila ada, bila tidak dari Sales harian tahun lalu.
+   Bulan berjalan yang belum lengkap diproyeksikan ke 1 bulan penuh (rata-rata harian × jumlah hari). */
+function bmMonthSales(c, m) {
+  const x = (App.index.sales[m] || {})[c];
+  if (x && x.g && (x.d || []).length) {
+    let t = 0; for (const d of x.d) t += +x.g[d] || 0;
+    const M = App.index.sales[m] || {}, last = Math.max(0, ...Object.values(M).map(o => Math.max(0, ...(o.d || [0])))), n = dim(m);
+    if (last && last < n && m >= todayISO().slice(0, 7)) return { v: t / last * n, proj: true, days: last };
+    return { v: t };
+  }
+  if (!App.daily) return null; let t = 0, ok = false; const n = dim(m);
+  for (let d = 1; d <= n; d++) { const v = App.daily.map.get(c + '|' + m + '-' + pad(d)); if (v != null) { t += +v || 0; ok = true; } }
+  return ok ? { v: t } : null;
+}
+const bmDefMonth = () => { const t = todayISO(); return +t.slice(8) >= 15 ? addMonths(t.slice(0, 7), 1) : t.slice(0, 7); };
+const bmDefBasis = T => [addMonths(T, -12), ...[5, 4, 3, 2, 1].map(k => addMonths(T, -k))];
+function bmTgtCalc() {
+  const P = App.bmTgt, T = P.m, codes = [...new Set([...storeCodes().filter(c => typeOk(c)), ...Object.keys(P.rows || {})])];
+  const rows = codes.map(c => {
+    const hist = P.basis.map(m => bmMonthSales(c, m)), vals = hist.filter(h => h && h.v > 0).map(h => h.v);
+    const inc = P.incl[c] != null ? !!P.incl[c] : sType(c) !== 'bz';
+    const avg = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+    const R = P.rows[c] || {}, e = R.e ?? null, o = R.o ?? null;
+    const ly = bmMonthSales(c, addMonths(T, -12)), prev = (App.tgtDetail[addMonths(T, -1)] || {})[c];
+    return { c, name: sName(c), hist, avg, inc, e, o, tot: (e || 0) + (o || 0), filled: e != null, ly: ly ? ly.v : null, prev: prev ? (prev.total || prev.eiger || 0) : null };
+  }).filter(r => r.avg || r.e != null || r.o != null || sType(r.c) !== 'bz');
+  const sumAvg = rows.filter(r => r.inc && r.avg).reduce((a, r) => a + r.avg, 0);
+  for (const r of rows) { r.share = r.inc && r.avg && sumAvg ? r.avg / sumAvg : 0; r.kas = (P.ho || 0) * r.share; }
+  const tot = rows.reduce((a, r) => a + r.tot, 0), gap = (P.ho || 0) - tot;
+  /* saran untuk toko yang EIGER-nya belum diisi: sisa target dibagi proporsional kontribusi, dikurangi outlive toko tsb */
+  const empty = rows.filter(r => !r.filled && r.share > 0), es = empty.reduce((a, r) => a + r.share, 0);
+  const rem = (P.ho || 0) - rows.filter(r => r.filled).reduce((a, r) => a + r.tot, 0) - empty.reduce((a, r) => a + (r.o || 0), 0);
+  for (const r of rows) r.saran = !r.filled && r.share > 0 && es ? Math.max(0, rem * r.share / es) : null;
+  return { rows, sumAvg, tot, gap, totE: rows.reduce((a, r) => a + (r.e || 0), 0), totO: rows.reduce((a, r) => a + (r.o || 0), 0) };
+}
+const bmRound = v => { const s = +App.ui.tgRound || 1e6; return Math.round(v / s) * s; };
+async function bmTgtLoad(T) {
+  const v = await bmGet('tgt:' + T).catch(() => null);
+  App.bmTgt = Object.assign({ m: T, ho: null, basis: bmDefBasis(T), incl: {}, rows: {} }, v || {}, { m: T });
+}
+function pageBmTarget(view) {
+  const U = App.ui, T = U.tgM || bmDefMonth();
+  setHead('Setting Target Store', 'Bagi target HO ' + fmtMonth(T) + ' ke toko Jateng 01');
+  if (!App.daily) { view.innerHTML = '<div class="loading"><span class="spin"></span>Memuat sales tahun lalu…</div>'; loadDaily().catch(() => { App.daily = { map: new Map(), names: {} }; }).then(() => { if (App.page === 'bm_target') render(); }); return; }
+  if (!App.bmTgt || App.bmTgt.m !== T) { view.innerHTML = '<div class="loading"><span class="spin"></span>Memuat rencana target…</div>'; bmTgtLoad(T).then(() => { if (App.page === 'bm_target') render(); }, loadFail); return; }
+  const P = App.bmTgt, C = bmTgtCalc(), applied = P.appliedAt;
+  const projM = P.basis.filter(m => C.rows.some(r => r.hist[P.basis.indexOf(m)] && r.hist[P.basis.indexOf(m)].proj));
+  const allM = []; for (let k = 24; k >= 1; k--) allM.push(addMonths(T, -k));
+  view.innerHTML = `<div class="stack">
+  <section class="card"><div class="card-h"><h3>1 · Target dari HO</h3><span class="small muted" id="tgMsg">${P.at ? 'tersimpan ' + esc(fmtDate(P.at.slice(0, 10))) : ''}</span></div>
+    <div class="filters" style="align-items:flex-end">
+      <label class="fl">Bulan target<input type="month" class="inp" id="tgM" value="${T}"></label>
+      <label class="fl" style="flex:1 1 240px">Target ${esc(fmtMonth(T))} dari HO (total EIGER + Outlive)<input class="inp" id="tgHo" inputmode="numeric" placeholder="mis. 10.197.403.273" value="${rpIn(P.ho)}" style="font-size:18px;font-weight:800"></label>
+      <label class="fl">Pembulatan<select class="inp" id="tgRound">${[[1e6, 'Rp 1 juta'], [5e5, 'Rp 500 ribu'], [1e5, 'Rp 100 ribu'], [1, 'tanpa']].map(([v, l]) => `<option value="${v}" ${(+U.tgRound || 1e6) === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+    </div>
+    <div class="small muted" style="margin:8px 0 4px">Bulan dasar rata-rata sales (klik untuk pilih / batal). Bawaan: bulan yang sama tahun lalu + 5 bulan terakhir.</div>
+    <div class="filters" style="margin:0;gap:6px">${allM.map(m => `<button class="btn sm ${P.basis.includes(m) ? 'primary' : ''}" data-tgbm="${m}">${esc(fmtMonth(m).replace(/ 20(\d\d)$/, " '$1"))}</button>`).join('')}</div>
+    ${projM.length ? `<p class="small" style="margin:6px 0 0;color:var(--orange-deep)">${projM.map(fmtMonth).join(', ')} belum lengkap, jadi diproyeksikan ke 1 bulan penuh dari rata-rata harian.</p>` : ''}
+  </section>
+  <div class="pt-tiles" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr))">
+    <div class="pt-tile"><span>Target HO</span><b id="tgT1">${fmtRpS(P.ho || 0)}</b><small>${esc(fmtMonth(T))}</small></div>
+    <div class="pt-tile"><span>Sudah dibagi (EIGER + Outlive)</span><b id="tgT2">${fmtRpS(C.tot)}</b><small id="tgT2s">EIGER ${fmtRpS(C.totE)} · Outlive ${fmtRpS(C.totO)}</small></div>
+    <div class="pt-tile" id="tgGapT" style="background:${Math.abs(C.gap) < 1 ? '#15803D' : C.gap > 0 ? '#C2410C' : '#B91C1C'}"><span id="tgT3l">${Math.abs(C.gap) < 1 ? 'Pas dengan target HO ✓' : C.gap > 0 ? 'Sisa belum dibagi' : 'Kelebihan dari target HO'}</span><b id="tgT3">${fmtRp(Math.abs(C.gap))}</b><small>GAP = target HO − total toko</small></div>
+    <div class="pt-tile" style="background:#0B1B4A"><span>Status</span><b style="font-size:16px">${applied ? '✅ Sudah diterapkan' : 'Draft'}</b><small>${applied ? esc(fmtDate(applied.slice(0, 10))) + ' · ubah lalu terapkan ulang bila perlu' : 'belum jadi Target Sales dashboard'}</small></div>
+  </div>
+  <section class="card"><div class="card-h"><h3>2 · Bagi ke toko</h3><div class="row-act" style="margin:0;flex-wrap:wrap">
+      <button class="btn sm" id="tgFill" title="Isi target EIGER = target kasaran − outlive, dibulatkan">⚡ Isi dari kasaran</button>
+      <button class="btn sm" id="tgSaran" title="Isi toko yang masih kosong dengan saran">➗ Pakai saran (toko kosong)</button>
+      <button class="btn sm" id="tgGap" title="Tambahkan / kurangi GAP ke toko dengan target terbesar">🎯 Tutup GAP</button>
+      <button class="btn sm" id="tgClear">Kosongkan</button>
+      <button class="btn sm" id="tgXls">⬇ Excel</button></div></div>
+    <p class="small muted" style="margin:0 0 8px">Ketik target <b>EIGER</b> & <b>Outlive</b> per toko (angka saja, titik otomatis). Kasaran = target HO × % kontribusi rata-rata sales. Saran = sisa target dibagi ke toko yang belum diisi, proporsional kontribusi. Centang di depan nama toko untuk ikut / tidak ikut pembagian (Bazaar & toko baru bawaannya tidak ikut).</p>
+    <div class="tbl-wrap tg-wrap"><table class="tbl tg-tbl"><thead><tr><th class="tg-st" title="Centang = ikut pembagian kasaran">✓ Toko</th>${P.basis.map(m => `<th class="r">${esc(fmtMonth(m).replace(/ 20(\d\d)$/, " '$1"))}</th>`).join('')}<th class="r">Rata-rata</th><th class="r">% Kontribusi</th><th class="r">Target kasaran</th><th class="r tg-in">Target EIGER (BM)</th><th class="r tg-in">Outlive (BM)</th><th class="r">Total</th><th class="r">Target bln lalu</th><th class="r">vs bln lalu</th><th class="r">Growth vs ${esc(fmtMonth(addMonths(T, -12)).replace(/^\w+ /, ''))}</th><th class="r">Saran</th></tr></thead><tbody>
+    ${C.rows.map(r => `<tr data-tgrow="${esc(r.c)}"><td class="tg-st"><input type="checkbox" data-tginc="${esc(r.c)}" ${r.inc ? 'checked' : ''} title="Ikut pembagian kasaran"> <b class="tn">${esc(r.c)}</b> ${esc(r.name)}</td>
+      ${r.hist.map(h => `<td class="r small ${h && h.proj ? 'tg-proj' : ''}">${h ? fmtN(h.v) : '–'}</td>`).join('')}
+      <td class="r">${r.avg ? fmtN(r.avg) : '–'}</td><td class="r">${r.share ? fmtPct(r.share, 2) : '–'}</td><td class="r">${r.kas ? fmtN(r.kas) : '–'}</td>
+      <td class="r tg-in"><input class="inp sm r" inputmode="numeric" data-tge="${esc(r.c)}" value="${rpIn(r.e)}" placeholder="${r.saran ? rpIn(bmRound(r.saran)) : ''}"></td>
+      <td class="r tg-in"><input class="inp sm r" inputmode="numeric" data-tgo="${esc(r.c)}" value="${rpIn(r.o)}" placeholder="0"></td>
+      <td class="r"><b data-tgtot="${esc(r.c)}">${r.tot ? fmtN(r.tot) : '–'}</b></td><td class="r">${r.prev ? fmtN(r.prev) : '–'}</td>
+      <td class="r" data-tgvs="${esc(r.c)}"></td><td class="r" data-tggr="${esc(r.c)}"></td><td class="r small muted" data-tgsr="${esc(r.c)}"></td></tr>`).join('')}
+    </tbody><tfoot><tr><td class="tg-st"><b>TOTAL</b></td>${P.basis.map((m, i) => `<td class="r small">${fmtN(C.rows.reduce((a, r) => a + (r.hist[i] ? r.hist[i].v : 0), 0))}</td>`).join('')}<td class="r"><b>${fmtN(C.sumAvg)}</b></td><td class="r">100%</td><td class="r"><b>${fmtN(P.ho || 0)}</b></td>
+      <td class="r"><b id="tgFE">${fmtN(C.totE)}</b></td><td class="r"><b id="tgFO">${fmtN(C.totO)}</b></td><td class="r"><b id="tgFT">${fmtN(C.tot)}</b></td><td class="r"><b>${fmtN(C.rows.reduce((a, r) => a + (r.prev || 0), 0))}</b></td><td class="r" id="tgFV"></td><td class="r" id="tgFG"></td><td></td></tr></tfoot></table></div>
+  </section>
+  <section class="card"><div class="card-h"><h3>3 · Terapkan</h3></div>
+    <p class="small muted" style="margin:0 0 10px">Setelah GAP = 0, tekan tombol ini. Target per toko langsung dipakai di Monitoring Sales, Share Omset, Daily Report, dll. untuk ${esc(fmtMonth(T))} (sama seperti upload template Target Sales). Rincian EA/WAB yang sudah ada tetap dipertahankan.</p>
+    <button class="btn primary" id="tgApply">✅ Terapkan sebagai Target Sales ${esc(fmtMonth(T))}</button> <span class="small muted" id="tgApMsg"></span>
+  </section></div>`;
+  bmTgtRefresh();
+}
+/* hitung ulang angka tanpa menggambar ulang tabel (supaya kursor tidak lompat saat mengetik) */
+function bmTgtRefresh() {
+  const C = bmTgtCalc(), T = App.bmTgt.m, set = (sel, h) => { const el = typeof sel === 'string' ? $(sel) : sel; if (el) el.innerHTML = h; };
+  const pct = (a, b) => b ? (a / b - 1) : null, col = x => x == null ? '' : `style="color:${x >= 0 ? 'var(--ok)' : 'var(--bad)'}"`;
+  for (const r of C.rows) {
+    const k = CSS.escape(r.c);
+    set(`[data-tgtot="${k}"]`, r.tot ? fmtN(r.tot) : '–');
+    const vs = r.tot && r.prev ? r.tot - r.prev : null; set(`[data-tgvs="${k}"]`, vs == null ? '–' : `<span ${col(vs)}>${vs > 0 ? '+' : ''}${fmtN(vs)}</span>`);
+    const g = r.tot && r.ly ? pct(r.tot, r.ly) : null; set(`[data-tggr="${k}"]`, g == null ? '–' : `<span ${col(g)}>${fmtPct(g, 1)}</span>`);
+    set(`[data-tgsr="${k}"]`, r.saran ? fmtN(bmRound(r.saran)) : r.filled ? '✓' : '–');
+    const ie = $(`[data-tge="${k}"]`); if (ie && document.activeElement !== ie) ie.placeholder = r.saran ? rpIn(bmRound(r.saran)) : '';
+  }
+  set('#tgFE', fmtN(C.totE)); set('#tgFO', fmtN(C.totO)); set('#tgFT', fmtN(C.tot));
+  const pv = C.rows.reduce((a, r) => a + (r.prev || 0), 0), ly = C.rows.reduce((a, r) => a + (r.tot ? r.ly || 0 : 0), 0);
+  set('#tgFV', pv ? `<span ${col(C.tot - pv)}>${C.tot - pv > 0 ? '+' : ''}${fmtN(C.tot - pv)}</span>` : '–'); set('#tgFG', ly ? `<span ${col(pct(C.tot, ly))}>${fmtPct(pct(C.tot, ly), 1)}</span>` : '–');
+  set('#tgT2', fmtRpS(C.tot)); set('#tgT2s', `EIGER ${fmtRpS(C.totE)} · Outlive ${fmtRpS(C.totO)}`); set('#tgT1', fmtRpS(App.bmTgt.ho || 0));
+  const ok = Math.abs(C.gap) < 1, t3 = $('#tgGapT'); if (t3) t3.style.background = ok ? '#15803D' : C.gap > 0 ? '#C2410C' : '#B91C1C';
+  set('#tgT3l', ok ? 'Pas dengan target HO ✓' : C.gap > 0 ? 'Sisa belum dibagi' : 'Kelebihan dari target HO'); set('#tgT3', fmtRp(Math.abs(C.gap)));
+  return C;
+}
+const bmTgtSave = () => { App.bmTgt.at = new Date().toISOString(); bmSaveLater('tgt:' + App.bmTgt.m, () => App.bmTgt, '#tgMsg'); };
+function bmTgtSet(c, k, v) { const R = App.bmTgt.rows[c] || (App.bmTgt.rows[c] = {}); if (v == null) delete R[k]; else R[k] = v; if (R.e == null && R.o == null) delete App.bmTgt.rows[c]; }
+async function bmTgtApply() {
+  const P = App.bmTgt, C = bmTgtCalc(), rows = C.rows.filter(r => r.tot > 0), msg = $('#tgApMsg');
+  if (!rows.length) { toast('Belum ada target toko yang diisi'); return; }
+  if (Math.abs(C.gap) >= 1 && !confirm(`Total toko ${fmtRp(C.tot)} belum sama dengan target HO ${fmtRp(P.ho || 0)} (selisih ${fmtRp(C.gap)}).\nTetap terapkan?`)) return;
+  if (!confirm(`Terapkan target ${rows.length} toko untuk ${fmtMonth(P.m)}?\nTarget Sales toko-toko ini di dashboard akan diganti.`)) return;
+  const D = App.tgtDetail[P.m] || {};
+  const out = rows.map(r => { const o = D[r.c] || {}, ea = o.ea || 0, wab = o.wab || 0, e = r.e || 0; return [r.c, (App.stores[r.c] && App.stores[r.c].name) || r.name, Math.max(0, e - ea - wab), ea, wab, e, r.o || 0, e + (r.o || 0)]; });
+  try {
+    if (msg) msg.textContent = 'menerapkan…';
+    await withRetry(() => apiPost({ a: 'target', month: P.m, rows: out }));
+    await withRetry(() => apiPost({ a: 'log', entries: [{ id: uid(), scope: { months: [P.m], codes: rows.map(r => r.c) }, at: new Date().toISOString(), kind: 'TGT', file: 'Setting Target Store (BM)', stores: rows.length, info: 'target ' + fmtMonth(P.m) + ' dari menu Setting Target Store' }] })).catch(() => { });
+    P.appliedAt = new Date().toISOString(); await apiPost({ a: 'bmSave', key: 'tgt:' + P.m, v: P });
+    await loadAll(); render(); toast('✅ Target ' + fmtMonth(P.m) + ' sudah diterapkan');
+  } catch (e) { if (msg) msg.textContent = 'Gagal: ' + errMsg(e); }
+}
+async function exportBmTarget() {
+  if (!(await needXLSX())) return;
+  const P = App.bmTgt, C = bmTgtCalc(), T = P.m, wb = XLSX.utils.book_new();
+  const head = ['SITE', 'STORE', ...P.basis.map(fmtMonth), 'Average', '% Kontribusi to Branch', 'TARGET KASARAN', 'EIGER ADJUSTMENT BM', 'Outlive ADJ. BM', 'Total', 'Target ' + fmtMonth(addMonths(T, -1)), 'Selisih vs Target Bulan Lalu', '% Growth vs ' + fmtMonth(addMonths(T, -12))];
+  const a = [['Jateng 01', 'TARGET ' + fmtMonth(T).toUpperCase(), P.ho || 0], [], head,
+    ...C.rows.map(r => [r.c, r.name, ...r.hist.map(h => h ? Math.round(h.v) : null), r.avg ? Math.round(r.avg) : null, r.share || null, r.kas ? Math.round(r.kas) : null, r.e, r.o, r.tot || null, r.prev, r.tot && r.prev ? r.tot - r.prev : null, r.tot && r.ly ? r.tot / r.ly - 1 : null]),
+    ['', 'TOTAL', ...P.basis.map((m, i) => Math.round(C.rows.reduce((s, r) => s + (r.hist[i] ? r.hist[i].v : 0), 0))), Math.round(C.sumAvg), 1, P.ho || 0, C.totE, C.totO, C.tot, C.rows.reduce((s, r) => s + (r.prev || 0), 0), null, null],
+    ['', 'GAP (Target HO − Total)', ...P.basis.map(() => null), null, null, null, null, null, (P.ho || 0) - C.tot]];
+  const ws = XLSX.utils.aoa_to_sheet(a), nb = P.basis.length, rng = XLSX.utils.decode_range(ws['!ref']);
+  for (let i = 0; i <= rng.e.r; i++) for (let c = 2; c <= rng.e.c; c++) { const ad = XLSX.utils.encode_cell({ r: i, c }); if (!ws[ad] || typeof ws[ad].v !== 'number') continue; ws[ad].z = (i > 2 && (c === nb + 3 || c === nb + 10)) ? '0.00%' : '#,##0'; }
+  ws['!cols'] = [8, 36, ...P.basis.map(() => 14), 14, 10, 15, 16, 14, 15, 15, 15, 11].map(w => ({ wch: w }));
+  XLSX.utils.book_append_sheet(wb, ws, fmtMonth(T));
+  (await getDownloads()).save({ filename: `Pembagian_Target_${T}.xlsx`, data: new Blob([XLSX.write(wb, { bookType: 'xlsx', type: 'array' })]) });
+}
+
+/* ---------- 2. Rekap Dinas ---------- */
+const DN_CAT = ['Transportasi', 'Akomodasi', 'Uang Makan', 'Lain-lain'];
+const dnTot = t => t.rows.reduce((a, r) => a + (+r.cost || 0), 0);
+const dnCat = (t, k) => t.rows.filter(r => (r.cat || 'Transportasi') === k).reduce((a, r) => a + (+r.cost || 0), 0);
+const dnFmtD = iso => iso ? `${+iso.slice(8)} ${MONL[+iso.slice(5, 7) - 1]} ${iso.slice(0, 4)}` : '';
+function dnTitle(t) {
+  if (t.jenis === 'dalam') return 'Transport ' + (t.month ? fmtMonth(t.month) : '');
+  return 'Dinas Luar Kota' + (t.tujuan ? ' · ' + t.tujuan : '');
+}
+function dnPeriode(t) { const ds = t.rows.map(r => r.tgl).filter(Boolean).sort(); if (!ds.length) return ''; const a = ds[0], b = ds[ds.length - 1]; return a === b ? dnFmtD(a) : dnFmtD(a) + ' – ' + dnFmtD(b); }
+async function dnLoad() { const v = await bmGet('dinas').catch(() => null); App.dinas = Object.assign({ profile: { nama: (App.user && App.user.name) || 'Fany Dzikri Hakim', nik: '220450', jabatan: 'Head of Branch Jateng 01', cc: 'Regional 03', makan: 130000, budget: 750000 }, trips: [] }, v || {}); }
+const dnSave = () => bmSaveLater('dinas', () => App.dinas, '#dnMsg');
+const dnCur = () => (App.dinas.trips || []).find(t => t.id === App.ui.dnOpen) || null;
+function pageBmDinas(view) {
+  setHead('Rekap Dinas', 'Transport bulanan (dalam kota) & perjalanan dinas luar kota · upload nota, rekap otomatis');
+  if (!App.dinas) { view.innerHTML = '<div class="loading"><span class="spin"></span>Memuat rekap dinas…</div>'; dnLoad().then(() => { if (App.page === 'bm_dinas') render(); }, loadFail); return; }
+  const D = App.dinas, t = dnCur();
+  if (t) { view.innerHTML = dnEditor(t); return; }
+  const Pf = D.profile, L = (D.trips || []).slice().sort((a, b) => String(b.at || '').localeCompare(String(a.at || '')));
+  view.innerHTML = `<div class="stack">
+  <section class="card"><div class="card-h"><h3>Buat rekap baru</h3><span class="small muted" id="dnMsg"></span></div>
+    <div class="dn-new"><button class="dn-big" data-dnnew="dalam"><b>🚗 Transport bulanan</b><span>Dinas dalam kota · bensin operasional per bulan (budget ${fmtRpS(Pf.budget || 750000)})</span></button>
+    <button class="dn-big" data-dnnew="luar"><b>🧳 Dinas luar kota</b><span>Form HCB-FRM-05 · uang makan, transportasi, akomodasi</span></button></div>
+    <p class="small muted" style="margin:10px 0 0">Alur: buat rekap → <b>📷 upload foto nota</b> (boleh banyak sekaligus, dari HP juga bisa) → AI membaca tanggal, item & nominal → cek/ubah bila perlu → <b>⬇ Excel</b> + <b>⬇ Lampiran nota (PDF)</b>.</p></section>
+  <section class="card"><div class="card-h"><h3>Riwayat rekap</h3><p class="small muted">${L.length} rekap · klik untuk membuka</p></div>
+    ${L.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Jenis</th><th>Rekap</th><th>Periode</th><th class="r">Total</th><th class="r">Pengajuan</th><th class="r">Sisa / kurang</th><th class="r">Nota</th></tr></thead><tbody>
+      ${L.map(x => { const tt = dnTot(x), bg = +x.budget || 0; return `<tr data-dnopen="${esc(x.id)}" style="cursor:pointer"><td>${x.jenis === 'dalam' ? '🚗 Dalam kota' : '🧳 Luar kota'}</td><td><b>${esc(dnTitle(x))}</b></td><td class="small">${esc(dnPeriode(x) || '–')}</td><td class="r">${fmtRp(tt)}</td><td class="r">${bg ? fmtRp(bg) : '–'}</td><td class="r" style="color:${bg - tt >= 0 ? 'var(--ok)' : 'var(--bad)'}">${bg ? fmtRp(bg - tt) : '–'}</td><td class="r">${x.rows.reduce((a, r) => a + (r.nota || []).length, 0)}</td></tr>`; }).join('')}</tbody></table></div>` : '<p class="muted small">Belum ada rekap.</p>'}</section>
+  <section class="card"><div class="card-h"><h3>Data diri (dipakai di semua rekap)</h3></div>
+    <div class="dn-grid">${[['nama', 'Nama karyawan'], ['nik', 'NIK'], ['jabatan', 'Jabatan / Level'], ['cc', 'Cost center']].map(([k, l]) => `<label class="fl">${l}<input class="inp" data-dnpf="${k}" value="${esc(Pf[k] || '')}"></label>`).join('')}
+      <label class="fl">Uang makan / hari (luar kota)<input class="inp" inputmode="numeric" data-dnpfn="makan" value="${rpIn(Pf.makan)}"></label>
+      <label class="fl">Budget transport / bulan (dalam kota)<input class="inp" inputmode="numeric" data-dnpfn="budget" value="${rpIn(Pf.budget)}"></label></div></section></div>`;
+}
+function dnEditor(t) {
+  const luar = t.jenis === 'luar', tt = dnTot(t), bg = +t.budget || 0, Pf = App.dinas.profile;
+  const f = (k, l, type = 'text', extra = '') => `<label class="fl">${l}<input class="inp" type="${type}" data-dnf="${k}" value="${esc(t[k] || '')}" ${extra}></label>`;
+  const rowsSorted = t.rows.map((r, i) => ({ r, i })).sort((a, b) => String(a.r.tgl || '9').localeCompare(String(b.r.tgl || '9')));
+  return `<div class="stack">
+  <div class="filters" style="margin:0"><button class="btn sm" id="dnBack">← Semua rekap</button><span class="small muted" id="dnMsg"></span><span style="flex:1"></span>
+    <button class="btn sm" id="dnXls">⬇ Excel</button><button class="btn sm" id="dnPdf">⬇ Lampiran nota (PDF)</button><button class="btn sm" id="dnDel" style="color:var(--bad)">Hapus rekap</button></div>
+  <section class="card"><div class="card-h"><h3>${luar ? '🧳 Dinas luar kota' : '🚗 Transport bulanan (dalam kota)'}</h3><span class="small muted">${esc(Pf.nama || '')} · ${esc(Pf.nik || '')}</span></div>
+    <div class="dn-grid">${luar
+      ? f('tujuan', 'Tujuan DL', 'text', 'placeholder="mis. Pencarian Lokasi Ruko Baru - Magelang - Temanggung"') + `<label class="fl">Jenis dinas<select class="inp" data-dnf="jd">${['Luar Kota', 'Luar Negeri'].map(x => `<option ${(t.jd || 'Luar Kota') === x ? 'selected' : ''}>${x}</option>`).join('')}</select></label>`
+        + f('tibaTujuan', 'Jam tiba di kota tujuan', 'datetime-local') + f('tibaAsal', 'Jam tiba di kota asal', 'datetime-local')
+      : f('month', 'Bulan', 'month')}
+      <label class="fl">${luar ? 'Pengajuan uang perjalanan dinas' : 'Budget pengajuan'}<input class="inp" inputmode="numeric" data-dnfn="budget" value="${rpIn(t.budget)}"></label></div></section>
+  <section class="card dn-up"><div class="card-h"><h3>📷 Upload nota</h3><span class="small muted" id="dnUpMsg"></span></div>
+    <label class="dn-drop"><input type="file" id="dnFile" accept="image/*" multiple hidden><b>Pilih / foto nota</b><span>Boleh banyak sekaligus. Setiap nota jadi 1 baris; tanggal, item, kategori & nominal dibaca AI, lalu cek kembali.</span></label>
+    ${luar ? `<div class="filters" style="margin:10px 0 0;align-items:flex-end"><label class="fl">Uang makan<input class="inp sm" type="number" min="1" id="dnMkN" value="1" style="width:70px"></label><span class="small" style="padding-bottom:9px">hari × ${fmtRp(Pf.makan || 130000)}</span><button class="btn sm" id="dnMk">+ Tambah uang makan</button><button class="btn sm" id="dnAdd">+ Baris manual</button></div>` : `<div class="filters" style="margin:10px 0 0"><button class="btn sm" id="dnAdd">+ Baris manual</button></div>`}</section>
+  <section class="card"><div class="card-h"><h3>Rincian biaya</h3><span class="small muted">${t.rows.length} baris</span></div>
+    ${t.rows.length ? `<div class="dn-rows">${rowsSorted.map(({ r, i }) => `<div class="dn-row ${luar ? '' : 'dk'} ${r.ai ? 'dn-ai' : ''}">
+      <label class="fl">Tanggal<input class="inp sm" type="date" data-dnr="${i}|tgl" value="${esc(r.tgl || '')}"></label>
+      <label class="fl dn-item">Item<input class="inp sm" data-dnr="${i}|item" value="${esc(r.item || '')}" placeholder="${luar ? 'mis. Hotel Kyriad / Bensin Jogja - Magelang' : 'Uang Bensin'}"></label>
+      ${luar ? `<label class="fl">Kategori<select class="inp sm" data-dnr="${i}|cat">${DN_CAT.map(k => `<option ${(r.cat || 'Transportasi') === k ? 'selected' : ''}>${k}</option>`).join('')}</select></label>` : ''}
+      <label class="fl">Nominal (Rp)<input class="inp sm r" inputmode="numeric" data-dnrn="${i}" value="${rpIn(r.cost)}"></label>
+      <label class="fl dn-ket">Keterangan${luar ? '' : ' (rute per tanggal)'}<textarea class="inp sm" rows="${luar ? 1 : 3}" data-dnr="${i}|ket" placeholder="${luar ? 'Transportasi wajib dari – ke, mis. Jogja - Magelang 70km' : '7 Oktober : EAS Tamsis -> EAS Parangtritis'}">${esc(r.ket || '')}</textarea></label>
+      <div class="dn-act">${(r.nota || []).map((id, k) => `<button class="btn sm" data-dnimg="${esc(id)}" title="Lihat nota">🧾${(r.nota || []).length > 1 ? k + 1 : ''}</button>`).join('')}<label class="btn sm" title="Lampirkan nota ke baris ini">📎<input type="file" accept="image/*" multiple hidden data-dnrowup="${i}"></label><button class="btn sm" data-dnrdel="${i}" title="Hapus baris">✕</button></div>
+      ${r.ai ? '<div class="dn-flag small">✨ dibaca AI dari nota, mohon dicek</div>' : ''}</div>`).join('')}</div>` : '<p class="muted small">Belum ada baris. Upload nota atau tambah baris manual.</p>'}
+    <div class="dn-sum">${luar ? DN_CAT.map(k => `<div><span>${k}</span><b>${fmtRp(dnCat(t, k))}</b></div>`).join('') : ''}
+      <div><span>Total</span><b>${fmtRp(tt)}</b></div><div><span>${luar ? 'Pengajuan' : 'Budget pengajuan'}</span><b>${bg ? fmtRp(bg) : '–'}</b></div>
+      <div class="${bg - tt >= 0 ? 'ok' : 'bad'}"><span>${luar ? (bg - tt >= 0 ? 'Kelebihan (dikembalikan)' : 'Kekurangan (diganti)') : 'Sisa transfer'}</span><b>${bg ? fmtRp(bg - tt) : '–'}</b></div></div></section></div>`;
+}
+/* kompres foto nota: sisi terpanjang 1600px, JPEG 80% (cukup jelas untuk dibaca, ringan untuk diupload) */
+function dnCompress(file) {
+  return new Promise((res, rej) => {
+    const url = URL.createObjectURL(file), img = new Image();
+    img.onload = () => { const k = Math.min(1, 1600 / Math.max(img.width, img.height)), c = document.createElement('canvas'); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k); c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(url); res(c.toDataURL('image/jpeg', 0.8).split(',')[1]); };
+    img.onerror = () => { URL.revokeObjectURL(url); rej(new Error('Foto tidak bisa dibuka: ' + file.name + ' (format HEIC? ubah ke JPG di setelan kamera)')); };
+    img.src = url;
+  });
+}
+async function dnUpload(files, rowIdx) {
+  const t = dnCur(); if (!t || !files.length) return; const msg = $('#dnUpMsg'), say = x => { const m = $('#dnUpMsg'); if (m) m.textContent = x; };
+  let ok = 0, ai = 0, note = '';
+  for (let i = 0; i < files.length; i++) {
+    say(`Membaca nota ${i + 1}/${files.length}…`);
+    try {
+      const data = await dnCompress(files[i]);
+      const R = await apiPost({ a: 'nota', img: data, mime: 'image/jpeg', name: files[i].name, jenis: t.jenis });
+      try { await IDB.put('nota:' + R.id, data); } catch (e) { }
+      const d = R.data || {}, cost = d.cost != null ? parseRp(d.cost) : null, tgl = /^\d{4}-\d{2}-\d{2}$/.test(d.tanggal || '') ? d.tanggal : '';
+      const cat = DN_CAT.includes(d.kategori) ? d.kategori : 'Transportasi';
+      if (rowIdx != null && t.rows[rowIdx]) {
+        const r = t.rows[rowIdx]; (r.nota = r.nota || []).push(R.id);
+        if (!r.tgl && tgl) r.tgl = tgl; if (!r.item && d.item) r.item = d.item; if ((r.cost == null || r.cost === '') && cost != null) r.cost = cost; if (!r.ket && d.keterangan) r.ket = d.keterangan;
+      } else {
+        if (t.jenis === 'dalam' && !t.rows.length && tgl) t.month = tgl.slice(0, 7);
+        t.rows.push({ tgl, item: d.item || (t.jenis === 'dalam' ? 'Uang Bensin' : ''), cat, cost, ket: d.keterangan || '', nota: [R.id], ai: !!R.ai });
+      }
+      ok++; if (R.ai) ai++; if (R.note) note = R.note;
+    } catch (e) { note = errMsg(e); }
+  }
+  t.at = new Date().toISOString(); dnSave(); render();
+  say(`${ok} nota tersimpan${ai ? ` · ${ai} dibaca AI` : ''}${note ? ' · ' + note : ''}`);
+}
+async function dnImgData(id) {
+  try { const c = await IDB.get('nota:' + id); if (c) return c; } catch (e) { }
+  const R = await api('notaImg', { id }); if (!R || !R.data) throw new Error('Foto nota tidak ditemukan');
+  try { await IDB.put('nota:' + id, R.data); } catch (e) { } return R.data;
+}
+async function dnShowImg(id) {
+  const ov = document.createElement('div'); ov.className = 'modal-ov'; ov.id = 'dnImgOv';
+  ov.innerHTML = '<div class="modal" style="width:min(720px,100%);padding:12px;text-align:center"><div class="loading"><span class="spin"></span>Memuat nota…</div></div>';
+  ov.addEventListener('click', e => { if (e.target === ov || e.target.closest('[data-dnclose]')) ov.remove(); }); document.body.appendChild(ov);
+  try { const d = await dnImgData(id); ov.querySelector('.modal').innerHTML = `<img src="data:image/jpeg;base64,${d}" style="max-width:100%;max-height:78vh;border-radius:8px"><div style="margin-top:8px"><button class="btn sm" data-dnclose>Tutup</button></div>`; }
+  catch (e) { ov.querySelector('.modal').innerHTML = `<p>${esc(errMsg(e))}</p><button class="btn sm" data-dnclose>Tutup</button>`; }
+}
+let _pdfP = null;
+function needPDF() {
+  if (window.jspdf) return Promise.resolve(true);
+  return _pdfP || (_pdfP = new Promise(res => { const sc = document.createElement('script'); sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'; sc.onload = () => res(true); sc.onerror = () => { _pdfP = null; toast('Gagal memuat pembuat PDF, cek koneksi'); res(false); }; document.head.appendChild(sc); }));
+}
+async function dnPdf() {
+  const t = dnCur(); if (!t) return; const list = []; t.rows.slice().sort((a, b) => String(a.tgl).localeCompare(String(b.tgl))).forEach((r, i) => (r.nota || []).forEach(id => list.push({ id, r, no: i + 1 })));
+  if (!list.length) { toast('Belum ada foto nota'); return; }
+  if (!(await needPDF())) return;
+  const { jsPDF } = window.jspdf, doc = new jsPDF({ unit: 'mm', format: 'a4' }), msg = $('#dnMsg');
+  for (let i = 0; i < list.length; i++) {
+    if (msg) msg.textContent = `Menyusun PDF ${i + 1}/${list.length}…`;
+    const x = list[i], d = await dnImgData(x.id).catch(() => null); if (i) doc.addPage();
+    doc.setFontSize(11); doc.text(`Lampiran nota ${i + 1} · ${dnTitle(t)}`, 12, 12);
+    doc.setFontSize(9); doc.text(`${dnFmtD(x.r.tgl)} · ${x.r.item || ''} · ${fmtRp(x.r.cost || 0)}`, 12, 18);
+    if (!d) { doc.text('(foto tidak ditemukan)', 12, 30); continue; }
+    const img = await new Promise(res => { const im = new Image(); im.onload = () => res(im); im.onerror = () => res(null); im.src = 'data:image/jpeg;base64,' + d; });
+    if (img) { const W = 186, H = 262, k = Math.min(W / img.width, H / img.height); doc.addImage('data:image/jpeg;base64,' + d, 'JPEG', 12, 24, img.width * k, img.height * k); }
+  }
+  if (msg) msg.textContent = '';
+  const blob = doc.output('blob'); (await getDownloads()).save({ filename: `Nota_${dnTitle(t).replace(/[^\w]+/g, '_')}.pdf`, data: blob });
+}
+async function dnExcel() {
+  const t = dnCur(); if (!t || !(await needXLSX())) return; const Pf = App.dinas.profile, wb = XLSX.utils.book_new();
+  const rows = t.rows.slice().sort((a, b) => String(a.tgl || '').localeCompare(String(b.tgl || ''))), tt = dnTot(t), bg = +t.budget || 0;
+  const money = ws => { const R = XLSX.utils.decode_range(ws['!ref']); for (let i = 0; i <= R.e.r; i++) for (let c = 0; c <= R.e.c; c++) { const a = XLSX.utils.encode_cell({ r: i, c }); if (ws[a] && typeof ws[a].v === 'number' && ws[a].v >= 1000) ws[a].z = '#,##0'; } };
+  let ws, name;
+  if (t.jenis === 'dalam') {
+    const a = [[`REKAP TRANSPORT BM ${Pf.nama} - ${t.month ? fmtMonth(t.month) : ''}`], [], ['NO', 'TANGGAL', 'ITEMS', 'COST', 'Keterangan'],
+      ...rows.map((r, i) => [i + 1, dnFmtD(r.tgl), r.item || '', +r.cost || 0, r.ket || '']),
+      ['', '', 'Total :', tt], ['', '', 'Budget Pengajuan :', bg], ['', '', 'Sisa Transfer :', bg - tt]];
+    ws = XLSX.utils.aoa_to_sheet(a); ws['!cols'] = [5, 18, 18, 13, 70].map(w => ({ wch: w })); ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 4 } }];
+    name = `Rekap_Transport_${t.month || ''}`;
+  } else {
+    const dow = iso => iso ? DOW[new Date(iso + 'T12:00:00Z').getUTCDay()] : '';
+    const col = k => r => (r.cat || 'Transportasi') === k ? +r.cost || 0 : null;
+    const fmtDT = v => v ? v.replace('T', ' ') : '';
+    const a = [['REKAP REALISASI PERJALANAN DINAS (LUAR KOTA/LUAR NEGERI)', '', '', '', '', '', '', '', '', '', 'HCB-FRM-05 Rev. 1'], [],
+      ['Nama Karyawan', '', ': ' + (Pf.nama || '')], ['NIK', '', ': ' + (Pf.nik || '')], ['Jabatan / Level', '', ': ' + (Pf.jabatan || '')], ['Jenis Dinas', '', ': ' + (t.jd || 'Luar Kota')], ['Cost Center', '', ': ' + (Pf.cc || '')],
+      ['Tujuan DL', '', ': ' + (t.tujuan || '')], ['Periode DL', '', ': ' + dnPeriode(t)], ['Jam Tiba di Kota/Negara Tujuan', '', ': ' + fmtDT(t.tibaTujuan)], ['Jam Tiba di Kota/Negara Asal', '', ': ' + fmtDT(t.tibaAsal)], [],
+      ['Day', 'Date', 'Description', 'Uang Makan', '', 'Transportasi', '', 'Akomodasi', '', 'Lain-Lain', '', 'Keterangan'],
+      ['', '', '', 'Rp', 'Currency*', 'Rp', 'Currency*', 'Rp', 'Currency*', 'Rp', 'Currency*', ''],
+      ...rows.map(r => [dow(r.tgl), dnFmtD(r.tgl), r.item || '', col('Uang Makan')(r), null, col('Transportasi')(r), null, col('Akomodasi')(r), null, col('Lain-lain')(r), null, r.ket || '']),
+      ['', '', 'Total Biaya Perjalanan Dinas', dnCat(t, 'Uang Makan'), 0, dnCat(t, 'Transportasi'), 0, dnCat(t, 'Akomodasi'), 0, dnCat(t, 'Lain-lain'), 0, ''], [],
+      ['', '', 'Pengajuan uang perjalanan dinas', bg], ['', '', 'Uang makan', dnCat(t, 'Uang Makan')], ['', '', 'Akomodasi', dnCat(t, 'Akomodasi')], ['', '', 'Transportasi', dnCat(t, 'Transportasi')], ['', '', 'Lain-lain', dnCat(t, 'Lain-lain')],
+      ['', '', 'Total Biaya DL', tt], ['', '', bg - tt >= 0 ? 'Kelebihan/~~Kekurangan~~*' : '~~Kelebihan~~/Kekurangan*', Math.abs(bg - tt)], [],
+      ['', '', '', '', '', '', '', '', '', 'Yang Mengajukan,'], [], [], ['', '', '', '', '', '', '', '', '', `(${Pf.nama || ''})`], [],
+      ['Catatan:'], ['1. Untuk Biaya Transportasi WAJIB menyebutkan tujuan dari dan ke'], ['2. *) Jenis currency (mata uang) dapat disesuaikan dengan penggunaan di negara tujuan (USD/IDR/mata uang yang digunakan di negara tujuan)'], ['3. Hal-hal diluar ketentuan wajib menyertakan Form Berita Acara (General) yang diapprove oleh Division Head']];
+    ws = XLSX.utils.aoa_to_sheet(a); ws['!cols'] = [9, 18, 38, 12, 9, 12, 9, 12, 9, 12, 9, 40].map(w => ({ wch: w }));
+    ws['!merges'] = [{ s: { r: 12, c: 3 }, e: { r: 12, c: 4 } }, { s: { r: 12, c: 5 }, e: { r: 12, c: 6 } }, { s: { r: 12, c: 7 }, e: { r: 12, c: 8 } }, { s: { r: 12, c: 9 }, e: { r: 12, c: 10 } }];
+    name = `Rekap_Dinas_Luar_Kota_${(t.tujuan || '').replace(/[^\w]+/g, '_').slice(0, 40)}`;
+  }
+  money(ws); XLSX.utils.book_append_sheet(wb, ws, t.jenis === 'dalam' ? 'Trans. ' + (t.month ? MONL[+t.month.slice(5) - 1] : '') : 'Rekap DL');
+  (await getDownloads()).save({ filename: name + '.xlsx', data: new Blob([XLSX.write(wb, { bookType: 'xlsx', type: 'array' })]) });
+}
+/* gambar ulang setelah event selesai (hindari render bertumpuk saat input yang sedang fokus ikut terhapus) */
+let _bmR = null; const bmRender = () => { clearTimeout(_bmR); _bmR = setTimeout(() => { const y = window.scrollY; render(); window.scrollTo(0, y); }, 0); };
+/* event menu BM */
+document.addEventListener('click', async e => {
+  const t = e.target; if (!t || !t.closest) return;
+  if (!BM_ONLY.includes(App.page)) return;
+  const q = s => t.closest(s);
+  /* target */
+  if (q('[data-tgbm]')) { const m = q('[data-tgbm]').dataset.tgbm, B = App.bmTgt.basis; App.bmTgt.basis = B.includes(m) ? B.filter(x => x !== m) : [...B, m].sort(); bmTgtSave(); bmRender(); return; }
+  if (t.id === 'tgFill') { const C = bmTgtCalc(); for (const r of C.rows) if (r.kas > 0) bmTgtSet(r.c, 'e', Math.max(0, bmRound(r.kas - (r.o || 0)))); bmTgtSave(); bmRender(); return; }
+  if (t.id === 'tgSaran') { const C = bmTgtCalc(); for (const r of C.rows) if (r.saran) bmTgtSet(r.c, 'e', bmRound(r.saran)); bmTgtSave(); bmRender(); return; }
+  if (t.id === 'tgGap') { const C = bmTgtCalc(); const big = C.rows.filter(r => r.e != null).sort((a, b) => b.e - a.e)[0]; if (!big) { toast('Isi target toko dulu'); return; } if (Math.abs(C.gap) < 1) { toast('GAP sudah 0'); return; } bmTgtSet(big.c, 'e', big.e + C.gap); toast(`GAP ${fmtRp(C.gap)} dimasukkan ke ${big.name}`); bmTgtSave(); bmRender(); return; }
+  if (t.id === 'tgClear') { if (!confirm('Kosongkan semua target EIGER & Outlive yang sudah diketik?')) return; App.bmTgt.rows = {}; bmTgtSave(); bmRender(); return; }
+  if (t.id === 'tgXls') { exportBmTarget(); return; }
+  if (t.id === 'tgApply') { bmTgtApply(); return; }
+  /* dinas */
+  if (q('[data-dnnew]')) { const j = q('[data-dnnew]').dataset.dnnew, Pf = App.dinas.profile; const x = { id: uid(), jenis: j, at: new Date().toISOString(), rows: [], budget: j === 'dalam' ? (Pf.budget || 750000) : null, month: j === 'dalam' ? todayISO().slice(0, 7) : '' }; App.dinas.trips.push(x); App.ui.dnOpen = x.id; dnSave(); bmRender(); window.scrollTo(0, 0); return; }
+  if (q('[data-dnopen]')) { App.ui.dnOpen = q('[data-dnopen]').dataset.dnopen; bmRender(); window.scrollTo(0, 0); return; }
+  if (t.id === 'dnBack') { App.ui.dnOpen = ''; bmRender(); return; }
+  if (t.id === 'dnDel') { const x = dnCur(); if (x && confirm(`Hapus rekap "${dnTitle(x)}"? Foto nota tetap tersimpan di Google Drive.`)) { App.dinas.trips = App.dinas.trips.filter(y => y !== x); App.ui.dnOpen = ''; dnSave(); bmRender(); } return; }
+  if (t.id === 'dnAdd') { const x = dnCur(); x.rows.push({ tgl: todayISO(), item: x.jenis === 'dalam' ? 'Uang Bensin' : '', cat: 'Transportasi', cost: null, ket: '', nota: [] }); dnSave(); bmRender(); return; }
+  if (t.id === 'dnMk') { const x = dnCur(), n = Math.max(1, +($('#dnMkN') || {}).value || 1), rate = App.dinas.profile.makan || 130000, ds = x.rows.map(r => r.tgl).filter(Boolean).sort(); x.rows.push({ tgl: ds.length ? ds[ds.length - 1] : todayISO(), item: 'Uang Makan', cat: 'Uang Makan', cost: n * rate, ket: `Uang Makan ${n} Hari DL`, nota: [] }); dnSave(); bmRender(); return; }
+  if (q('[data-dnrdel]')) { const x = dnCur(), i = +q('[data-dnrdel]').dataset.dnrdel; if (confirm('Hapus baris ini?')) { x.rows.splice(i, 1); dnSave(); bmRender(); } return; }
+  if (q('[data-dnimg]')) { dnShowImg(q('[data-dnimg]').dataset.dnimg); return; }
+  if (t.id === 'dnXls') { dnExcel(); return; }
+  if (t.id === 'dnPdf') { dnPdf(); return; }
+});
+document.addEventListener('input', e => {
+  const t = e.target; if (!t || !BM_ONLY.includes(App.page)) return;
+  if (t.id === 'tgHo') { App.bmTgt.ho = parseRp(t.value); bmTgtSave(); bmTgtRefresh(); return; }
+  if (t.dataset.tge || t.dataset.tgo) { const c = t.dataset.tge || t.dataset.tgo; bmTgtSet(c, t.dataset.tge ? 'e' : 'o', parseRp(t.value)); bmTgtSave(); bmTgtRefresh(); return; }
+  const x = App.page === 'bm_dinas' && App.dinas ? dnCur() : null;
+  if (t.dataset.dnpf) { App.dinas.profile[t.dataset.dnpf] = t.value; dnSave(); return; }
+  if (t.dataset.dnpfn) { App.dinas.profile[t.dataset.dnpfn] = parseRp(t.value); dnSave(); return; }
+  if (!x) return;
+  if (t.dataset.dnf) { x[t.dataset.dnf] = t.value; x.at = new Date().toISOString(); dnSave(); return; }
+  if (t.dataset.dnfn) { x[t.dataset.dnfn] = parseRp(t.value); dnSave(); return; }
+  if (t.dataset.dnr) { const [i, k] = t.dataset.dnr.split('|'); x.rows[+i][k] = t.value; x.rows[+i].ai = false; x.at = new Date().toISOString(); dnSave(); return; }
+  if (t.dataset.dnrn) { x.rows[+t.dataset.dnrn].cost = parseRp(t.value); x.rows[+t.dataset.dnrn].ai = false; dnSave(); return; }
+});
+document.addEventListener('change', e => {
+  const t = e.target; if (!t || !BM_ONLY.includes(App.page)) return;
+  if (t.id === 'tgM') { if (t.value) { App.ui.tgM = t.value; bmRender(); } return; }
+  if (t.id === 'tgRound') { App.ui.tgRound = +t.value; bmRender(); return; }
+  if (t.dataset.tginc) { App.bmTgt.incl[t.dataset.tginc] = t.checked ? 1 : 0; bmTgtSave(); bmRender(); return; }
+  /* format ribuan & hitung ulang ringkasan setelah selesai mengetik */
+  if (t.id === 'tgHo' || t.dataset.tge || t.dataset.tgo) { const v = parseRp(t.value); t.value = rpIn(v); return; }
+  if (t.id === 'dnFile') { dnUpload([...t.files]); return; }
+  if (t.dataset.dnrowup != null) { dnUpload([...t.files], +t.dataset.dnrowup); return; }
+  if (t.dataset.dnrn || t.dataset.dnfn || t.dataset.dnpfn) { t.value = rpIn(parseRp(t.value)); if (t.dataset.dnrn || t.dataset.dnfn) bmRender(); return; }
+  if (t.dataset.dnr && /\|(tgl|cat)$/.test(t.dataset.dnr)) { bmRender(); return; }
+  if (t.dataset.dnf === 'month') { bmRender(); return; }
+});
+
 /* ================= SA-TR & SA-BO: monitoring bin harian (dari Export by Bin) ================= */
 async function loadSaBin(force) { if (App.saBin && !force) return App.saBin; const r = await api('sabin'); App.saBin = r.rows || []; return App.saBin; }
 function saBars(dates, tot, neg) {

@@ -805,6 +805,22 @@ button.pd-sz:hover{box-shadow:0 0 0 3px rgba(15,49,146,.12)}
   #bnav .bn-ai svg{stroke:#F26B21}#bnav .bn-ai span{color:#C2410C;font-weight:800}
   @media (max-width:420px){.bnav button span{font-size:10px;letter-spacing:-.1px}}
   .ai-claude{margin-top:14px;padding:12px 14px;border-radius:12px;background:#FFF7ED;border:1px solid #FED7AA}
+  .ai-wrap{max-width:980px;margin:0 auto;width:100%;display:flex;flex-direction:column;padding-bottom:var(--aidock,170px)}
+  #aiThread{flex:1;display:flex;flex-direction:column;gap:8px;padding-bottom:8px}
+  .ai-dock{position:fixed;left:50%;transform:translateX(-50%);width:min(980px,calc(100% - 24px));bottom:0;z-index:60;background:linear-gradient(to top,var(--bg,#F3F5FA) 82%,rgba(243,245,250,0));padding:16px 0 calc(10px + env(safe-area-inset-bottom))}
+  .ai-dock .ai-ex{display:flex;flex-wrap:nowrap!important;overflow-x:auto;padding-bottom:6px;scrollbar-width:none}.ai-dock .ai-ex::-webkit-scrollbar{display:none}.ai-dock .ai-ex .chip{white-space:nowrap;flex:0 0 auto;max-width:none}
+  .ai-inrow{display:flex;gap:8px;align-items:flex-end;background:var(--surface,#fff);border:1.5px solid var(--navy,#0F3192);border-radius:16px;padding:6px 6px 6px 12px;box-shadow:0 6px 24px rgba(11,27,74,.12)}
+  .ai-inrow textarea{flex:1;border:0!important;box-shadow:none!important;resize:none;font:inherit;font-size:16px;line-height:1.4;padding:8px 0;min-height:40px;max-height:130px;background:transparent;outline:none}
+  .ai-inrow #aiSend{border-radius:12px;min-width:46px;height:42px;font-size:18px;padding:0 12px}
+  .ai-foot{display:flex;gap:10px;justify-content:space-between;align-items:center;margin-top:6px;flex-wrap:wrap}.linkbtn{background:none;border:0;color:var(--bad);font:inherit;font-size:12px;cursor:pointer}
+  .ai-hello{display:flex;gap:12px;align-items:flex-start;background:var(--surface,#fff);border:1px solid var(--line,#E2E8F0);border-radius:16px;padding:16px;margin-top:6px}
+  .ai-av{width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,#F26B21,#C2410C);display:grid;place-items:center;color:#fff;font-size:18px;flex:0 0 auto}
+  .ai-av.sm{width:28px;height:28px;font-size:14px;position:absolute;left:-12px;top:-10px;box-shadow:0 2px 6px rgba(0,0,0,.15)}
+  .ai-a{position:relative;margin-left:14px}.ai-ex.big .chip{font-size:13px;padding:8px 12px;background:#fff}
+  .ai-res .tbl td:first-child,.ai-res .tbl th:first-child{min-width:200px}
+  @media (max-width:640px){.ai-dock{bottom:calc(59px + env(safe-area-inset-bottom));padding-bottom:8px;width:calc(100% - 20px)}.ai-a{margin-left:8px}.ai-av.sm{left:-8px}}
+  .ai-wrap.empty .ai-dock .ai-ex,.ai-wrap.empty #aiClear{display:none}
+  @media (max-width:640px){.ai-foot>span:first-child{display:none}.ai-foot{justify-content:flex-end;margin-top:2px}}
 </style>
 </head>
 <body>
@@ -5618,10 +5634,18 @@ function aiTable(r, ti) {
 function aiPaint(scroll) {
   if (App.page !== 'ai') return;
   const box = $('#aiThread'); if (!box) { render(); return; }
+  const wr = $('.ai-wrap'); if (wr) wr.classList.toggle('empty', !App.ai.thread.length);
+  setTimeout(aiDockPad, 0);
+  if (!App.ai.thread.length) {
+    box.innerHTML = `<div class="ai-hello"><div class="ai-av">✨</div><div><b>Halo${App.user && App.user.name ? ', ' + esc(String(App.user.name).split(' ')[0]) : ''}! Mau lihat data apa?</b>
+      <p class="small muted" style="margin:4px 0 10px">Tanya pakai bahasa sehari-hari: periode (hari ini, Sabtu, minggu lalu, week 2 November, 1–14 Nov), pengelompokan (per toko, per promo, per jam, artikel) & filter (nama toko, SMDS/DCNP, kategori). Pertanyaan lanjutan cukup diketik di kotak bawah.</p>
+      <div class="ai-ex big">${AI_EX.map(x => `<button class="chip" data-aiex="${esc(x)}" data-aisend="1">${esc(x)}</button>`).join('')}</div></div></div>`;
+    const b0 = $('#aiSend'); if (b0) b0.disabled = App.ai.busy; return;
+  }
   box.innerHTML = App.ai.thread.map((it, ti) => {
     const st = { plan: 'Menyusun rencana hitung…', calc: 'Menghitung dari data dashboard…', explain: 'Menulis kesimpulan…' }[it.stage];
-    return `<div class="ai-q"><div class="ai-bubble">${esc(it.q)}</div></div>
-    <section class="card ai-a">
+    return `<div class="ai-q" id="aiQ${ti}"><div class="ai-bubble">${esc(it.q)}</div></div>
+    <section class="card ai-a"><div class="ai-av sm">✨</div>
       ${it.plan && it.plan.title ? `<div class="card-h"><h3>✨ ${esc(it.plan.title)}</h3>${it.res.length ? `<button class="btn sm" data-aixls="${ti}">⬇ Excel</button>` : ''}</div>` : ''}
       ${it.err ? `<p style="color:var(--bad)">⚠ ${esc(it.err)}</p>` : ''}
       ${it.text ? `<div class="ai-text">${picaMd(it.text)}</div>` : st ? `<p class="muted"><span class="spin"></span> ${st}</p>` : ''}
@@ -5635,9 +5659,10 @@ function aiPaint(scroll) {
   }).join('') || '';
   App.charts = (App.charts || []).filter(c => { if (c.canvas && !document.body.contains(c.canvas)) { try { c.destroy(); } catch (e) { } return false; } return true; });
   App.ai.thread.forEach((it, ti) => it.res.forEach((r, ri) => { const cv = $(`#aiC_${ti}_${ri}`); if (cv) aiChart(cv, r); }));
-  const b = $('#aiSend'); if (b) { b.disabled = App.ai.busy; b.textContent = App.ai.busy ? 'Memproses…' : 'Tanya ➤'; }
+  const b = $('#aiSend'); if (b) { b.disabled = App.ai.busy; b.textContent = App.ai.busy ? '…' : '➤'; }
   const lf = $('#aiLeft'); if (lf) lf.textContent = App.ai.left != null ? `sisa ${App.ai.left} pertanyaan hari ini` : '';
-  if (scroll) { const last = box.lastElementChild; if (last) last.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+  /* pertanyaan baru: gulir ke pertanyaan itu supaya jawabannya terbaca dari atas; buka halaman: ke chat terakhir */
+  if (scroll) { const n = App.ai.thread.length - 1, el = $('#aiQ' + n); if (scroll === 'bottom') setTimeout(() => aiScrollTo(el), 30); else aiScrollTo(el); }
 }
 function aiChart(cv, r) {
   if (typeof Chart === 'undefined') return;
@@ -5682,24 +5707,33 @@ async function aiExcel(ti) {
 }
 function pageAI(view) {
   setHead('✨ Tanya AI', 'Tanya apa saja soal data penjualan, promo, stok & target. Angka dihitung langsung dari data master, kesimpulan disusun otomatis.');
-  view.innerHTML = `<div class="stack ai-wrap">
-    <section class="card ai-box"><textarea id="aiQ" class="inp" rows="2" placeholder="Contoh: growth sales & efektivitas promo hari Sabtu ini dibanding Sabtu minggu lalu per toko">${esc(App.ui.aiDraft || '')}</textarea>
-      <div class="ai-bar"><div class="ai-ex">${AI_EX.map(x => `<button class="chip" data-aiex="${esc(x)}">${esc(x)}</button>`).join('')}</div>
-      <div class="ai-send"><span class="small muted" id="aiLeft"></span>${App.ai.thread.length ? '<button class="btn sm" id="aiClear">Bersihkan</button>' : ''}<button class="btn primary" id="aiSend">Tanya ➤</button></div></div>
-      <p class="small muted" style="margin:8px 0 0">Data: penjualan Item DSR s/d ${App.lastDate ? fmtDate(App.lastDate) : '–'}, stok terbaru, target & list promo. Pertanyaan lanjutan boleh, mis. "sekarang khusus toko Kaliurang".</p></section>
-    <div id="aiThread"></div></div>`;
-  aiPaint();
+  view.innerHTML = `<div class="ai-wrap">
+    <div id="aiThread"></div>
+    <div class="ai-dock" id="aiDock">
+      <div class="ai-ex">${AI_EX.map(x => `<button class="chip" data-aiex="${esc(x)}">${esc(x)}</button>`).join('')}</div>
+      <div class="ai-inrow"><textarea id="aiQ" class="inp" rows="1" placeholder="Tulis pertanyaan…">${esc(App.ui.aiDraft || '')}</textarea><button class="btn primary" id="aiSend" aria-label="Kirim">➤</button></div>
+      <div class="ai-foot small muted"><span>Data s/d ${App.lastDate ? fmtDate(App.lastDate) : '–'} · Enter untuk kirim, Shift+Enter baris baru</span><span id="aiLeft"></span><button class="linkbtn" id="aiClear">🗑 Bersihkan chat</button></div>
+    </div></div>`;
+  aiPaint(App.ai.thread.length ? 'bottom' : false);
+  const q = $('#aiQ'); if (q) aiGrow(q);
+  aiDockPad();
 }
+/* tinggi kotak tanya mengikuti isi (maks 5 baris) */
+function aiGrow(q) { q.style.height = 'auto'; q.style.height = Math.min(q.scrollHeight, 130) + 'px'; aiDockPad(); }
+/* ruang kosong di bawah chat = tinggi kotak tanya, supaya jawaban terakhir tidak tertutup */
+function aiDockPad() { const d = $('#aiDock'), w = $('.ai-wrap'); if (d && w) w.style.setProperty('--aidock', (d.offsetHeight + 16) + 'px'); }
+/* gulir supaya elemen tampil tepat di bawah header (header & kotak tanya menempel) */
+function aiScrollTo(el) { if (!el) return; const hb = $('#brandbar'), top = el.getBoundingClientRect().top + window.scrollY - ((hb && hb.offsetHeight) || 110) - 12; window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' }); }
 document.addEventListener('click', e => {
   const t = e.target; if (!t || !t.closest || App.page !== 'ai') return;
-  const ex = t.closest('[data-aiex]'); if (ex) { const q = $('#aiQ'); if (q) { q.value = ex.dataset.aiex; App.ui.aiDraft = q.value; q.focus(); } return; }
-  if (t.id === 'aiSend') { const q = $('#aiQ'); const v = q ? q.value : ''; if (q) q.value = ''; App.ui.aiDraft = ''; aiAsk(v); return; }
-  if (t.id === 'aiClear') { App.ai.thread = []; render(); return; }
+  const ex = t.closest('[data-aiex]'); if (ex) { if (ex.dataset.aisend) { aiAsk(ex.dataset.aiex); return; } const q = $('#aiQ'); if (q) { q.value = ex.dataset.aiex; App.ui.aiDraft = q.value; aiGrow(q); q.focus(); } return; }
+  if (t.id === 'aiSend') { const q = $('#aiQ'); const v = q ? q.value : ''; if (q) { q.value = ''; aiGrow(q); } App.ui.aiDraft = ''; aiAsk(v); return; }
+  if (t.id === 'aiClear') { if (!confirm('Bersihkan semua chat?')) return; App.ai.thread = []; render(); window.scrollTo(0, 0); return; }
   const xl = t.closest('[data-aixls]'); if (xl) { aiExcel(+xl.dataset.aixls); return; }
   const cp = t.closest('[data-aicopy]'); if (cp) { aiCopy(+cp.dataset.aicopy); return; }
 });
-document.addEventListener('keydown', e => { if (App.page === 'ai' && e.target && e.target.id === 'aiQ' && e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); const v = e.target.value; e.target.value = ''; App.ui.aiDraft = ''; aiAsk(v); } });
-document.addEventListener('input', e => { if (App.page === 'ai' && e.target && e.target.id === 'aiQ') App.ui.aiDraft = e.target.value; });
+document.addEventListener('keydown', e => { if (App.page === 'ai' && e.target && e.target.id === 'aiQ' && e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); const v = e.target.value; e.target.value = ''; App.ui.aiDraft = ''; aiGrow(e.target); aiAsk(v); } });
+document.addEventListener('input', e => { if (App.page === 'ai' && e.target && e.target.id === 'aiQ') { App.ui.aiDraft = e.target.value; aiGrow(e.target); } });
 
 /* ---------- Tanya AI versi gratis (tanpa API key): pembaca pertanyaan berbasis kata kunci + kesimpulan otomatis (seperti Analisa PICA) ---------- */
 const AL_DAYS = { senin: 1, selasa: 2, rabu: 3, kamis: 4, jumat: 5, "jum'at": 5, sabtu: 6, minggu: 0, ahad: 0 };
@@ -5717,9 +5751,15 @@ function alPeriods(q, last) {
   const iso = q.match(/\d{4}-\d{2}-\d{2}/g); if (iso) ds.push(...iso);
   const dayName = Object.keys(AL_DAYS).find(k => k === 'minggu' ? /hari minggu/.test(q) : new RegExp('\\b' + k + '\\b').test(q));
   const monName = Object.keys(AL_MON).filter(k => k.length > 3 || ['mei'].includes(k)).find(k => new RegExp('\\bbulan ' + k + '\\b|\\b' + k + '\\s*(20\\d\\d)?\\b').test(q) && !/\d\s*$/.test(q.split(k)[0]));
-  if (ds.length >= 2 && /sampai|s\/d|hingga|-\s*\d/.test(q) && !/vs|dibanding|banding/.test(q)) { const [a, b] = ds.slice(0, 2).sort(); P1 = alRange(a, b); why = 'rentang tanggal'; }
-  else if (ds.length >= 2) { P1 = alRange(ds[0], ds[0]); P2 = alRange(ds[1], ds[1]); why = 'tanggal yang disebut'; }
-  else if (ds.length === 1) { P1 = alRange(ds[0], ds[0]); why = 'tanggal yang disebut'; }
+  /* "week 2 november", "minggu ke-1 nov", "w3": minggu ke-N dalam bulan = tgl 1-7, 8-14, 15-21, 22-akhir */
+  const wk = [...q.matchAll(/(?:week|minggu ke|minggu ke-|pekan ke|w)\s*-?\s*([1-5])\b/g)].map(x => +x[1]);
+  const wMon = (() => { const k = Object.keys(AL_MON).find(k => new RegExp('\\b' + k + '\\b').test(q)); return k ? ((q.match(new RegExp(k + '\\s*(20\\d\\d)')) || [])[1] || yr) + '-' + pad(AL_MON[k]) : (/bulan lalu/.test(q) ? addMonths(lastM, -1) : lastM); })();
+  const wRange = n => { const a = wMon + '-' + pad((n - 1) * 7 + 1), b = n >= 4 ? wMon + '-' + pad(dim(wMon)) : wMon + '-' + pad(n * 7); const r = alRange(a, b < last || wMon < lastM ? b : last); r.label = 'Week ' + n + ' ' + MON[+wMon.slice(5) - 1]; return r; };
+  if (wk.length >= 2) { const [a, b] = [...new Set(wk)].sort((x, y) => y - x); P1 = wRange(a); P2 = wRange(b); why = 'minggu ke-' + b + ' & ke-' + a + ' (week 1 = tgl 1–7, week 2 = 8–14, week 3 = 15–21, week 4 = 22–akhir bulan)'; }
+  else if (wk.length === 1) { P1 = wRange(wk[0]); P2 = wk[0] > 1 ? wRange(wk[0] - 1) : null; if (!P2) { const pm = addMonths(wMon, -1); P2 = alRange(addDays(P1.from, -dim(pm)), addDays(P1.to, -dim(pm))); P2.label = 'Week 1 ' + MON[+pm.slice(5) - 1]; } why = 'week ' + wk[0] + ' (tgl ' + +P1.from.slice(8) + '–' + +P1.to.slice(8) + ')'; }
+  else if (ds.length >= 2 && /sampai|s\/d|hingga|-\s*\d/.test(q) && !/vs|dibanding|banding|dan/.test(q)) { const [a, b] = ds.slice(0, 2).sort(); P1 = alRange(a, b); why = 'rentang tanggal'; }
+  else if (ds.length >= 2) { const [b, a] = ds.slice(0, 2).sort(); P1 = alRange(a, a); P2 = alRange(b, b); why = 'tanggal terbaru dibanding tanggal sebelumnya'; }
+  else if (ds.length === 1) { P1 = alRange(ds[0], ds[0]); P2 = alRange(addDays(ds[0], -7), addDays(ds[0], -7)); why = 'tanggal yang disebut vs hari yang sama minggu sebelumnya'; }
   else if (mN) { const n = Math.min(120, Math.max(1, +mN[1])); P1 = alRange(addDays(last, -n + 1), last); P2 = alRange(addDays(last, -2 * n + 1), addDays(last, -n)); why = n + ' hari terakhir'; }
   else if (dayName) { let d = alLastDow(last, AL_DAYS[dayName]); if (new RegExp(dayName + '\\s+(lalu|kemarin)').test(q) && !/vs|dibanding|banding/.test(q)) d = addDays(d, -7); P1 = alRange(d, d); P2 = alRange(addDays(d, -7), addDays(d, -7)); why = 'hari ' + dayName + ' terakhir vs minggu sebelumnya'; }
   else if (/\bkemarin\b/.test(q)) { const d = addDays(todayISO(), -1) <= last ? addDays(todayISO(), -1) : last; P1 = alRange(d, d); P2 = alRange(addDays(d, -7), addDays(d, -7)); why = 'kemarin vs hari yang sama minggu lalu'; }

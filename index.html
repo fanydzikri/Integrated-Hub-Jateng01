@@ -973,7 +973,9 @@ function parseWorkbookAll(buf, fileName) {
   if (rats.length) {
     const tg = out.find(p => p.kind === 'TGT' && Object.keys(p.data).some(k => k !== '?'));
     const pick = rats.find(p => /^recap$/i.test(p.sheet)) || rats.slice().sort((a, b) => b.rows - a.rows)[0];
-    if (tg) { pick.month = Object.keys(tg.data).filter(k => k !== '?').sort()[0]; pick.needMonth = false; }
+    if (tg) { pick.month = Object.keys(tg.data).filter(k => k !== '?').sort()[0]; pick.needMonth = false; pick.tgStores = tg.data[pick.month] || null; }
+    /* dua format: Breakdown Target HO (sheet TARGET V.1) atau template internal Jateng 01 (sheet TARGET MASTER / SUMMARY / MAN POWER) */
+    pick.fmt = (tg && /target\s*master/i.test(tg.sheet || '')) || rats.some(p => /^\d{4}$/.test(p.sheet || '')) ? 'Template internal Jateng 01' : 'Breakdown Target HO';
     return [pick];
   }
   /* bulan bersama: dari bobot harian (paling pasti) atau target lain di file yang sama */
@@ -1210,16 +1212,17 @@ function parseTarget(rows, hi, h, fileName) {
 /* target tagging per head (file Breakdown Target: sheet RECAP / sheet per toko) -> total target per NIK per toko (semua brand & channel) */
 function parseRaTarget(rows, hi, h, fileName) {
   const C = { code: colIdx(h, 'codesite', 'siteid'), nik: colIdx(h, 'nikkaryawan'), nm: colIdx(h, 'namakaryawan'), adj: colIdx(h, 'adjustmentstore'), pr: colIdx(h, 'proratetarget'), br: colIdx(h, 'brand'), ch: colIdx(h, 'targetchannel') };
-  const items = [];
+  const items = []; let pr = 0;
   for (let i = hi + 1; i < rows.length; i++) {
     const r = rows[i] || [];
     let code = String(r[C.code] ?? '').trim().replace(/\.0+$/, ''), nik = String(r[C.nik] ?? '').trim().replace(/\.0+$/, '');
     if (!/^\d{3,6}$/.test(code) || !/^\d{4,10}$/.test(nik)) continue;
-    const v = r[C.adj] != null && r[C.adj] !== '' ? numV(r[C.adj]) : (C.pr >= 0 ? numV(r[C.pr]) : 0);
+    const hasAdj = r[C.adj] != null && r[C.adj] !== '' && !isNaN(numV(r[C.adj]));
+    const v = hasAdj ? numV(r[C.adj]) : (C.pr >= 0 ? numV(r[C.pr]) : 0); if (!hasAdj) pr++;
     items.push([code, nik, String(r[C.nm] ?? '').replace(/\s+/g, ' ').trim(), String(r[C.br] ?? '').trim(), String(r[C.ch] ?? '').trim(), v]);
   }
   if (!items.length) throw new Error('Tidak ada baris target per head (kolom Code Site, NIK Karyawan, Adjustment Store).');
-  return { kind: 'RAT', file: fileName, items, rows: items.length, month: null, needMonth: true };
+  return { kind: 'RAT', file: fileName, items, rows: items.length, month: null, needMonth: true, pr };
 }
 /* gabung baris target per head menjadi 1 baris per toko+NIK: [nik, kodeToko, nama, totalTarget] */
 function raTargetRows(p) {
@@ -4024,8 +4027,8 @@ function uploadChecklist() {
     { n: 'Bobot harian', d: 'sheet Bobot Harian di template', s: st(!!wOf(tm), !!wOf(m)), extra: lbl + (wOf(tm) ? ' sudah ada' : ' belum ada') },
     { n: 'Target OmniChannel', d: 'sheet Target OmniChannel di template', s: st(has(App.omni[tm]), has(App.omni[m])), extra: lbl + (has(App.omni[tm]) ? ' sudah ada' : ' belum ada') },
     { n: 'Target Sales Member EAC', d: 'sheet Target EAC (bisa sekaligus Jan–Des)', s: st(has(App.eac[tm]), has(App.eac[m])), extra: lbl + (has(App.eac[tm]) ? ' sudah ada' : ' belum ada') },
-    (() => { const R = (App.raTgt || {})[tm] || {}, ids = Object.keys(R), nSt = new Set(ids.map(i => R[i].c)).size;
-      return { n: 'Target tagging per head (RA)', d: 'file Breakdown Target per RA · upload di Kelola data', s: st(ids.length > 0, has((App.raTgt || {})[m])), extra: lbl + (ids.length ? ` sudah ada · ${ids.length} RA · ${nSt} toko` : ' belum ada') }; })(),
+    (() => { const R = (App.raTgt || {})[m] || {}, ids = Object.keys(R), nSt = new Set(ids.map(i => R[i].c)).size;
+      return { n: 'Target tagging per head (RA)', d: 'file Breakdown Target HO atau template internal Jateng 01 · cukup bulan berjalan', s: st(ids.length > 0, false), extra: fmtMonth(m) + (ids.length ? ` sudah ada · ${ids.length} RA · ${nSt} toko` : ' belum ada') }; })(),
     ...(() => { const MI = App.mstInfo || {}, up = x => x && x.at ? ' · upload ' + fmtDateS(x.at.slice(0, 10)) : '';
       return [
         { n: 'Master Artikel', pic: 'IC', d: 'file Master Artikel HO (rutin ±tanggal 5)', s: MI.master ? (MI.master.month >= m ? 'ok' : 'warn') : 'bad', extra: MI.master ? 'versi ' + fmtMonth(MI.master.month) + up(MI.master) : 'belum diupload' },
@@ -6274,7 +6277,10 @@ function renderPending() {
     }
     if (p.kind === 'RAT') {
       const R0 = raTargetRows(p), stN = new Set(R0.map(r => r[1])).size, tt = R0.reduce((a, r) => a + r[3], 0);
-      return `<div class="pend-i"><span class="k" style="background:#13806F;color:#fff">Target per head</span><div><div class="f">${esc(p.file)}</div><div class="d">${R0.length} RA di ${stN} toko · total ${fmtRpS(tt)} · bulan <input type="month" class="inp sm" data-pmonth="${i}" value="${esc(p.month || '')}">${p.needMonth ? ' <b style="color:var(--warn)">pilih bulan</b>' : ''} · menggantikan target per head bulan yang sama</div></div><button class="btn sm" data-rmp="${i}">Hapus</button></div>`;
+      const TS = p.tgStores || {}, tsCodes = Object.keys(TS).filter(c => (TS[c].total || 0) > 0 && (!SET().areaStores || inArea(c))), tagged = new Set(R0.map(r => r[1])), miss = tsCodes.filter(c => !tagged.has(c));
+      const tsTot = tsCodes.reduce((a, c) => a + (TS[c].total || 0), 0);
+      const extra = `<div class="d small" style="margin-top:4px">📄 ${esc(p.fmt || 'Breakdown Target')}${tsCodes.length ? ` · target toko ${fmtRpS(tsTot)}, sudah ditag ${fmtRpS(tt)}${Math.abs(tsTot - tt) > 1000 ? ` (<b style="color:var(--warn)">selisih ${fmtRpS(tsTot - tt)}</b>)` : ' ✓'}` : ''}${miss.length ? `<br><b style="color:var(--warn)">${miss.length} toko belum ditag:</b> ${miss.slice(0, 8).map(c => esc(c + ' ' + sName(c))).join(', ')}${miss.length > 8 ? ', …' : ''}` : ''}${p.pr ? `<br><b style="color:var(--warn)">${fmtN(p.pr)} baris *Adjustment Store kosong</b> → memakai Prorate Target (dibagi rata).` : ''}</div>`;
+      return `<div class="pend-i"><span class="k" style="background:#13806F;color:#fff">Target per head</span><div><div class="f">${esc(p.file)}</div><div class="d">${R0.length} RA di ${stN} toko · total ${fmtRpS(tt)} · bulan <input type="month" class="inp sm" data-pmonth="${i}" value="${esc(p.month || '')}">${p.needMonth ? ' <b style="color:var(--warn)">pilih bulan</b>' : ''} · menggantikan target per head bulan yang sama</div>${extra}</div><button class="btn sm" data-rmp="${i}">Hapus</button></div>`;
     }
     if (p.kind === 'WGT') {
       const warn = p.days !== dim(p.month) ? ` <b style="color:var(--warn)">hanya ${p.days} dari ${dim(p.month)} hari</b>` : '';

@@ -804,6 +804,7 @@ button.pd-sz:hover{box-shadow:0 0 0 3px rgba(15,49,146,.12)}
   @media (max-width:640px){.ai-bubble{max-width:92%}.ai-chart{height:240px}}
   #bnav .bn-ai svg{stroke:#F26B21}#bnav .bn-ai span{color:#C2410C;font-weight:800}
   @media (max-width:420px){.bnav button span{font-size:10px;letter-spacing:-.1px}}
+  .ai-claude{margin-top:14px;padding:12px 14px;border-radius:12px;background:#FFF7ED;border:1px solid #FED7AA}
 </style>
 </head>
 <body>
@@ -5414,7 +5415,7 @@ const AI_EX = [
 const AI_MET = {
   sales: ['Sales', 'rp'], gross: ['Gross', 'rp'], net: ['Netto', 'rp'], qty: ['Qty', 'n'], trx: ['Transaksi', 'n'], atv: ['Basket size', 'rp'], upt: ['UPT', 'd2'],
   promoValue: ['Potongan promo', 'rp'], discPct: ['% diskon', 'pct'], promoShare: ['Porsi sales promo', 'pct'], share: ['Kontribusi', 'pct'],
-  stockQty: ['Stok (pcs)', 'n'], stockValue: ['Value stok', 'rp'], target: ['Target', 'rp'], ach: ['Ach', 'pct']
+  stockQty: ['Stok (pcs)', 'n'], stockValue: ['Value stok', 'rp'], target: ['Target 1 bulan', 'rp'], ach: ['Ach 1 bulan', 'pct'], targetTD: ['Target s/d tgl', 'rp'], achTD: ['Ach s/d tgl', 'pct']
 };
 const aiFmt = (k, v) => { if (v == null || !isFinite(v)) return '–'; const f = (AI_MET[k] || [])[1]; return f === 'rp' ? fmtRp(Math.round(v)) : f === 'pct' ? fmtPct(v, 1) : f === 'd2' ? (Math.round(v * 100) / 100).toLocaleString('id-ID') : fmtN(Math.round(v)); };
 const aiDow = iso => new Date(iso + 'T12:00:00Z').getUTCDay();
@@ -5474,14 +5475,14 @@ function aiLabel(g, k) {
     case 'article': return k + ' · ' + artInfo(k).name; case 'sku': return k + ' · ' + artInfo(artOf(k)).name; default: return k;
   }
 }
-const aiAcc = () => ({ v: 0, g: 0, n: 0, q: 0, trx: new Set(), pv: 0, vp: 0, sq: 0, sv: 0, tg: 0 });
+const aiAcc = () => ({ v: 0, g: 0, n: 0, q: 0, trx: new Set(), pv: 0, vp: 0, sq: 0, sv: 0, tg: 0, tt: 0 });
 function aiMetric(k, a, tot) {
   const t = a.trx.size;
   switch (k) {
     case 'sales': return a.v; case 'gross': return a.g; case 'net': return a.n; case 'qty': return a.q; case 'trx': return t;
     case 'atv': return t ? a.v / t : null; case 'upt': return t ? a.q / t : null; case 'promoValue': return a.pv; case 'discPct': return a.g ? a.pv / a.g : null;
     case 'promoShare': return a.v ? a.vp / a.v : null; case 'share': return tot && tot.v ? a.v / tot.v : null;
-    case 'stockQty': return a.sq; case 'stockValue': return a.sv; case 'target': return a.tg; case 'ach': return a.tg ? a.v / a.tg : null;
+    case 'stockQty': return a.sq; case 'stockValue': return a.sv; case 'target': return a.tg; case 'ach': return a.tg ? a.v / a.tg : null; case 'targetTD': return a.tt; case 'achTD': return a.tt ? a.v / a.tt : null;
   }
   return null;
 }
@@ -5513,7 +5514,7 @@ async function aiRun(Q) {
     out.rows = [...M.entries()].map(([k, a]) => ({ k, label: g === 'article' ? k + ' · ' + artInfo(k).name : g === 'store' ? k + ' · ' + sName(k) : k, vals: [metrics.map(m => aiMetric(m, a, T))] }));
     out.tot = [metrics.map(m => aiMetric(m, T, T))];
   } else if (src === 'target') {
-    if (!metrics.length) metrics = ['target', 'sales', 'ach']; out.metrics = metrics = metrics.filter(k => ['target', 'sales', 'ach'].includes(k)); if (!metrics.length) out.metrics = metrics = ['target', 'sales', 'ach'];
+    const TM = ['target', 'targetTD', 'sales', 'achTD', 'ach']; metrics = metrics.filter(k => TM.includes(k)); if (!metrics.length) metrics = ['target', 'targetTD', 'sales', 'achTD']; out.metrics = metrics;
     if (!periods.length) { const m = (App.lastDate || todayISO()).slice(0, 7); periods = [{ label: fmtMonth(m), from: m + '-01', to: App.lastDate || todayISO() }]; }
     let codes = storeCodes().filter(c => typeOk(c)); const fs = aiArr(F.stores); if (fs) codes = codes.filter(c => fs.map(String).includes(c)); if (F.storeType) codes = codes.filter(c => sType(c) === F.storeType);
     const per = [];
@@ -5521,17 +5522,17 @@ async function aiRun(Q) {
       await ensureMonths(p.from, p.to); const L = linesIn(p.from, p.to), M = new Map(), T = aiAcc();
       const months = []; for (let m = p.from.slice(0, 7); m <= p.to.slice(0, 7); m = addMonths(m, 1)) months.push(m);
       const tgOf = c => months.reduce((x, m) => x + monthTarget(c, m), 0);
-      if (g === 'store') for (const c of codes) { const a = aiAcc(); a.tg = tgOf(c); M.set(c, a); }
-      else { const a = aiAcc(); a.tg = codes.reduce((x, c) => x + tgOf(c), 0); M.set('Total', a); }
+      if (g === 'store') for (const c of codes) { const a = aiAcc(); a.tg = tgOf(c); a.tt = proratedTarget(c, p.from, p.to); M.set(c, a); }
+      else { const a = aiAcc(); a.tg = codes.reduce((x, c) => x + tgOf(c), 0); a.tt = codes.reduce((x, c) => x + proratedTarget(c, p.from, p.to), 0); M.set('Total', a); }
       for (const l of L) { if (!codes.includes(l.s)) continue; const a = M.get(g === 'store' ? l.s : 'Total'); if (a) a.v += VAL(l); }
-      for (const a of M.values()) { T.v += a.v; T.tg += a.tg; }
+      for (const a of M.values()) { T.v += a.v; T.tg += a.tg; T.tt += a.tt; }
       per.push({ M, T });
       out.periods.push({ label: p.label || fmtDateS(p.from) + '–' + fmtDateS(p.to), from: p.from, to: p.to });
     }
     const keys = [...new Set(per.flatMap(x => [...x.M.keys()]))];
     out.rows = keys.map(k => ({ k, label: aiLabel(g === 'store' ? 'store' : 'none', k), vals: per.map(x => metrics.map(m => aiMetric(m, x.M.get(k) || aiAcc(), x.T))) }));
     out.tot = per.map(x => metrics.map(m => aiMetric(m, x.T, x.T)));
-    out.notes.push('Ach = sales ÷ target 1 bulan penuh.');
+    out.notes.push('Ach s/d tgl = sales ÷ target sampai tanggal data terakhir (mengikuti bobot harian).');
   } else {
     if (!metrics.length) metrics = ['sales', 'qty', 'trx']; out.metrics = metrics;
     if (!periods.length) { const L = App.lastDate || todayISO(); periods = [{ label: fmtDateS(L), from: L, to: L }]; }
@@ -5588,15 +5589,18 @@ async function aiAsk(q) {
   App.ai.thread.push(item); App.ai.busy = true; aiPaint(true);
   try {
     const prev = App.ai.thread.slice(-3, -1).filter(x => x.plan).map(x => ({ q: x.q, title: x.plan.title, queries: (x.plan.queries || []).map(y => ({ source: y.source, periods: y.periods, filters: y.filters, groupBy: y.groupBy, metrics: y.metrics })) }));
-    const ctx = await aiCtx();
-    const P = await apiPost({ a: 'ask', mode: 'plan', q, ctx, prev });
-    item.plan = P.plan || {}; if (P.left != null) App.ai.left = P.left;
+    if (!App.ai.local) {
+      try { const ctx = await aiCtx(); const P = await apiPost({ a: 'ask', mode: 'plan', q, ctx, prev }); item.plan = P.plan || {}; if (P.left != null) App.ai.left = P.left; }
+      catch (e) { if (e && (e.code === 'noai' || e.code === 'limit' || e.code === 'ai')) { App.ai.local = e.code === 'noai'; item.plan = null; } else throw e; }
+    }
+    if (!item.plan) { await ensureMonths(addDays(App.lastDate || todayISO(), -45), App.lastDate || todayISO()).catch(() => { }); item.plan = alPlan(q); }
     if (!(item.plan.queries || []).length) { item.text = item.plan.reply || 'Pertanyaan ini belum bisa dijawab dari data dashboard.'; item.stage = 'done'; return; }
     item.stage = 'calc'; aiPaint();
     for (const Q of item.plan.queries.slice(0, 3)) item.res.push(await aiRun(Q));
     item.stage = 'explain'; aiPaint();
-    const E = await apiPost({ a: 'ask', mode: 'explain', q, plan: { title: item.plan.title, note: item.plan.note, queries: item.plan.queries }, results: aiResText(item.res) });
-    item.text = E.text || ''; item.stage = 'done';
+    if (item.plan.local) item.text = alExplain(item.plan, item.res);
+    else { try { const E = await apiPost({ a: 'ask', mode: 'explain', q, plan: { title: item.plan.title, note: item.plan.note, queries: item.plan.queries }, results: aiResText(item.res) }); item.text = E.text || ''; } catch (e) { item.text = alExplain(item.plan, item.res); } }
+    item.stage = 'done';
   } catch (e) { item.err = errMsg(e); item.stage = 'done'; }
   finally { App.ai.busy = false; aiPaint(true); }
 }
@@ -5621,10 +5625,12 @@ function aiPaint(scroll) {
       ${it.plan && it.plan.title ? `<div class="card-h"><h3>✨ ${esc(it.plan.title)}</h3>${it.res.length ? `<button class="btn sm" data-aixls="${ti}">⬇ Excel</button>` : ''}</div>` : ''}
       ${it.err ? `<p style="color:var(--bad)">⚠ ${esc(it.err)}</p>` : ''}
       ${it.text ? `<div class="ai-text">${picaMd(it.text)}</div>` : st ? `<p class="muted"><span class="spin"></span> ${st}</p>` : ''}
-      ${it.plan && it.plan.note ? `<p class="small muted">Asumsi: ${esc(it.plan.note)}</p>` : ''}
+      ${it.plan && it.plan.note ? `<p class="small muted">${it.plan.local ? '🧮 ' : 'Asumsi: '}${esc(it.plan.note)}</p>` : ''}
       ${it.res.map((r, ri) => `<div class="ai-res"><h4>${esc(r.title || 'Hasil ' + (ri + 1))}</h4><p class="small muted">${r.periods.map(p => esc(p.label) + (p.from ? ` (${fmtDateS(p.from)}${p.to !== p.from ? '–' + fmtDateS(p.to) : ''})` : '')).join(' <b>vs</b> ')}${r.allRows > r.rows.length ? ` · ${r.rows.length} teratas dari ${r.allRows}` : ''}${r.notes.length ? ' · ' + esc(r.notes.join(' ')) : ''}</p>
         ${r.chart !== 'none' && r.rows.length > 1 && r.g !== 'none' ? `<div class="ai-chart"><canvas id="aiC_${ti}_${ri}"></canvas></div>` : ''}${aiTable(r, ti)}</div>`).join('')}
-      ${it.plan && (it.plan.queries || []).length ? `<details class="small muted"><summary>Lihat rencana hitung AI</summary><pre class="ai-pre">${esc(JSON.stringify(it.plan.queries, null, 1))}</pre></details>` : ''}
+      ${it.res.length && it.stage === 'done' ? `<div class="ai-claude"><b>🔎 Mau analisa lebih detail?</b><p class="small" style="margin:4px 0 8px">1) Klik <b>Salin data untuk Claude</b> · 2) Klik <b>Buka claude.ai</b> · 3) Tempel di kolom chat lalu kirim. Setelah itu bisa lanjut tanya apa saja ke Claude tentang data ini. Data yang disalin hanya angka (tanpa nama customer).</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary sm" data-aicopy="${ti}">📋 Salin data untuk Claude</button><a class="btn sm" href="https://claude.ai/new" target="_blank" rel="noopener">Buka claude.ai ↗</a></div><p class="small" id="aiCopyMsg${ti}" style="margin:6px 0 0"></p></div>` : ''}
+      ${it.plan && (it.plan.queries || []).length ? `<details class="small muted"><summary>Lihat rencana hitung</summary><pre class="ai-pre">${esc(JSON.stringify(it.plan.queries, null, 1))}</pre></details>` : ''}
     </section>`;
   }).join('') || '';
   App.charts = (App.charts || []).filter(c => { if (c.canvas && !document.body.contains(c.canvas)) { try { c.destroy(); } catch (e) { } return false; } return true; });
@@ -5642,6 +5648,27 @@ function aiChart(cv, r) {
     options: { maintainAspectRatio: false, indexAxis: !line && rows.length > 6 ? 'y' : 'x', plugins: { legend: { labels: { boxWidth: 12 } }, tooltip: { callbacks: { label: c => c.dataset.label + ': ' + aiFmt(r.metrics[m], c.raw) } } },
       scales: { x: { ticks: { maxRotation: 0, autoSkip: true } }, y: { ticks: { autoSkip: true } } } } }));
 }
+/* salin pertanyaan + hasil hitung untuk dianalisa lebih dalam di claude.ai (gratis, seperti Analisa PICA) */
+const AI_CLAUDE_PROMPT = 'Kamu analis bisnis retail senior untuk toko EIGER (perlengkapan outdoor) area Jateng 01 di Indonesia. ' +
+  'Di bawah ini pertanyaan dari tim toko beserta HASIL HITUNG dari dashboard Integrated Hub (data penjualan Item DSR, stok, target & promo). ' +
+  'Jawab pertanyaannya dalam Bahasa Indonesia yang lugas dengan format:\n## Jawaban singkat (2-3 kalimat dengan angka)\n## Temuan penting (3-6 poin, urut dari dampak terbesar, sebutkan angka & toko/artikel/promo)\n' +
+  '## Kemungkinan penyebab (maks 4 poin)\n## Rekomendasi aksi (3-5 aksi konkret: apa, siapa, kapan, target angka)\n## Data tambahan yang perlu dicek\n\n' +
+  'Jangan mengarang angka yang tidak ada di data. Growth = periode pertama dibanding periode kedua. Setelah menjawab, siap menerima pertanyaan lanjutan tentang data ini.';
+async function aiCopy(ti) {
+  const it = App.ai.thread[ti]; if (!it) return;
+  const full = it.res.map(r => Object.assign({}, r, { rows: r.rows.slice(0, 60) }));
+  const text = AI_CLAUDE_PROMPT + '\n\nPertanyaan: ' + it.q + '\n' + (it.plan && it.plan.note ? it.plan.note.replace(/ Ubah kata-kata.*$/, '') + '\n' : '') +
+    'Nilai penjualan: ' + VL() + '. Data s/d ' + (App.lastDate ? fmtDate(App.lastDate) : '–') + '. Cakupan: ' + (App.user && App.user.role === 'toko' ? 'toko ' + (App.user.store || '') : scopeOn() ? 'scope ' + App.ui.scope : 'semua toko area Jateng 01') + '.\n\n' +
+    'HASIL HITUNG:\n' + aiResText(full).replace(/### /g, '## ') + (it.text ? '\n\nKesimpulan otomatis dashboard (boleh dikoreksi):\n' + it.text.replace(/\*\*/g, '') : '');
+  let ok = false;
+  try { await navigator.clipboard.writeText(text); ok = true; } catch (e) {
+    const ta = document.createElement('textarea'); ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0'; document.body.appendChild(ta); ta.select();
+    try { ok = document.execCommand('copy'); } catch (er) { } ta.remove();
+  }
+  const msg = $('#aiCopyMsg' + ti);
+  if (msg) msg.innerHTML = ok ? '✅ Data & instruksi sudah disalin. Buka claude.ai, <b>tempel (Ctrl+V / tahan lalu Tempel)</b> di kolom chat, lalu kirim.' : '⚠️ Browser tidak mengizinkan salin otomatis. Coba lagi di Chrome/Safari terbaru.';
+  toast(ok ? 'Tersalin — tinggal tempel di claude.ai' : 'Gagal menyalin');
+}
 async function aiExcel(ti) {
   const it = App.ai.thread[ti]; if (!it || !(await needXLSX())) return; const wb = XLSX.utils.book_new();
   it.res.forEach((r, ri) => {
@@ -5654,7 +5681,7 @@ async function aiExcel(ti) {
   (await getDownloads()).save({ filename: `Tanya_AI_${todayISO()}.xlsx`, data: new Blob([XLSX.write(wb, { bookType: 'xlsx', type: 'array' })]) });
 }
 function pageAI(view) {
-  setHead('✨ Tanya AI', 'Tanya apa saja soal data penjualan, promo, stok & target. AI menyusun hitungan, angka dihitung langsung dari data master.');
+  setHead('✨ Tanya AI', 'Tanya apa saja soal data penjualan, promo, stok & target. Angka dihitung langsung dari data master, kesimpulan disusun otomatis.');
   view.innerHTML = `<div class="stack ai-wrap">
     <section class="card ai-box"><textarea id="aiQ" class="inp" rows="2" placeholder="Contoh: growth sales & efektivitas promo hari Sabtu ini dibanding Sabtu minggu lalu per toko">${esc(App.ui.aiDraft || '')}</textarea>
       <div class="ai-bar"><div class="ai-ex">${AI_EX.map(x => `<button class="chip" data-aiex="${esc(x)}">${esc(x)}</button>`).join('')}</div>
@@ -5669,9 +5696,181 @@ document.addEventListener('click', e => {
   if (t.id === 'aiSend') { const q = $('#aiQ'); const v = q ? q.value : ''; if (q) q.value = ''; App.ui.aiDraft = ''; aiAsk(v); return; }
   if (t.id === 'aiClear') { App.ai.thread = []; render(); return; }
   const xl = t.closest('[data-aixls]'); if (xl) { aiExcel(+xl.dataset.aixls); return; }
+  const cp = t.closest('[data-aicopy]'); if (cp) { aiCopy(+cp.dataset.aicopy); return; }
 });
 document.addEventListener('keydown', e => { if (App.page === 'ai' && e.target && e.target.id === 'aiQ' && e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); const v = e.target.value; e.target.value = ''; App.ui.aiDraft = ''; aiAsk(v); } });
 document.addEventListener('input', e => { if (App.page === 'ai' && e.target && e.target.id === 'aiQ') App.ui.aiDraft = e.target.value; });
+
+/* ---------- Tanya AI versi gratis (tanpa API key): pembaca pertanyaan berbasis kata kunci + kesimpulan otomatis (seperti Analisa PICA) ---------- */
+const AL_DAYS = { senin: 1, selasa: 2, rabu: 3, kamis: 4, jumat: 5, "jum'at": 5, sabtu: 6, minggu: 0, ahad: 0 };
+const AL_MON = { jan: 1, januari: 1, feb: 2, februari: 2, mar: 3, maret: 3, apr: 4, april: 4, mei: 5, jun: 6, juni: 6, jul: 7, juli: 7, agu: 8, agt: 8, agus: 8, agustus: 8, sep: 9, sept: 9, september: 9, okt: 10, oktober: 10, nov: 11, november: 11, des: 12, desember: 12 };
+const alLastDow = (last, dw) => { let d = last; for (let i = 0; i < 7 && aiDow(d) !== dw; i++) d = addDays(d, -1); return d; };
+const alShiftY = iso => (+iso.slice(0, 4) - 1) + iso.slice(4);
+const alRange = (from, to) => ({ from, to, label: from === to ? AI_DOW[aiDow(from)] + ' ' + fmtDateS(from) : fmtDateS(from) + ' – ' + fmtDateS(to) });
+function alPeriods(q, last) {
+  const yr = last.slice(0, 4), lastM = last.slice(0, 7), Q = ' ' + q + ' ';
+  let P1 = null, P2 = null, why = '';
+  const mN = q.match(/(\d{1,3})\s*hari\s*(terakhir|belakangan)/);
+  /* tanggal eksplisit: "14 nov", "21/11", "2026-11-14" */
+  const ds = []; let m; const reD = /(\d{1,2})\s*(?:\/|-|\s)\s*(\d{1,2}|[a-z]{3,9})(?:\s*(?:\/|-|\s)\s*(\d{4}))?/g;
+  while ((m = reD.exec(q))) { const mo = /^\d+$/.test(m[2]) ? +m[2] : AL_MON[m[2]]; if (!mo || mo > 12 || +m[1] > 31 || +m[1] < 1) continue; ds.push((m[3] || yr) + '-' + pad(mo) + '-' + pad(+m[1])); }
+  const iso = q.match(/\d{4}-\d{2}-\d{2}/g); if (iso) ds.push(...iso);
+  const dayName = Object.keys(AL_DAYS).find(k => k === 'minggu' ? /hari minggu/.test(q) : new RegExp('\\b' + k + '\\b').test(q));
+  const monName = Object.keys(AL_MON).filter(k => k.length > 3 || ['mei'].includes(k)).find(k => new RegExp('\\bbulan ' + k + '\\b|\\b' + k + '\\s*(20\\d\\d)?\\b').test(q) && !/\d\s*$/.test(q.split(k)[0]));
+  if (ds.length >= 2 && /sampai|s\/d|hingga|-\s*\d/.test(q) && !/vs|dibanding|banding/.test(q)) { const [a, b] = ds.slice(0, 2).sort(); P1 = alRange(a, b); why = 'rentang tanggal'; }
+  else if (ds.length >= 2) { P1 = alRange(ds[0], ds[0]); P2 = alRange(ds[1], ds[1]); why = 'tanggal yang disebut'; }
+  else if (ds.length === 1) { P1 = alRange(ds[0], ds[0]); why = 'tanggal yang disebut'; }
+  else if (mN) { const n = Math.min(120, Math.max(1, +mN[1])); P1 = alRange(addDays(last, -n + 1), last); P2 = alRange(addDays(last, -2 * n + 1), addDays(last, -n)); why = n + ' hari terakhir'; }
+  else if (dayName) { let d = alLastDow(last, AL_DAYS[dayName]); if (new RegExp(dayName + '\\s+(lalu|kemarin)').test(q) && !/vs|dibanding|banding/.test(q)) d = addDays(d, -7); P1 = alRange(d, d); P2 = alRange(addDays(d, -7), addDays(d, -7)); why = 'hari ' + dayName + ' terakhir vs minggu sebelumnya'; }
+  else if (/\bkemarin\b/.test(q)) { const d = addDays(todayISO(), -1) <= last ? addDays(todayISO(), -1) : last; P1 = alRange(d, d); P2 = alRange(addDays(d, -7), addDays(d, -7)); why = 'kemarin vs hari yang sama minggu lalu'; }
+  else if (/hari ini/.test(q)) { P1 = alRange(last, last); P2 = alRange(addDays(last, -7), addDays(last, -7)); why = 'data terakhir vs hari yang sama minggu lalu'; }
+  else if (/minggu ini|pekan ini|week to date|wtd/.test(q)) { const a = aiMon(last); P1 = alRange(a, last); P2 = alRange(addDays(a, -7), addDays(last, -7)); why = 'minggu ini (Senin s/d data terakhir) vs periode sama minggu lalu'; }
+  else if (/minggu lalu|pekan lalu/.test(q)) { const a = addDays(aiMon(last), -7); P1 = alRange(a, addDays(a, 6)); P2 = alRange(addDays(a, -7), addDays(a, -1)); why = 'minggu lalu (Senin–Minggu) vs minggu sebelumnya'; }
+  else if (/bulan lalu/.test(q)) { const pm = addMonths(lastM, -1), pp = addMonths(pm, -1); P1 = alRange(pm + '-01', pm + '-' + pad(dim(pm))); P2 = alRange(pp + '-01', pp + '-' + pad(dim(pp))); P1.label = fmtMonth(pm); P2.label = fmtMonth(pp); why = 'bulan lalu vs bulan sebelumnya'; }
+  else if (monName) { const mo = AL_MON[monName], y = (q.match(new RegExp(monName + '\\s*(20\\d\\d)')) || [])[1] || yr, mm = y + '-' + pad(mo); const to = mm === lastM ? last : mm + '-' + pad(dim(mm)); P1 = alRange(mm + '-01', to); P1.label = fmtMonth(mm); const pm = addMonths(mm, -1); P2 = alRange(pm + '-01', pm + '-' + pad(Math.min(dim(pm), +to.slice(8)))); P2.label = fmtMonth(pm) + (mm === lastM ? ' (tgl sama)' : ''); why = 'bulan ' + fmtMonth(mm); }
+  else { P1 = alRange(lastM + '-01', last); P1.label = 'MTD ' + fmtMonth(lastM); const pm = addMonths(lastM, -1); P2 = alRange(pm + '-01', pm + '-' + pad(Math.min(dim(pm), +last.slice(8)))); P2.label = fmtMonth(pm) + ' (tgl sama)'; why = 'bulan berjalan s/d data terakhir vs tanggal yang sama bulan lalu'; }
+  /* pembanding tahun lalu */
+  if (/tahun lalu|\bly\b|yoy|year on year/.test(q)) { P2 = alRange(alShiftY(P1.from), alShiftY(P1.to)); P2.label = P1.label.replace(/20\d\d/, '') + ' ' + (+yr - 1); P2.label = (P1.from === P1.to ? AI_DOW[aiDow(P2.from)] + ' ' : '') + fmtDateS(P2.from) + (P2.from !== P2.to ? ' – ' + fmtDateS(P2.to) : '') + ' ' + (+yr - 1); why += ' · pembanding tahun lalu'; }
+  if (/tanpa (pembanding|banding)|saja$/.test(q) && !/vs|dibanding|banding|growth|naik|turun/.test(q)) P2 = null;
+  return { periods: [P1, P2].filter(Boolean), why };
+}
+function alFilters(q) {
+  const F = {}, Q = q;
+  /* toko: cocokkan kata unik dari nama toko / kode */
+  const st = storeCodes().filter(c => typeOk(c)), hit = [];
+  for (const c of st) { if (new RegExp('\\b' + c + '\\b').test(Q)) { hit.push(c); continue; } const words = sName(c).toLowerCase().replace(/eiger|store|adventure|eas|yogyakarta|jogja|semarang|solo|surakarta/g, ' ').split(/[^a-z0-9]+/).filter(w => w.length >= 4); if (words.some(w => new RegExp('\\b' + w + '\\b').test(Q))) hit.push(c); }
+  if (hit.length && hit.length < st.length) F.stores = hit;
+  if (/bazaar|bazar/.test(Q) && !hit.length) F.storeType = 'bz';
+  if (/\bsmds\b/.test(Q)) F.promoName = 'smds'; else if (/\bdcnp\b/.test(Q)) F.promoName = 'dcnp';
+  if (/non\s*promo|tanpa promo|harga normal/.test(Q)) F.promo = 'none'; else if (/markdown/.test(Q)) F.promo = 'markdown';
+  /* kategori: cocokkan ke daftar MC */
+  const M = artInfoMap(), L = { l2: new Set(), l3: new Set(), l4: new Set() }; for (const [, v] of M) { if (v.c2) L.l2.add(v.c2); if (v.c3) L.l3.add(v.c3); if (v.c4) L.l4.add(v.c4); }
+  for (const k of ['l4', 'l3', 'l2']) { const f = [...L[k]].filter(x => x && x.length >= 3 && new RegExp('\\b' + x.toLowerCase().replace(/[^a-z0-9 ]/g, '.') + 's?\\b').test(Q)); if (f.length) { F[k] = f; break; } }
+  const jm = Q.match(/jam\s*(\d{1,2})(?:[.:]\d\d)?\s*(?:-|s\/d|sampai|hingga)\s*(\d{1,2})/); if (jm) { F.hourFrom = +jm[1]; F.hourTo = +jm[2]; }
+  if (/walk\s*in/.test(Q)) F.channel = 'walk in'; else if (/endless|eas app|online/.test(Q)) F.channel = 'endless';
+  const ra = Q.match(/\b(?:ra|sales person|karyawan)\s+([a-z]{3,}(?:\s[a-z]{3,})?)/); if (ra && !/terbaik|terlaris|tertinggi|per\b/.test(ra[1])) F.salesPerson = ra[1];
+  return F;
+}
+function alPlan(q0) {
+  const q = ' ' + String(q0 || '').toLowerCase().replace(/[?!,]/g, ' ').replace(/\s+/g, ' ') + ' ', last = App.lastDate || todayISO();
+  const { periods, why } = alPeriods(q, last), F = alFilters(q);
+  const lim = +((q.match(/(?:top|terbaik|terlaris|teratas|terbawah)\s*(\d{1,3})|(\d{1,3})\s*(?:artikel|produk|item|sku|toko|promo|ra|besar|teratas)/) || []).slice(1).find(Boolean) || 0) || null;
+  const asc = /terendah|paling rendah|terbawah|paling sedikit|paling kecil|minus|turun paling/.test(q);
+  const has = re => re.test(q);
+  let g = has(/per toko|tiap toko|setiap toko|masing.masing toko|antar toko|toko mana|toko apa|ranking toko/) ? 'store'
+    : has(/per jam|jam (berapa|paling|ramai|sepi)|jam ramai|jam sepi|per-jam/) ? 'hour'
+    : has(/per hari\b|harian|tren|trend|setiap hari|tiap hari/) ? 'date'
+    : has(/hari apa|per hari dalam seminggu|weekday|weekend/) ? 'dow'
+    : has(/per minggu|mingguan|weekly/) ? 'week' : has(/per bulan|bulanan|monthly/) ? 'month'
+    : has(/\b(ra|sales person|salesperson|karyawan|pramuniaga)\b/) ? 'salesPerson'
+    : has(/kupon|voucher/) ? 'coupon' : has(/channel|omni|tipe transaksi/) ? 'channel'
+    : has(/\blv\s*4|mc lv4|level 4|sub ?kategori/) ? 'l4' : has(/\blv\s*2|mc lv2|level 2|divisi/) ? 'l2' : has(/\blv\s*3|mc lv3|level 3|kategori/) ? 'l3'
+    : has(/\bsku\b|ukuran|size/) ? 'sku' : has(/artikel|produk|item|terlaris|best ?seller|slow ?moving/) ? 'article'
+    : has(/promo|diskon|potongan/) ? 'promo' : 'none';
+  const src = has(/\bstok\b|\bstock\b|inventory|persediaan/) && !has(/sell.?through/) ? 'stock' : has(/target|pencapaian|achievement|\bach\b|capaian/) ? 'target' : 'sales';
+  const base = { id: 'q1', source: src, periods, filters: F, groupBy: g, limit: lim || (g === 'article' || g === 'sku' ? 10 : 25), sort: { by: null, dir: asc ? 'asc' : 'desc' }, chart: ['date', 'hour', 'week', 'month'].includes(g) ? 'line' : 'bar' };
+  const queries = [];
+  const ringkas = has(/ringkas|summary|rangkum|performa|performance|kinerja|overview|gimana|bagaimana|kondisi/) && g === 'none' && src === 'sales' && !has(/promo|artikel|jam|stok/);
+  if (src === 'stock') {
+    Object.assign(base, { title: 'Stok' + (F.promoName ? ' ' + F.promoName.toUpperCase() : ''), groupBy: ['store', 'l2', 'l3', 'l4', 'article'].includes(g) ? g : has(/toko/) ? 'store' : 'l3', metrics: ['stockQty', 'stockValue'], periods: [] });
+    if (has(/smds|dcnp/) && !F.promoName) base.filters.promo = 'any'; queries.push(base);
+  } else if (src === 'target') {
+    queries.push(Object.assign(base, { title: 'Pencapaian target per toko', groupBy: g === 'none' ? 'store' : 'store', periods: periods.slice(0, 1), metrics: ['target', 'targetTD', 'sales', 'achTD', 'ach'], sort: { by: 'achTD', dir: asc ? 'asc' : 'desc' }, chart: 'bar' }));
+  } else if (ringkas) {
+    queries.push({ id: 'q1', title: 'Pencapaian target per toko', source: 'target', periods: [alRange((last.slice(0, 7)) + '-01', last)], filters: F, groupBy: 'store', metrics: ['target', 'targetTD', 'sales', 'achTD'], sort: { by: 'achTD', dir: 'desc' }, chart: 'bar', limit: 30 });
+    queries.push({ id: 'q2', title: 'Sales, transaksi & basket per toko', source: 'sales', periods, filters: F, groupBy: 'store', metrics: ['sales', 'trx', 'atv', 'upt'], sort: { by: 'sales', dir: 'desc' }, chart: 'bar', limit: 30 });
+    queries.push({ id: 'q3', title: '10 artikel terlaris', source: 'sales', periods, filters: F, groupBy: 'article', metrics: ['sales', 'qty'], sort: { by: 'sales', dir: 'desc' }, chart: 'none', limit: 10 });
+    queries.push({ id: 'q4', title: 'Kontribusi promo', source: 'sales', periods, filters: F, groupBy: 'promo', metrics: ['sales', 'qty', 'promoValue', 'discPct'], sort: { by: 'sales', dir: 'desc' }, chart: 'none', limit: 8 });
+  } else {
+    let metrics = ['sales'];
+    if (g === 'promo' || has(/promo|diskon|potongan|efektif/)) { metrics = ['sales', 'qty', 'trx', 'promoValue', 'discPct']; if (g === 'none') { base.groupBy = 'promo'; g = 'promo'; } if (!F.promo && !F.promoName) F.promo = 'any'; }
+    else if (g === 'article' || g === 'sku' || g === 'l2' || g === 'l3' || g === 'l4') metrics = ['sales', 'qty', 'share'];
+    else if (g === 'hour' || g === 'dow') metrics = ['trx', 'sales', 'atv'];
+    else if (g === 'salesPerson') metrics = ['sales', 'trx', 'atv', 'upt'];
+    else metrics = ['sales', 'trx', 'atv', 'upt'];
+    if (has(/transaksi|struk|traffic|pengunjung|ramai/) && !metrics.includes('trx')) metrics.unshift('trx');
+    if (has(/basket|atv|rata.rata belanja/) && !metrics.includes('atv')) metrics.push('atv');
+    if (has(/\bupt\b/) && !metrics.includes('upt')) metrics.push('upt');
+    if (has(/\bqty|pcs|unit|jumlah barang/) && !metrics.includes('qty')) metrics.splice(1, 0, 'qty');
+    const sortBy = has(/ramai|transaksi|traffic/) ? 'trx' : has(/\bqty|pcs|unit|terlaris/) && g !== 'promo' && metrics.includes('qty') ? 'qty' : metrics[0];
+    Object.assign(base, { metrics, sort: { by: sortBy, dir: asc ? 'asc' : 'desc' } });
+    if (has(/terlaris/) && !metrics.includes('qty')) base.metrics.splice(1, 0, 'qty');
+    const lbl = { none: 'Total', store: 'per toko', date: 'per hari', dow: 'per hari dalam minggu', hour: 'per jam', week: 'per minggu', month: 'per bulan', promo: 'per promo', coupon: 'per kupon', l2: 'per MC Lv2', l3: 'per MC Lv3', l4: 'per MC Lv4', article: 'artikel', sku: 'SKU', salesPerson: 'per RA', channel: 'per channel' }[g];
+    base.title = (g === 'article' || g === 'sku' ? (asc ? base.limit + ' ' + lbl + ' penjualan terendah' : base.limit + ' ' + lbl + ' terlaris') : (g === 'promo' ? 'Efektivitas promo' : 'Sales ' + lbl));
+    queries.push(base);
+    /* efektivitas promo: tambah porsi promo vs non promo */
+    if (g === 'promo' && !F.promoName) queries.push({ id: 'q2', title: 'Porsi penjualan promo vs non promo', source: 'sales', periods, filters: Object.assign({}, F, { promo: null }), groupBy: 'none', metrics: ['sales', 'promoShare', 'promoValue', 'discPct', 'trx'], chart: 'none' });
+  }
+  const fTxt = [F.stores ? 'toko ' + F.stores.map(sName).join(', ') : '', F.storeType ? 'Bazaar' : '', F.promoName ? F.promoName.toUpperCase() : '', F.promo === 'any' ? 'transaksi berpromo' : F.promo === 'none' ? 'non promo' : '', F.l2 || F.l3 || F.l4 ? 'kategori ' + (F.l4 || F.l3 || F.l2).join(', ') : '', F.hourFrom != null ? `jam ${F.hourFrom}–${F.hourTo}` : '', F.channel ? 'channel ' + F.channel : '', F.salesPerson ? 'RA ' + F.salesPerson : ''].filter(Boolean).join(' · ');
+  return { title: ringkas ? 'Ringkasan performance Jateng 01' : queries[0].title, note: `Dibaca sebagai: ${src === 'stock' ? 'stok terbaru' : periods.map(p => p.label).join(' vs ')}${why && src !== 'stock' ? ' (' + why + ')' : ''}${fTxt ? ' · filter: ' + fTxt : ''}. Ubah kata-kata pertanyaan bila kurang tepat.`, queries, local: true };
+}
+/* kesimpulan otomatis dari hasil hitung (tanpa AI) */
+function alExplain(plan, R) {
+  const out = [], tips = [];
+  const v = (r, m, pi, row) => { const i = r.metrics.indexOf(m); return i < 0 ? null : ((row ? row.vals : r.tot)[pi] || [])[i]; };
+  const gr = (a, b) => aiGrowth(a, b), pc = x => (x >= 0 ? '+' : '') + fmtPct(x, 1);
+  for (const r of R) {
+    const two = r.periods.length > 1, p1 = r.periods[0] ? r.periods[0].label : '', p2 = two ? r.periods[1].label : '';
+    if (r.src === 'target') {
+      const T = r.tot[0] || [], ia = r.metrics.indexOf('achTD'), it = r.metrics.indexOf('targetTD');
+      const ach = ia >= 0 ? T[ia] : v(r, 'ach', 0); out.push(`**Pencapaian ${p1}: ${fmtPct(ach, 1)}** dari target s/d tanggal ini (sales ${fmtRpS(v(r, 'sales', 0))} vs target ${fmtRpS(it >= 0 ? T[it] : v(r, 'target', 0))}).`);
+      const rows = r.rows.filter(x => (x.vals[0] || [])[ia] != null);
+      const low = rows.filter(x => x.vals[0][ia] < .9).sort((a, b) => a.vals[0][ia] - b.vals[0][ia]), top = rows.slice().sort((a, b) => b.vals[0][ia] - a.vals[0][ia]).slice(0, 3);
+      if (top.length) out.push('- Tertinggi: ' + top.map(x => `${x.label.split(' · ')[1] || x.label} **${fmtPct(x.vals[0][ia], 1)}**`).join(', '));
+      if (low.length) { out.push(`- **${low.length} toko di bawah 90%**: ` + low.slice(0, 5).map(x => `${x.label.split(' · ')[1] || x.label} ${fmtPct(x.vals[0][ia], 1)}`).join(', ')); tips.push(`Follow up ${low.length} toko di bawah 90% (cek traffic, basket & stok artikel laris).`); }
+      continue;
+    }
+    if (r.src === 'stock') {
+      out.push(`**Total stok ${fmtN(v(r, 'stockQty', 0))} pcs** senilai **${fmtRpS(v(r, 'stockValue', 0))}** (${p1}).`);
+      const top = r.rows.slice(0, 3); if (top.length) out.push('- Terbesar: ' + top.map(x => `${x.label} ${fmtN(x.vals[0][0])} pcs (${fmtPct(x.vals[0][0] / (v(r, 'stockQty', 0) || 1), 1)})`).join(', '));
+      continue;
+    }
+    const S1 = v(r, 'sales', 0), S2 = two ? v(r, 'sales', 1) : null, G = gr(S1, S2);
+    if (!S1 && !(r.metrics.includes('trx') && v(r, 'trx', 0))) { out.push(`Tidak ada penjualan untuk **${r.title}** pada ${p1}${two && S2 ? ` (pembanding ${p2}: ${fmtRpS(S2)})` : ''}. Cek apakah Item DSR periode ini sudah diupload.`); continue; }
+    if (r.g === 'promo' || r.title === 'Porsi penjualan promo vs non promo') {
+      if (r.metrics.includes('promoShare')) { const ps = v(r, 'promoShare', 0), ps2 = two ? v(r, 'promoShare', 1) : null; out.push(`- Porsi sales berpromo **${fmtPct(ps, 1)}**${ps2 != null ? ` (sebelumnya ${fmtPct(ps2, 1)})` : ''}, rata-rata diskon **${fmtPct(v(r, 'discPct', 0), 1)}**.`); continue; }
+      out.push(`**Sales transaksi berpromo ${p1}: ${fmtRpS(S1)}**${G != null ? ` (${pc(G)} vs ${p2}, ${fmtRpS(S2)})` : ''}, potongan ${fmtRpS(v(r, 'promoValue', 0))} (${fmtPct(v(r, 'discPct', 0), 1)}).`);
+      const rows = r.rows.filter(x => x.k !== '(tanpa promo)');
+      const top = rows.slice(0, 3); if (top.length) out.push('- Promo dengan sales terbesar: ' + top.map(x => { const g2 = two ? gr(x.vals[0][0], (x.vals[1] || [])[0]) : null; return `${x.label} **${fmtRpS(x.vals[0][0])}**${g2 != null ? ' (' + pc(g2) + ')' : ''}`; }).join('; '));
+      const iq = r.metrics.indexOf('qty'), idc = r.metrics.indexOf('discPct');
+      if (idc >= 0) { const weak = rows.filter(x => x.vals[0][idc] >= .3 && two && gr(x.vals[0][0], (x.vals[1] || [])[0]) != null && gr(x.vals[0][0], (x.vals[1] || [])[0]) < 0); if (weak.length) tips.push(`Evaluasi promo diskon besar yang sales-nya turun: ${weak.slice(0, 3).map(x => x.label).join(', ')}.`); }
+      const nw = two ? rows.filter(x => !(x.vals[1] || [])[0] && x.vals[0][0] > 0) : []; if (nw.length) out.push(`- Promo baru (tidak ada di ${p2}): ${nw.slice(0, 4).map(x => x.label).join(', ')}.`);
+      continue;
+    }
+    if (r.g === 'none') { out.push(`**Sales ${p1}: ${fmtRpS(S1)}**${G != null ? ` (${pc(G)} vs ${p2}: ${fmtRpS(S2)})` : ''}.`); }
+    else if (['article', 'sku', 'l2', 'l3', 'l4'].includes(r.g)) {
+      const iq = r.metrics.indexOf('qty'); out.push(`**${r.title}** (${p1}): ` + r.rows.slice(0, 5).map((x, i) => `${i + 1}. ${x.label}${iq >= 0 ? ' ' + fmtN(x.vals[0][iq]) + ' pcs' : ''} (${fmtRpS(x.vals[0][0])})`).join('; ') + '.');
+      if (two) { const up = r.rows.filter(x => gr(x.vals[0][0], (x.vals[1] || [])[0]) != null).sort((a, b) => gr(b.vals[0][0], b.vals[1][0]) - gr(a.vals[0][0], a.vals[1][0])); if (up.length) out.push(`- Naik paling tinggi: ${up[0].label} (${pc(gr(up[0].vals[0][0], up[0].vals[1][0]))}).`); }
+      continue;
+    } else if (r.g === 'hour' || r.g === 'dow') {
+      const it = r.metrics.indexOf('trx'), rows = r.rows.slice().sort((a, b) => b.vals[0][it] - a.vals[0][it]);
+      if (rows.length) out.push(`**Paling ramai: ${rows[0].label}** (${fmtN(rows[0].vals[0][it])} transaksi), lalu ${rows.slice(1, 3).map(x => `${x.label} (${fmtN(x.vals[0][it])})`).join(', ')}. Paling sepi: ${rows[rows.length - 1].label}.`);
+      tips.push('Atur jadwal shift & briefing RA mengikuti jam/hari paling ramai.');
+      continue;
+    } else if (r.g === 'date' || r.g === 'week' || r.g === 'month') {
+      const best = r.rows.slice().sort((a, b) => b.vals[0][0] - a.vals[0][0])[0]; out.push(`**Total ${p1}: ${fmtRpS(S1)}**${G != null ? ` (${pc(G)} vs ${p2})` : ''}. Tertinggi: ${best ? best.label + ' ' + fmtRpS(best.vals[0][0]) : '–'}.`);
+      continue;
+    } else {
+      out.push(`**Total sales ${p1}: ${fmtRpS(S1)}**${G != null ? ` (${pc(G)} vs ${p2}: ${fmtRpS(S2)})` : ''}.`);
+      if (two) {
+        const rows = r.rows.map(x => ({ x, g: gr(x.vals[0][0], (x.vals[1] || [])[0]) })).filter(y => y.g != null);
+        const up = rows.slice().sort((a, b) => b.g - a.g), dn = up.slice().reverse().filter(y => y.g < 0);
+        if (up.length && up[0].g > 0) out.push('- Growth tertinggi: ' + up.slice(0, 3).filter(y => y.g > 0).map(y => `${y.x.label.split(' · ')[1] || y.x.label} **${pc(y.g)}**`).join(', '));
+        if (dn.length) { out.push(`- **${dn.length} ${r.g === 'store' ? 'toko' : 'baris'} turun**: ` + dn.slice(0, 5).map(y => `${y.x.label.split(' · ')[1] || y.x.label} ${pc(y.g)}`).join(', ')); if (r.g === 'store') tips.push(`Cek toko yang turun (${dn.slice(0, 3).map(y => y.x.label.split(' · ')[1] || y.x.label).join(', ')}): traffic, stok artikel laris & eksekusi promo.`); }
+      }
+    }
+    /* dekomposisi: transaksi vs basket */
+    if (two && r.metrics.includes('trx') && r.metrics.includes('atv')) {
+      const gt = gr(v(r, 'trx', 0), v(r, 'trx', 1)), gb = gr(v(r, 'atv', 0), v(r, 'atv', 1));
+      if (gt != null && gb != null) { out.push(`- Penggerak: transaksi **${pc(gt)}** (${fmtN(v(r, 'trx', 0))} vs ${fmtN(v(r, 'trx', 1))}), basket size **${pc(gb)}** (${fmtRpS(v(r, 'atv', 0))} vs ${fmtRpS(v(r, 'atv', 1))}).`);
+        if (gt < 0 && gb >= 0) tips.push('Transaksi turun tapi basket naik: dorong traffic (sapa pengunjung, promo pintu masuk, follow up member).');
+        else if (gb < 0 && gt >= 0) tips.push('Basket size turun: dorong bundling & upselling (aksesori, Buy More Save More).');
+        else if (gt < 0 && gb < 0) tips.push('Transaksi & basket sama-sama turun: prioritaskan cek stok artikel laris dan aktivasi promo berjalan.'); }
+    }
+  }
+  if (!out.length) out.push('Tidak ada data untuk periode/filter ini. Pastikan Item DSR periode tersebut sudah diupload.');
+  return out.join('\n') + (tips.length ? '\nSaran:\n' + [...new Set(tips)].slice(0, 3).map(t => '- ' + t).join('\n') : '');
+}
 
 /* ================= SA-TR & SA-BO: monitoring bin harian (dari Export by Bin) ================= */
 async function loadSaBin(force) { if (App.saBin && !force) return App.saBin; const r = await api('sabin'); App.saBin = r.rows || []; return App.saBin; }

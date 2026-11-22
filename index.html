@@ -5933,7 +5933,7 @@ async function wbrData() {
   if (!App.daily) await loadDaily().catch(() => { App.daily = { map: new Map(), names: {} }; });
   if (!Object.keys(App.stock || {}).length) await loadStock().catch(() => { });
   if (App.mst && App.mst.status === 'idle') loadMaster();
-  try { if (!App.hub) await loadHub(); } catch (e) { App.hub = App.hub || { approval: [], task: [], info: [], stores: [] }; }
+  if (!scopeOn()) { try { if (!App.hub) await loadHub(); } catch (e) { App.hub = App.hub || { approval: [], task: [], info: [], stores: [] }; } }
   const val = App.ui.rpVal || SET().defaultValue || 'g', R = reportData(D, val), G = SET().achGreen / 100;
   /* --- performance per toko --- */
   const by = (a, b) => { const o = new Map(); for (const l of linesIn(a, b)) { const x = o.get(l.s) || { v: 0, q: 0, trx: new Set() }; x.v += VAL(l); if (!isPB(l.sku)) x.q += l.q; if (l.q > 0) x.trx.add(l.d + l.o); o.set(l.s, x); } return o; };
@@ -5973,6 +5973,26 @@ async function wbrData() {
   const pm2 = new Map(); for (const l of promoL) if (l.pv > 0 && l.pn) pm2.set(l.pn, (pm2.get(l.pn) || 0) + VAL(l));
   const promo = { shareSalesPromo: allV ? promoV / allV : null, topPromo: [...pm2.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5).map(([k, v]) => ({ promo: k, sales: Math.round(v) })) };
   const det = P.det ? { displayedPct: P.det.gP, genericNotDisplayed: (P.det.gW || 0) - (P.det.gS || 0) } : null;
+  /* --- mode toko: fokus performance & inventory toko itu sendiri (bahan WBR toko dengan timnya) --- */
+  const sc = scopeOn() ? App.ui.scope : '';
+  if (sc) {
+    const PS = picaData(sc, D, R, 'cum'), RS = picaRules(PS), L = linesIn(m + '-01', D, sc), LMl = linesIn(pm + '-01', pm + '-' + pad(pd), sc);
+    const grp = (lines, kf) => { const o = new Map(); for (const l of lines) { const k = kf(l); if (!k) continue; const x = o.get(k) || { v: 0, q: 0, trx: new Set() }; x.v += VAL(l); if (!isPB(l.sku)) x.q += l.q; if (l.q > 0) x.trx.add(l.d + l.o); o.set(k, x); } return o; };
+    const ra = [...grp(L, l => spName(l.sp) === '(TANPA NAMA)' ? '' : spName(l.sp)).entries()].map(([k, x]) => ({ ra: k, sales: Math.round(x.v), trx: x.trx.size, qty: x.q, upt: x.trx.size ? x.q / x.trx.size : null, atv: x.trx.size ? x.v / x.trx.size : null })).filter(x => x.trx >= 3).sort((a, b) => b.sales - a.sales);
+    const daily = []; for (let d = addDays(D, -6); d <= D; d = addDays(d, 1)) { const x = grp(linesIn(d, d, sc), () => 'x').get('x'), y = grp(linesIn(addDays(d, -7), addDays(d, -7), sc), () => 'x').get('x'); daily.push({ date: d, hari: DOW[dowOf(d)], sales: x ? Math.round(x.v) : 0, trx: x ? x.trx.size : 0, salesMingguLalu: y ? Math.round(y.v) : 0 }); }
+    const lm3 = grp(LMl, l => artInfo(artOf(l.sku)).c3 || ''), c3 = [...grp(L, l => artInfo(artOf(l.sku)).c3 || '').entries()].map(([k, x]) => ({ mc: k, sales: Math.round(x.v), qty: x.q, growthLM: lm3.get(k) && lm3.get(k).v ? x.v / lm3.get(k).v - 1 : null })).sort((a, b) => b.sales - a.sales).slice(0, 8);
+    const topArt = [...grp(L.filter(l => !isPB(l.sku)), l => artOf(l.sku)).entries()].map(([k, x]) => ({ artikel: k, nama: artInfo(k).name, qty: x.q, sales: Math.round(x.v) })).sort((a, b) => b.qty - a.qty).slice(0, 10);
+    let invS = null;
+    if (App.stock[sc]) { const rows = prodStockBase([sc]), sum = f => rows.reduce((a, r) => a + f(r), 0), cat = {}; for (const k of ['S', 'D', 'P', 'N']) cat[{ S: 'SMDS', D: 'DCNP', P: 'PromoLain', N: 'Normal' }[k]] = { qty: sum(r => r.cq[k]), value: Math.round(sum(r => r.cv[k])) };
+      const l3 = new Map(); for (const r of rows) { const x = l3.get(r.l3) || { qty: 0, value: 0 }; x.qty += r.q; x.value += r.v; l3.set(r.l3, x); }
+      invS = { stockDate: App.stock[sc].date, qty: sum(r => r.q), value: Math.round(sum(r => r.v)), articles: rows.length, byCategory: cat, topMCLv3: [...l3.entries()].sort((a, b) => b[1].value - a[1].value).slice(0, 6).map(([k, x]) => ({ mc: k, qty: x.qty, value: Math.round(x.value) })),
+        artikelLarisStokHabis: (PS.oos || []).slice(0, 10).map(x => ({ artikel: x.art, nama: x.name, terjual30hari: x.q })) }; }
+    const st = stores[0] || null, lostS = lost.filter(x => x.s === sc);
+    return { mode: 'toko', c: sc, store: sName(sc), D, m, week: wbrWeek(D), valueBasis: VL(), branch: st ? Object.assign({}, st, { needPerDay: PS.remDays ? Math.round(PS.needDay) : 0, remainingDays: PS.remDays, trxLM: PS.prev.n, atvLM: PS.prev.bs, uptLM: PS.prev.upt, areaAtv: P.area.bs, areaUpt: P.area.upt, peakHour: PS.peakH, hariPalingSepi: PS.lowW != null ? DOW[PS.lowW] : null, memberShare: PS.memShare, promoShare: PS.promoShare }) : null,
+      daily, ra, mcLv3: c3, topArtikel: topArt, inv: invS, lost: { input: lostS.length, value: Math.round(lostS.reduce((a, x) => a + lostAmt(x).v, 0)), topArtikel: Object.entries(lostS.reduce((o, x) => { const k = artName(x.name) || x.name; o[k] = (o[k] || 0) + (x.q || 1); return o; }, {})).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([k, q]) => ({ artikel: k, qty: q })) },
+      det: PS.det ? { displayedPct: PS.det.gP, genericNotDisplayed: (PS.det.gW || 0) - (PS.det.gS || 0) } : null,
+      pica: { problems: RS.prob.slice(0, 5).map(x => wbrStrip(x.t)), checks: RS.check.slice(0, 4).map(wbrStrip), actions: RS.act.slice(0, 6).map(wbrStrip) }, at: new Date().toISOString() };
+  }
   /* --- approval & task (Operational Hub) --- */
   const H = App.hub || { approval: [], task: [] }, today = todayISO();
   const tasks = (H.task || []).filter(t => ((t.deadline || t.date || '').slice(0, 7) === m) || (taskState(t, today).st !== 'Selesai' && (t.deadline || '') < m + '-01'));
@@ -5990,56 +6010,130 @@ async function wbrData() {
   return { D, m, week: wbrWeek(D), valueBasis: VL(), branch, stores, pica, inv, lost: { input: lost.length, value: Math.round(lost.reduce((a, x) => a + lostAmt(x).v, 0)), topArtikel: lostTop }, promo, det, task, approval, at: new Date().toISOString() };
 }
 /* prompt untuk Claude: bangun PPT dari template + data */
+const WBR_PPT_CODE = `import copy
+from pptx import Presentation
+
+prs = Presentation("Master_PPT_Eigerindo_2.pptx")   # file template yang saya lampirkan
+COVER, ISI, PENUTUP = prs.slides[0], prs.slides[1], prs.slides[2]
+
+def salin_slide(src):
+    """Duplikat slide template LENGKAP dengan logo, sidebar, garis oranye (semua gambar ikut)."""
+    new = prs.slides.add_slide(src.slide_layout)
+    for ph in list(new.placeholders):
+        ph._element.getparent().remove(ph._element)
+    rmap = {}
+    for rId, rel in src.part.rels.items():
+        if rel.is_external or "notesSlide" in rel.reltype or "slideLayout" in rel.reltype:
+            continue
+        rmap[rId] = new.part.relate_to(rel._target, rel.reltype)
+    for shp in src.shapes:
+        el = copy.deepcopy(shp._element)
+        for node in el.iter():
+            for k, v in list(node.attrib.items()):
+                if (k.endswith("}embed") or k.endswith("}link") or k.endswith("}id")) and v in rmap:
+                    node.set(k, rmap[v])
+        new.shapes._spTree.append(el)
+    return new
+
+def ganti_teks(shape, teks):
+    """Ganti teks TANPA menghilangkan format template (warna putih, ukuran, bold di cover)."""
+    tf = shape.text_frame; p = tf.paragraphs[0]
+    r0 = p.runs[0] if p.runs else p.add_run()
+    r0.text = teks
+    for r in p.runs[1:]: r._r.getparent().remove(r._r)
+    for extra in tf.paragraphs[1:]: extra._p.getparent().remove(extra._p)
+
+def pindah_slide(lama, baru):
+    lst = prs.slides._sldIdLst; el = list(lst)[lama]; lst.remove(el); lst.insert(baru, el)
+
+def hapus_slide(idx):
+    lst = prs.slides._sldIdLst; el = list(lst)[idx]; prs.part.drop_rel(el.rId); lst.remove(el)
+
+# 1) cover: ganti_teks(COVER.shapes.title, "judul") ; teks "JATENG 01" = textbox lain di slide 1 (cari yg berisi "JATENG 01")
+# 2) setiap slide isi: s = salin_slide(ISI) lalu tambahkan textbox/tabel/chart di area konten
+# 3) terakhir: pindah_slide(2, len(prs.slides)-1)  -> "Thank You!" ke paling akhir; hapus_slide(1) -> buang slide isi kosong asli
+# prs.save("WBR.pptx")`;
 function wbrPrompt(X) {
-  const pc = v => v == null ? null : Math.round(v * 1000) / 10;
   const data = JSON.parse(JSON.stringify(X, (k, v) => typeof v === 'number' && !Number.isInteger(v) && Math.abs(v) < 20 ? Math.round(v * 10000) / 10000 : v));
-  return `Kamu membantu Branch Manager EIGER Jateng 01 menyiapkan bahan WBR (Weekly Business Review) mingguan dalam PowerPoint.
-Saya melampirkan template "Master_PPT_Eigerindo_2.pptx". Buatkan file .pptx BARU memakai template itu, berisi data di bawah (data dari dashboard Integrated Hub, JANGAN mengarang angka).
+  const toko = X.mode === 'toko', who = toko ? X.store : 'Jateng 01';
+  const tpl = `## Template — WAJIB memakai file asli (bukan meniru desainnya)
+- Saya melampirkan "Master_PPT_Eigerindo_2.pptx". Bila file itu TIDAK terlampir, berhenti dan minta saya melampirkannya.
+- Kerjakan dengan Python + python-pptx: BUKA file template itu lalu tambahkan slide di dalamnya. DILARANG membuat presentasi baru dari nol (jangan pptxgenjs / Presentation() kosong / menggambar ulang logo jadi teks "EIGERINDO").
+- Slide 1 template = cover (latar navy bergambar, logo Eigerindo, teks "JATENG 01"): cukup ganti teks judul${toko ? ' dan teks "JATENG 01" menjadi nama toko' : ''}.
+- Slide 2 template = desain isi (sidebar kiri + logo + www.eigerindo.co.id + @lifeateigerindo, garis oranye bawah): SEMUA slide isi dibuat dengan menduplikat slide ini memakai fungsi di bawah.
+- Slide 3 template = penutup "Thank You!" (ilustrasi orang) di paling akhir.
+- Ukuran slide 13,33 × 7,5 inch. Area konten: kiri ≥ 1,3 inch, kanan ≤ 13,0 inch, atas ≥ 0,3 inch, bawah ≤ 6,95 inch (jangan menimpa sidebar & garis oranye).
+- Pakai kode dasar ini (sudah diuji dengan template tersebut):
+\`\`\`python
+${WBR_PPT_CODE}
+\`\`\`
+- Sebelum mengirim file: render tiap slide jadi gambar (LibreOffice → PNG) dan cek: logo Eigerindo terlihat di sidebar setiap slide isi, tidak ada teks terpotong / bertumpuk / keluar area. Perbaiki dulu bila ada.
+- Warna: navy #063365, oranye #F63D00, hijau #15803D (≥ 100%), kuning #CA8A04 (90–99,9%), merah #B91C1C (< 90%), abu #64748B. Font Arial. Judul slide 26–28pt bold navy, isi min 12pt. Rupiah ringkas "Rp 1,23 M" / "Rp 456 jt", persen 1 desimal. Grafik = chart native PowerPoint (bisa diedit).`;
+  const ket = `Keterangan data: achTD = sales ÷ target s/d tanggal data (bobot harian); achMonth = sales ÷ target 1 bulan; growthLM = vs tanggal yang sama bulan lalu; growthLY = vs periode sama tahun lalu; wow = 7 hari terakhir vs 7 hari sebelumnya; nilai sales memakai ${X.valueBasis}; angka desimal = rasio (0,953 = 95,3%).`;
+  const inter = `## Supaya INTERAKTIF dengan tim (wajib di slide performance)
+- Kotak "🗣️ Diskusi" berisi 2 pertanyaan pemantik yang spesifik dari data (sebut ${toko ? 'nama RA / artikel / hari' : 'toko'} & angkanya).
+- Kotak "✅ Komitmen minggu ini": tabel kosong 3 baris (${toko ? 'Nama | Aksi | Target | Deadline' : 'Toko | Aksi | PIC | Deadline'}) untuk diisi live saat meeting.
+- Speaker notes tiap slide: 3–5 talking points + urutan bicara.`;
+  if (toko) return `Kamu membantu Store Head ${X.store} (EIGER, area Jateng 01) menyiapkan bahan WBR (Weekly Business Review) toko bersama tim RA dalam PowerPoint. Data dari dashboard Integrated Hub — JANGAN mengarang angka.
 
-## Template (wajib dipakai)
-- Slide 1 template = cover (latar navy, logo Eigerindo, teks "JATENG 01", judul). Ganti judul jadi "Weekly Business Review" dan tambahkan subjudul "Week ${X.week} · ${fmtMonth(X.m)} · data s/d ${fmtDate(X.D)}".
-- Slide 2 template = desain isi (sidebar kiri putih + logo, garis oranye bawah). Pakai desain ini untuk SEMUA slide isi; area konten mulai x ≥ 1,3 inch, y 0,35–6,9 inch (jangan menimpa sidebar & garis oranye).
-- Slide 3 template = penutup "Thank You!", taruh di akhir.
-- Warna: navy #063365, oranye #F63D00, hijau #15803D (ach ≥ 100%), kuning #CA8A04 (90–99,9%), merah #B91C1C (< 90%), abu #64748B. Font Arial. Judul slide 26–28pt bold navy, isi minimal 12pt. Rupiah ringkas: "Rp 1,23 M" / "Rp 456 jt". Persen 1 desimal.
-- Rapi & tidak padat: maksimal 1 grafik/tabel utama + 1 kotak insight per slide. Grafik pakai chart native PowerPoint (bisa diedit), bukan gambar.
+${tpl}
 
-## Susunan slide (total 9)
-1. Cover.
-2. Daftar Isi: (1) Approval & Task, (2) Performance Bulan Berjalan, (3) Informasi Tambahan. Tambahkan kotak kecil "Aturan main meeting": timebox 45 menit · setiap toko 1 komitmen · keputusan dicatat di slide Action Plan.
-3. Approval & Task: kiri = status task bulan ini (bar/donut: Selesai, On Progress, Belum Mulai, Overdue) + % penyelesaian per toko (bar horizontal, urut terendah, merah bila < 80%); kanan = kotak status approval (Menunggu, Proses Review, Revisi, Disetujui & Ditolak bulan ini) + daftar approval terbuka paling lama. Bawah: daftar task overdue + toko yang belum.
-4. Performance 1/4 — Scorecard Branch: kotak KPI (Sales MTD, Ach s/d tanggal, Ach 1 bulan, Gap, kebutuhan sales/hari sisa ${X.branch.remainingDays} hari, Growth vs bulan lalu & vs tahun lalu, Transaksi, Basket size/ATV, UPT) + perbandingan minggu ini vs minggu lalu.
-5. Performance 2/4 — Per Toko: tabel ranking (Toko, Sales MTD, Ach s/d tgl, Growth vs LM, Growth vs LY, ATV, UPT, WoW) dengan warna sel sesuai ach; tandai Top 3 ⭐ & Bottom 3 ⚠.
-6. Performance 3/4 — Inventory & Promo: stok total (qty & value), komposisi SMDS / DCNP / Normal, MC Lv3 terbesar, porsi sales promo & promo terlaris, lost sales (top artikel), detention bila ada.
-7. Performance 4/4 — PICA & Action Plan: tabel Problem → Penyebab → Aksi → PIC → Deadline, diisi dari data PICA (area + 3 toko terendah). Kolom PIC & Deadline dikosongkan untuk diisi saat meeting.
-8. Informasi Tambahan: slide kosong terstruktur (3 poin placeholder "(diisi BM)") — nanti saya tambahkan isinya.
-9. Thank You.
+## Susunan slide (total 8)
+1. Cover: "WBR ${X.store}" · "Week ${X.week} · ${fmtMonth(X.m)} · data s/d ${fmtDate(X.D)}".
+2. Daftar Isi: (1) Performance Toko Bulan Berjalan, (2) Inventory & Produk, (3) Informasi Tambahan. Kotak "Aturan main": 30 menit · setiap RA 1 komitmen.
+3. Performance 1/4 — Scorecard Toko: Sales MTD, Ach s/d tgl, Ach 1 bulan, gap & kebutuhan per hari, growth vs bulan lalu & tahun lalu, transaksi/ATV/UPT dibanding bulan lalu & rata-rata area, + grafik 7 hari terakhir vs minggu lalu.
+4. Performance 2/4 — Tim RA: tabel ranking RA (sales, transaksi, UPT, ATV), tandai ⭐ tertinggi & RA yang perlu coaching (UPT/ATV terendah). Bagian "Shout-out" untuk RA terbaik.
+5. Performance 3/4 — Produk & Inventory: MC Lv3 terlaris + growth, 10 artikel terlaris, stok toko (qty/value, SMDS/DCNP/Normal), artikel laris yang stoknya habis, lost sales, detention.
+6. Performance 4/4 — PICA & Komitmen Tim: Problem → Penyebab → Aksi → Nama → Deadline (dari data PICA); "Vote fokus minggu depan" 3 pilihan.
+7. Informasi Tambahan: 3 poin placeholder "(diisi Store Head)".
+8. Thank You.
 
-## Supaya INTERAKTIF dengan tim (wajib di slide 3–7)
-- Kotak "🗣️ Diskusi" berisi 2 pertanyaan pemantik yang spesifik dari data (sebut toko/angkanya), mis. "Toko X: apa yang menahan transaksi turun 12% minggu ini?".
-- Kotak "✅ Komitmen minggu ini": tabel kosong 3 baris (Toko | Aksi | PIC | Deadline) untuk diisi live saat meeting.
-- Slide 5: panggil Top 1 untuk "share best practice 2 menit", Bottom 3 menyampaikan rencana.
-- Slide 7: "Vote fokus minggu depan" — 3 pilihan fokus (dari problem PICA terbesar) dengan kotak centang.
-- Speaker notes tiap slide: 3–5 poin talking points + urutan bicara.
+${inter}
 
 ## Data (JSON)
 \`\`\`json
 ${JSON.stringify(data)}
 \`\`\`
-Keterangan data: achTD = sales ÷ target s/d tanggal data (mengikuti bobot harian); achMonth = sales ÷ target 1 bulan; growthLM = vs tanggal yang sama bulan lalu; growthLY = vs periode sama tahun lalu; wow = 7 hari terakhir vs 7 hari sebelumnya; nilai sales memakai ${X.valueBasis}; angka desimal = rasio (0,953 = 95,3%).
+${ket} ra = data per sales person dari Item DSR (belum termasuk pembagian omni; untuk % Ach target RA lihat menu RA Performance).
 
-Setelah file jadi, tampilkan ringkasan 3 poin per slide, lalu tanya apakah ada tambahan slide/informasi yang mau saya masukkan.`;
+Setelah file jadi, tampilkan ringkasan 3 poin per slide, lalu tanya apakah ada tambahan slide/informasi.`;
+  return `Kamu membantu Branch Manager EIGER Jateng 01 menyiapkan bahan WBR (Weekly Business Review) mingguan dalam PowerPoint. Data dari dashboard Integrated Hub — JANGAN mengarang angka.
+
+${tpl}
+
+## Susunan slide (total 9)
+1. Cover: "Weekly Business Review" · "Week ${X.week} · ${fmtMonth(X.m)} · data s/d ${fmtDate(X.D)}".
+2. Daftar Isi: (1) Approval & Task, (2) Performance Bulan Berjalan, (3) Informasi Tambahan. Kotak kecil "Aturan main meeting": timebox 45 menit · setiap toko 1 komitmen · keputusan dicatat di slide Action Plan.
+3. Approval & Task: kiri = status task bulan ini (Selesai, On Progress, Belum Mulai, Overdue) + % penyelesaian per toko (bar horizontal, urut terendah, merah bila < 80%); kanan = status approval + approval terbuka paling lama. Bawah: task overdue + toko yang belum.
+4. Performance 1/4 — Scorecard Branch: KPI (Sales MTD, Ach s/d tgl, Ach 1 bulan, Gap, kebutuhan/hari sisa ${X.branch.remainingDays} hari, Growth vs LM & LY, Transaksi, ATV, UPT) + minggu ini vs minggu lalu.
+5. Performance 2/4 — Per Toko: tabel ranking (Toko, Sales MTD, Ach s/d tgl, Growth LM, Growth LY, ATV, UPT, WoW) berwarna sesuai ach; Top 3 ⭐ & Bottom 3 ⚠. Top 1 "share best practice 2 menit", Bottom 3 sampaikan rencana.
+6. Performance 3/4 — Inventory & Promo: stok (qty & value), SMDS / DCNP / Normal, MC Lv3 terbesar, porsi sales promo & promo terlaris, lost sales, detention.
+7. Performance 4/4 — PICA & Action Plan: Problem → Penyebab → Aksi → PIC → Deadline (area + 3 toko terendah; PIC & Deadline dikosongkan). "Vote fokus minggu depan" 3 pilihan.
+8. Informasi Tambahan: 3 poin placeholder "(diisi BM)".
+9. Thank You.
+
+${inter}
+
+## Data (JSON)
+\`\`\`json
+${JSON.stringify(data)}
+\`\`\`
+${ket}
+
+Setelah file jadi, tampilkan ringkasan 3 poin per slide, lalu tanya apakah ada tambahan slide/informasi.`;
 }
 function wbrPill(v, G) { if (v == null) return '–'; const c = v >= G ? 'var(--ok)' : v >= .9 ? '#CA8A04' : 'var(--bad)'; return `<b style="color:${c}">${fmtPct(v, 1)}</b>`; }
 function pageWbr(view) {
-  setHead('Ringkasan WBR', 'Bahan Weekly Business Review bulan berjalan · Approval & Task · Performance · Inventory · PICA → salin ke Claude untuk dibuatkan PPT');
+  setHead('Ringkasan WBR', scopeOn() ? 'Bahan WBR toko bersama tim: performance penjualan, tim RA, produk & inventory, PICA → salin ke Claude untuk dibuatkan PPT' : 'Bahan Weekly Business Review bulan berjalan · Approval & Task · Performance · Inventory · PICA → salin ke Claude untuk dibuatkan PPT');
   const X = App.wbr;
-  if (!X || X.D !== repLast() || App.ui.wbrStale) {
+  if (!X || X.D !== repLast() || App.ui.wbrStale || (X.mode === 'toko' ? X.c : '') !== (scopeOn() ? App.ui.scope : '')) {
     App.ui.wbrStale = false;
     view.innerHTML = '<div class="loading"><span class="spin"></span>Menyusun ringkasan WBR (penjualan, stok, PICA, task & approval)…</div>';
     wbrData().then(d => { App.wbr = d || { empty: 1 }; if (App.page === 'wbr') render(); }, e => { App.wbr = { err: errMsg(e) }; if (App.page === 'wbr') render(); });
     return;
   }
   if (X.err || X.empty) { view.innerHTML = `<div class="empty-state"><h2>Ringkasan belum bisa disusun</h2><p class="muted">${esc(X.err || 'Belum ada data penjualan bulan ini.')}</p><button class="btn primary" id="wbrRe">⟳ Coba lagi</button></div>`; return; }
+  if (X.mode === 'toko') { pageWbrStore(view, X); return; }
   const B = X.branch, G = SET().achGreen / 100, I = X.inv, Tk = X.task, Ap = X.approval;
   const tile = (l, v, s, bg) => `<div class="pt-tile" ${bg ? `style="background:${bg}"` : ''}><span>${l}</span><b>${v}</b><small>${s || ''}</small></div>`;
   const top3 = X.stores.filter(s => s.achTD != null).slice(0, 3), bot3 = X.stores.filter(s => s.achTD != null && s.target).slice(-3).reverse();
@@ -6077,6 +6171,29 @@ function pageWbr(view) {
     { k: 'achMonth', label: 'Ach bulan', r: 1, h: s => fmtPct(s.achMonth, 1) }, { k: 'growthLM', label: 'vs bln lalu', r: 1, h: s => chgH(s.growthLM) }, { k: 'growthLY', label: 'vs thn lalu', r: 1, h: s => chgH(s.growthLY) },
     { k: 'atv', label: 'ATV', r: 1, h: s => fmtRpS(s.atv) }, { k: 'upt', label: 'UPT', r: 1, h: s => fmtX(s.upt, 2) }, { k: 'wow', label: 'WoW', r: 1, v: s => s.week.wow, h: s => chgH(s.week.wow) }] });
 }
+function pageWbrStore(view, X) {
+  const B = X.branch, G = SET().achGreen / 100, I = X.inv;
+  const tile = (l, v, s, bg) => `<div class="pt-tile" ${bg ? `style="background:${bg}"` : ''}><span>${l}</span><b>${v}</b><small>${s || ''}</small></div>`;
+  const cmp = (a, b) => a == null || !b ? '' : (a >= b ? '▲ ' : '▼ ') + fmtPct(Math.abs(a / b - 1), 1);
+  view.innerHTML = `<div class="stack">
+  <section class="card wbr-cta"><div><b>🎯 WBR ${esc(X.store)} · Week ${X.week} ${esc(fmtMonth(X.m))}</b><p class="small" style="margin:4px 0 0">Mode toko: fokus performance & inventory toko ini untuk WBR bersama tim. Data s/d <b>${esc(fmtDate(X.D))}</b>. 1) <b>Salin prompt PPT</b> · 2) buka <b>claude.ai</b>, lampirkan <b>Master_PPT_Eigerindo_2.pptx</b> · 3) tempel lalu kirim.</p></div>
+    <div class="wbr-btns"><button class="btn primary" id="wbrCopy">📋 Salin prompt PPT</button><a class="btn" href="https://claude.ai/new" target="_blank" rel="noopener">Buka claude.ai ↗</a><button class="btn" id="wbrXls">⬇ Excel</button><button class="btn" id="wbrRe">⟳</button></div><p class="small" id="wbrMsg" style="margin:6px 0 0;flex-basis:100%"></p></section>
+  <section class="card"><div class="card-h"><h3>1 · Performance toko bulan berjalan</h3><span class="small muted">1–${+X.D.slice(8)} ${esc(fmtMonth(X.m))} · ${esc(X.valueBasis)}</span></div>
+    ${B ? `<div class="pt-tiles" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))">
+      ${tile('Sales MTD', fmtRpS(B.sales), 'target bulan ' + fmtRpS(B.target), '#0B1B4A')}${tile('Ach s/d tanggal', B.achTD == null ? '–' : fmtPct(B.achTD, 1), 'gap ' + fmtRpS(B.gap), B.achTD >= G ? '#15803D' : B.achTD >= .9 ? '#CA8A04' : '#B91C1C')}${tile('Ach 1 bulan', B.achMonth == null ? '–' : fmtPct(B.achMonth, 1), `butuh ${fmtRpS(B.needPerDay)}/hari · ${B.remainingDays} hari lagi`)}
+      ${tile('Growth vs bln lalu', B.growthLM == null ? '–' : (B.growthLM >= 0 ? '+' : '') + fmtPct(B.growthLM, 1), 'tanggal yang sama')}${tile('Growth vs thn lalu', B.growthLY == null ? '–' : (B.growthLY >= 0 ? '+' : '') + fmtPct(B.growthLY, 1), 'MTD')}
+      ${tile('Transaksi', fmtN(B.trx), cmp(B.trx, B.trxLM) + ' vs bln lalu')}${tile('ATV', fmtRpS(B.atv), 'area ' + fmtRpS(B.areaAtv))}${tile('UPT', fmtX(B.upt, 2), 'area ' + fmtX(B.areaUpt, 2))}</div>` : '<p class="muted">Belum ada penjualan bulan ini.</p>'}
+    <div class="wbr-2"><div><h4>7 hari terakhir vs minggu lalu</h4><div id="wbrD"></div></div><div><h4>Tim RA (MTD)</h4><div id="wbrRA"></div></div></div></section>
+  <section class="card"><div class="card-h"><h3>2 · Produk & inventory</h3>${I ? `<span class="small muted">stok per ${esc(fmtDate(I.stockDate))}</span>` : ''}</div>
+    ${I ? `<div class="pt-tiles" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))">${tile('Total stok', fmtN(I.qty) + ' pcs', fmtRpS(I.value) + ' · ' + fmtN(I.articles) + ' artikel', '#0B1B4A')}${['SMDS', 'DCNP', 'Normal'].map(k => tile(k, fmtN(I.byCategory[k].qty) + ' pcs', fmtRpS(I.byCategory[k].value))).join('')}
+      ${tile('Lost sales MTD', fmtN(X.lost.input) + ' input', fmtRpS(X.lost.value), X.lost.input ? '#C2410C' : '')}${X.det ? tile('Detention display', fmtPct(X.det.displayedPct, 1), fmtN(X.det.genericNotDisplayed) + ' generic belum display') : ''}</div>` : '<p class="muted small">Stok toko belum diupload.</p>'}
+    <div class="wbr-2"><div><h4>10 artikel terlaris</h4><div id="wbrArt"></div></div><div><h4>MC Lv3 & artikel laris yang stoknya habis</h4><div id="wbrMc"></div>${I && I.artikelLarisStokHabis.length ? `<p class="small" style="margin:8px 0 0">⚠ Stok habis: ${I.artikelLarisStokHabis.map(x => esc(x.nama) + ' (' + x.terjual30hari + ' terjual)').join(', ')}</p>` : ''}</div></div></section>
+  <section class="card"><div class="card-h"><h3>3 · PICA toko</h3></div><div class="wbr-2"><div><h4>Problem</h4><ul class="small">${X.pica.problems.map(p => `<li>${esc(p)}</li>`).join('')}</ul><h4>Cek</h4><ul class="small">${X.pica.checks.map(p => `<li>${esc(p)}</li>`).join('')}</ul></div><div><h4>Aksi</h4><ul class="small">${X.pica.actions.map(p => `<li>${esc(p)}</li>`).join('')}</ul></div></div></section></div>`;
+  $('#wbrD').innerHTML = tbl('wbrD', { rows: X.daily, limit: 7, cols: [{ k: 'date', label: 'Tanggal', h: d => `${esc(d.hari.slice(0, 3))}, ${fmtDateS(d.date)}` }, { k: 'sales', label: 'Sales', r: 1, h: d => fmtRpS(d.sales) }, { k: 'trx', label: 'Trx', r: 1, h: d => fmtN(d.trx) }, { k: 'salesMingguLalu', label: 'Minggu lalu', r: 1, h: d => `<span class="muted">${fmtRpS(d.salesMingguLalu)}</span>` }, { k: 'g', label: 'Growth', r: 1, v: d => d.salesMingguLalu ? d.sales / d.salesMingguLalu - 1 : null, h: d => chgH(d.salesMingguLalu ? d.sales / d.salesMingguLalu - 1 : null) }] });
+  $('#wbrRA').innerHTML = tbl('wbrRA', { rows: X.ra, limit: 15, empty: 'Belum ada data sales person.', cols: [{ k: 'ra', label: 'RA', h: r => `<b>${esc(r.ra)}</b>` }, { k: 'sales', label: 'Sales', r: 1, h: r => fmtRpS(r.sales) }, { k: 'trx', label: 'Trx', r: 1, h: r => fmtN(r.trx) }, { k: 'upt', label: 'UPT', r: 1, h: r => fmtX(r.upt, 2) }, { k: 'atv', label: 'ATV', r: 1, h: r => fmtRpS(r.atv) }] });
+  $('#wbrArt').innerHTML = tbl('wbrArt', { rows: X.topArtikel, limit: 10, cols: [{ k: 'nama', label: 'Artikel', h: r => `<b>${esc(r.nama)}</b><br><small class="muted">${esc(r.artikel)}</small>` }, { k: 'qty', label: 'Qty', r: 1, h: r => fmtN(r.qty) }, { k: 'sales', label: 'Sales', r: 1, h: r => fmtRpS(r.sales) }] });
+  $('#wbrMc').innerHTML = tbl('wbrMc', { rows: X.mcLv3, limit: 8, cols: [{ k: 'mc', label: 'MC Lv3', h: r => `<b>${esc(r.mc)}</b>` }, { k: 'sales', label: 'Sales', r: 1, h: r => fmtRpS(r.sales) }, { k: 'growthLM', label: 'vs bln lalu', r: 1, h: r => chgH(r.growthLM) }] });
+}
 async function wbrCopy() {
   const X = App.wbr; if (!X || X.err) return; const text = wbrPrompt(X); let ok = false;
   try { await navigator.clipboard.writeText(text); ok = true; } catch (e) { const ta = document.createElement('textarea'); ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0'; document.body.appendChild(ta); ta.select(); try { ok = document.execCommand('copy'); } catch (er) { } ta.remove(); }
@@ -6086,6 +6203,14 @@ async function wbrCopy() {
 async function wbrExcel() {
   const X = App.wbr; if (!X || X.err || !(await needXLSX())) return; const wb = XLSX.utils.book_new(), B = X.branch;
   const add = (n, a, w) => { const ws = XLSX.utils.aoa_to_sheet(a); ws['!cols'] = (w || []).map(x => ({ wch: x })); XLSX.utils.book_append_sheet(wb, ws, n); };
+  if (X.mode === 'toko') {
+    add('Toko', [['WBR ' + X.store + ' Week ' + X.week + ' ' + fmtMonth(X.m), 'data s/d ' + X.D], [], ...(B ? [['Target bulan', B.target], ['Sales MTD', B.sales], ['Ach s/d tgl', B.achTD], ['Ach bulan', B.achMonth], ['Gap', B.gap], ['Kebutuhan/hari', B.needPerDay], ['Growth vs bln lalu', B.growthLM], ['Growth vs thn lalu', B.growthLY], ['Transaksi', B.trx], ['ATV', Math.round(B.atv || 0)], ['UPT', B.upt]] : [])], [24, 18]);
+    add('7 hari', [['Tanggal', 'Hari', 'Sales', 'Transaksi', 'Sales minggu lalu'], ...X.daily.map(d => [d.date, d.hari, d.sales, d.trx, d.salesMingguLalu])], [12, 10, 14, 10, 16]);
+    add('Tim RA', [['RA', 'Sales', 'Transaksi', 'Qty', 'UPT', 'ATV'], ...X.ra.map(r => [r.ra, r.sales, r.trx, r.qty, r.upt, Math.round(r.atv || 0)])], [30, 14, 10, 8, 7, 12]);
+    add('Produk', [['Artikel', 'Nama', 'Qty', 'Sales'], ...X.topArtikel.map(r => [r.artikel, r.nama, r.qty, r.sales]), [], ['MC Lv3', 'Sales', 'Qty', 'Growth vs bln lalu'], ...X.mcLv3.map(r => [r.mc, r.sales, r.qty, r.growthLM])], [14, 36, 10, 14]);
+    add('PICA', [['Jenis', 'Isi'], ...X.pica.problems.map(p => ['Problem', p]), ...X.pica.checks.map(p => ['Cek', p]), ...X.pica.actions.map(p => ['Aksi', p])], [10, 110]);
+    (await getDownloads()).save({ filename: `WBR_${X.c}_W${X.week}_${X.m}.xlsx`, data: new Blob([XLSX.write(wb, { bookType: 'xlsx', type: 'array' })]) }); return;
+  }
   add('Branch', [['WBR Week ' + X.week + ' ' + fmtMonth(X.m), 'data s/d ' + X.D], [], ['Target bulan', B.target], ['Target s/d tgl', B.targetTD], ['Sales MTD', B.sales], ['Ach s/d tgl', B.achTD], ['Ach bulan', B.achMonth], ['Gap', B.gap], ['Kebutuhan/hari', B.needPerDay], ['Growth vs bln lalu', B.growthLM], ['Growth vs thn lalu', B.growthLY], ['Transaksi', B.trx], ['ATV', Math.round(B.atv || 0)], ['UPT', B.upt], ['Sales minggu ini', B.week.sales], ['Sales minggu lalu', B.week.prevWeek], ['WoW', B.week.wow]], [24, 18]);
   add('Per toko', [['Kode', 'Toko', 'Target', 'Target s/d tgl', 'Sales MTD', 'Ach s/d tgl', 'Ach bulan', 'Growth vs bln lalu', 'Growth vs thn lalu', 'Transaksi', 'ATV', 'UPT', 'Sales minggu ini', 'WoW'], ...X.stores.map(s => [s.c, s.name, s.target, s.targetTD, s.sales, s.achTD, s.achMonth, s.growthLM, s.growthLY, s.trx, Math.round(s.atv || 0), s.upt, s.week.sales, s.week.wow])], [7, 32, 14, 14, 14, 10, 10, 12, 12, 10, 12, 7, 14, 8]);
   add('Task & Approval', [['Status task', 'Jumlah'], ['Selesai', X.task.selesai], ['On Progress', X.task.onProgress], ['Belum Mulai', X.task.belumMulai], ['Overdue', X.task.overdue], [], ['Toko', '% selesai', 'Selesai', 'Total'], ...X.task.perStore.map(s => [s.name, s.pct, s.done, s.total]), [], ['Approval', 'Jumlah'], ['Menunggu', X.approval.menunggu], ['Proses Review', X.approval.prosesReview], ['Revisi', X.approval.revisi], ['Disetujui bulan ini', X.approval.disetujuiBulanIni], ['Ditolak bulan ini', X.approval.ditolakBulanIni]], [30, 12, 10, 10]);

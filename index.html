@@ -821,6 +821,11 @@ button.pd-sz:hover{box-shadow:0 0 0 3px rgba(15,49,146,.12)}
   @media (max-width:640px){.ai-dock{bottom:calc(59px + env(safe-area-inset-bottom));padding-bottom:8px;width:calc(100% - 20px)}.ai-a{margin-left:8px}.ai-av.sm{left:-8px}}
   .ai-wrap.empty .ai-dock .ai-ex,.ai-wrap.empty #aiClear{display:none}
   @media (max-width:640px){.ai-foot>span:first-child{display:none}.ai-foot{justify-content:flex-end;margin-top:2px}}
+  .wbr-cta{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;background:#FFF7ED;border:1px solid #FED7AA}.wbr-btns{display:flex;gap:8px;flex-wrap:wrap}
+  .wbr-2{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:12px}.wbr-2 h4{margin:4px 0 8px;font-size:14px;color:var(--navy,#0F3192)}.wbr-2 ul{margin:0 0 8px;padding-left:18px}.wbr-2 li{margin:3px 0}
+  .wbr-bar{display:grid;grid-template-columns:minmax(120px,1fr) 2fr 44px;gap:8px;align-items:center;font-size:12.5px;margin:3px 0}.wbr-bar span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .wbr-bar i{display:block;height:10px;background:#EEF2F6;border-radius:6px;overflow:hidden}.wbr-bar em{display:block;height:100%;border-radius:6px}.wbr-bar b{text-align:right}
+  @media (max-width:760px){.wbr-2{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -2026,7 +2031,7 @@ function renderPeriod() {
   if (App.page === 'home' || isOps(App.page)) { box.innerHTML = ''; return; }
   const tsel = hasTypes() && App.page !== 'toko' && !scopeOn() ? `<label class="small muted" for="typeSel">Jenis toko</label><select id="typeSel" class="inp"><option value="">Semua toko</option>${['rg', 'bz', 'ot'].filter(t => storeCodes().some(c => sType(c) === t)).map(t => `<option value="${t}" ${App.ui.typeF === t ? 'selected' : ''}>${TYPE_LABEL[t]}</option>`).join('')}</select>` : '';
   if (['report', 'promo', 'omni', 'eac', 'lost', 'detention', 'growth', 'stok', 'transfer', 'ro', 'pica', 'juknis', 'bc', 'omset', 'satr', 'sabo', 'ai'].includes(App.page)) { box.innerHTML = tsel; return; }
-  if (!App.lastDate || ['admin', 'settings', 'links', 'bm_target', 'bm_dinas', 'produk'].includes(App.page)) { box.innerHTML = ''; return; }
+  if (!App.lastDate || ['admin', 'settings', 'links', 'bm_target', 'bm_dinas', 'produk', 'wbr'].includes(App.page)) { box.innerHTML = ''; return; }
   const L = App.lastDate, cm = L.slice(0, 7);
   const months = Object.keys(App.index.sales).sort().reverse().filter(m => m !== cm);
   const p = App.period;
@@ -2083,14 +2088,14 @@ function render() {
   }
   if (App.page === 'stok') App.page = 'transfer';
   if (BM_ONLY.includes(App.page) && !App.superAdmin) App.page = 'report';
-  if (!isOps(App.page) && App.page !== 'home' && !App.lastDate && !['admin', 'report', 'settings', 'lost', 'detention', 'juknis', 'bc', 'omset', 'satr', 'sabo', 'bm_target', 'bm_dinas', 'links', 'ai'].includes(App.page)) { App.page = srLast() ? 'report' : 'detention'; }
+  if (!isOps(App.page) && App.page !== 'home' && !App.lastDate && !['admin', 'report', 'settings', 'lost', 'detention', 'juknis', 'bc', 'omset', 'satr', 'sabo', 'bm_target', 'bm_dinas', 'links', 'ai', 'wbr'].includes(App.page)) { App.page = srLast() ? 'report' : 'detention'; }
   const NEED_STOCK = ['produk', 'transfer', 'ro', 'promostock', 'detention', 'pica', 'toko', 'stok', 'area', 'lost', 'settings'];
   if (NEED_STOCK.includes(App.page) && !App.stockLoaded && Object.keys(App.index.stock || {}).length) {
     view.innerHTML = '<div class="loading"><span class="spin"></span>Memuat data stok…</div>';
     const pg = App.page; loadStock().catch(e => { App.stockLoaded = true; toast('Data stok gagal dimuat: ' + (e.message || e.code)); }).then(() => { App.stockLoaded = true; if (App.page === pg) render(); });
     return;
   }
-  const fn = { ai: pageAI, links: pageLinks, bm_target: pageBmTarget, bm_dinas: pageBmDinas, satr: v => pageSaBin(v, 'TR'), sabo: v => pageSaBin(v, 'BO'), area: pageArea, report: pageReport, trend: pageTrend, promo: pagePromo, omni: pageOmni, eac: pageEac, ra: pageRA, pareto: pagePareto, lost: pageLost, promostock: pagePromoStock, detention: pageDetention, growth: pageGrowth, transfer: pageTransfer, ro: pageRO, pica: pagePica, juknis: pageJuknis, home: pageHome, bc: pageBC, omset: pageOmset, ops_approval: pageApproval, ops_task: pageTask, ops_info: pageInfo, ops_ess: pageEss, toko: pageStore, produk: pageProduct, stok: pageStock, admin: pageAdmin, settings: pageSettings }[App.page] || pageReport;
+  const fn = { wbr: pageWbr, ai: pageAI, links: pageLinks, bm_target: pageBmTarget, bm_dinas: pageBmDinas, satr: v => pageSaBin(v, 'TR'), sabo: v => pageSaBin(v, 'BO'), area: pageArea, report: pageReport, trend: pageTrend, promo: pagePromo, omni: pageOmni, eac: pageEac, ra: pageRA, pareto: pagePareto, lost: pageLost, promostock: pagePromoStock, detention: pageDetention, growth: pageGrowth, transfer: pageTransfer, ro: pageRO, pica: pagePica, juknis: pageJuknis, home: pageHome, bc: pageBC, omset: pageOmset, ops_approval: pageApproval, ops_task: pageTask, ops_info: pageInfo, ops_ess: pageEss, toko: pageStore, produk: pageProduct, stok: pageStock, admin: pageAdmin, settings: pageSettings }[App.page] || pageReport;
   try { fn(view); renderAsOf(); lockScopedSelects(view); if (App.page === 'admin') renderUsers(); if ((App.loadWarn || []).length) view.insertAdjacentHTML('afterbegin', `<div class="note" style="margin-bottom:14px">Sebagian data belum termuat (${esc(App.loadWarn.join(', '))}). Tekan <b>Muat ulang</b> di kanan atas untuk mencoba lagi.</div>`); } catch (e) { console.error(e); view.innerHTML = `<div class="empty-state"><h2>Halaman gagal ditampilkan</h2><p class="muted">${esc(e.message)}</p></div>`; }
 }
 
@@ -4223,14 +4228,14 @@ const PRIO = { Tinggi: '🔥', Sedang: '⚡', Rendah: '🌿' };
 const APST = { Menunggu: ['⏳', 'or'], 'Proses Review': ['🔍', 'or'], Revisi: ['🔄', 'red'], Disetujui: ['✅', 'ok'], Ditolak: ['❌', 'red'] };
 /* ---------- beranda: pilih hub ---------- */
 /* ===== katalog menu: satu pintu untuk Store Management & Operational Hub ===== */
-const MENU_IC = { ai: '✨', links: '🔗', bm_target: '🎯', bm_dinas: '🧾', omset: '💬', report: '🎯', trend: '📈', promo: '🏷️', omni: '🛒', eac: '👥', ra: '🧑‍💼', pareto: '📊', growth: '📅', produk: '👕', transfer: '🔁', ro: '📦', promostock: '💸', detention: '🗄️', bc: '🔢', satr: '🚚', sabo: '📌', lost: '⚠️', pica: '💡', juknis: '🎁', admin: '⬆️', settings: '⚙️', ops_approval: '✅', ops_task: '📋', ops_info: '📢', ops_ess: '📝' };
-const MENU_EXTRA = { ai: ['Tanya AI', 'Tanya data penjualan, promo, stok & target ke AI'], links: ['Kumpulan Link', 'Link kerja daily, weekly, monthly & lainnya'], bm_target: ['Setting Target Store', 'Bagi target HO ke toko, adjust per toko, terapkan'], bm_dinas: ['Rekap Dinas', 'Transport bulanan & dinas luar kota dari foto nota'], lost: ['Lost Sales', 'Barang dicari customer tapi tidak tersedia'], pica: ['Analisa PICA', 'Cari masalah & tindakan perbaikan toko'], juknis: ['Info Promo', 'Buka website Promo Eigerindo'], admin: ['Kelola data', 'Upload data, akun & daftar toko'], settings: ['Pengaturan', 'Pengaturan dashboard'],
+const MENU_IC = { wbr: '🗂️', ai: '✨', links: '🔗', bm_target: '🎯', bm_dinas: '🧾', omset: '💬', report: '🎯', trend: '📈', promo: '🏷️', omni: '🛒', eac: '👥', ra: '🧑‍💼', pareto: '📊', growth: '📅', produk: '👕', transfer: '🔁', ro: '📦', promostock: '💸', detention: '🗄️', bc: '🔢', satr: '🚚', sabo: '📌', lost: '⚠️', pica: '💡', juknis: '🎁', admin: '⬆️', settings: '⚙️', ops_approval: '✅', ops_task: '📋', ops_info: '📢', ops_ess: '📝' };
+const MENU_EXTRA = { wbr: ['Ringkasan WBR', 'Bahan Weekly Business Review: task, approval, performance, inventory, PICA → PPT'], ai: ['Tanya AI', 'Tanya data penjualan, promo, stok & target ke AI'], links: ['Kumpulan Link', 'Link kerja daily, weekly, monthly & lainnya'], bm_target: ['Setting Target Store', 'Bagi target HO ke toko, adjust per toko, terapkan'], bm_dinas: ['Rekap Dinas', 'Transport bulanan & dinas luar kota dari foto nota'], lost: ['Lost Sales', 'Barang dicari customer tapi tidak tersedia'], pica: ['Analisa PICA', 'Cari masalah & tindakan perbaikan toko'], juknis: ['Info Promo', 'Buka website Promo Eigerindo'], admin: ['Kelola data', 'Upload data, akun & daftar toko'], settings: ['Pengaturan', 'Pengaturan dashboard'],
   ops_approval: ['Approval', 'Ajukan & pantau persetujuan BM'], ops_task: ['Task', 'Checklist tugas tiap toko'], ops_info: ['Informasi', 'Info & materi terbaru dari HO'], ops_ess: ['ESS Self Assessment', 'Self assessment RA saat briefing siang'] };
-const MENU_KW = { ai: 'ai tanya chat analisa growth efektivitas promo pertanyaan data', links: 'link url form daily weekly monthly sop lembur ipm vm sga memo materi', satr: 'sa tr satr transit bin plus minus', sabo: 'sa bo sabo booking bin', produk: 'artikel sku lokasi bin cek stok toko lain', omset: 'piket share omset per 2 jam sales report care', report: 'achievement target daily report pencapaian', ra: 'sales person karyawan upt basket tagging target per head', transfer: 'pindah stok antar toko', ro: 'order gudang ho repeat', detention: 'display gudang pajang', bc: 'stock opname so', ops_ess: 'briefing journey', ops_task: 'tugas checklist', ops_approval: 'pengajuan memo lembur', juknis: 'promo diskon', lost: 'kosong tidak ada stok' };
+const MENU_KW = { wbr: 'wbr weekly business review ppt presentasi meeting mingguan ringkasan performance', ai: 'ai tanya chat analisa growth efektivitas promo pertanyaan data', links: 'link url form daily weekly monthly sop lembur ipm vm sga memo materi', satr: 'sa tr satr transit bin plus minus', sabo: 'sa bo sabo booking bin', produk: 'artikel sku lokasi bin cek stok toko lain', omset: 'piket share omset per 2 jam sales report care', report: 'achievement target daily report pencapaian', ra: 'sales person karyawan upt basket tagging target per head', transfer: 'pindah stok antar toko', ro: 'order gudang ho repeat', detention: 'display gudang pajang', bc: 'stock opname so', ops_ess: 'briefing journey', ops_task: 'tugas checklist', ops_approval: 'pengajuan memo lembur', juknis: 'promo diskon', lost: 'kosong tidak ada stok' };
 /* ===== SATU struktur menu untuk semua tempat (menu atas PC, bar bawah HP, beranda, pencarian, sub-menu) =====
    4 kelompok besar, tiap kelompok dibagi beberapa bagian kecil. Semua 24 sub menu tetap ada. */
 const MENU_GROUPS = [
-  { k: 'g_sales', t: 'Penjualan', icon: 'area', ic: '📊', d: 'Omset, target, tim, promo & channel', secs: [['Pantau harian', ['omset', 'report']], ['Analisa penjualan', ['trend', 'growth', 'pica']], ['Tim & member', ['ra', 'eac']], ['Promo & channel', ['juknis', 'promo', 'omni']]] },
+  { k: 'g_sales', t: 'Penjualan', icon: 'area', ic: '📊', d: 'Omset, target, tim, promo & channel', secs: [['Pantau harian', ['omset', 'report']], ['Laporan mingguan', ['wbr']], ['Analisa penjualan', ['trend', 'growth', 'pica']], ['Tim & member', ['ra', 'eac']], ['Promo & channel', ['juknis', 'promo', 'omni']]] },
   { k: 'g_stock', t: 'Stok & Produk', icon: 'produk', ic: '📦', d: 'Produk, kelola stok, display & opname', secs: [['Produk', ['produk', 'pareto', 'lost']], ['Kelola stok', ['transfer', 'ro', 'promostock']], ['Display & opname', ['detention', 'bc']], ['Bin SA', ['satr', 'sabo']]] },
   { k: 'g_ops', t: 'Operasional', icon: 'task', ic: '📋', d: 'Task, approval, informasi & ESS', secs: [['Tugas harian', ['ops_task', 'ops_approval']], ['Info & briefing', ['ops_info', 'ops_ess']], ['Link kerja', ['links']]] },
   { k: 'g_admin', t: 'Admin', icon: 'admin', ic: '⚙️', d: 'Kelola data & pengaturan', admin: 1, secs: [['Data & pengaturan', ['admin', 'settings']], ['Kerja BM', ['bm_target', 'bm_dinas']]] }
@@ -5914,6 +5919,184 @@ function alExplain(plan, R) {
   if (!out.length) out.push('Tidak ada data untuk periode/filter ini. Pastikan Item DSR periode tersebut sudah diupload.');
   return out.join('\n') + (tips.length ? '\nSaran:\n' + [...new Set(tips)].slice(0, 3).map(t => '- ' + t).join('\n') : '');
 }
+
+/* ================= RINGKASAN WBR (Weekly Business Review) =================
+   Ringkasan bulan berjalan: Approval & Task, Performance (penjualan, inventory, PICA), lalu prompt siap-salin
+   untuk Claude agar dibuatkan PPT dengan template Master PPT Eigerindo (maks 4 slide performance, interaktif). */
+const wbrStrip = h => String(h || '').replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim();
+const wbrWeek = D => Math.min(5, Math.ceil(+D.slice(8) / 7));
+async function wbrData() {
+  const D = repLast(); if (!D) return null;
+  const m = D.slice(0, 7), day = +D.slice(8), pm = addMonths(m, -1), pd = Math.min(day, dim(pm));
+  await ensureMonths(pm + '-01', D);
+  if (!App.daily) await loadDaily().catch(() => { App.daily = { map: new Map(), names: {} }; });
+  if (!Object.keys(App.stock || {}).length) await loadStock().catch(() => { });
+  if (App.mst && App.mst.status === 'idle') loadMaster();
+  try { if (!App.hub) await loadHub(); } catch (e) { App.hub = App.hub || { approval: [], task: [], info: [], stores: [] }; }
+  const val = App.ui.rpVal || SET().defaultValue || 'g', R = reportData(D, val), G = SET().achGreen / 100;
+  /* --- performance per toko --- */
+  const by = (a, b) => { const o = new Map(); for (const l of linesIn(a, b)) { const x = o.get(l.s) || { v: 0, q: 0, trx: new Set() }; x.v += VAL(l); if (!isPB(l.sku)) x.q += l.q; if (l.q > 0) x.trx.add(l.d + l.o); o.set(l.s, x); } return o; };
+  const LM = by(pm + '-01', pm + '-' + pad(pd)), W1 = by(addDays(D, -6), D), W0 = by(addDays(D, -13), addDays(D, -7));
+  const lyOf = c => { let t = 0, l = 0, any = false; for (let d = m + '-01'; d <= D; d = addDays(d, 1)) { const v = tyVal(c, d); if (v == null) continue; const y = lyVal(c, d, 'date'); if (y == null) continue; any = true; t += v; l += y; } return any && l ? t / l - 1 : null; };
+  const stores = R.rows.filter(r => r.T || r.cs).map(r => {
+    const lm = LM.get(r.c), w1 = W1.get(r.c), w0 = W0.get(r.c);
+    return { c: r.c, name: r.name, type: r.type, target: Math.round(r.T), targetTD: Math.round(r.cT), sales: Math.round(r.cs), achTD: r.cAch, achMonth: r.mAch, gap: Math.round(r.cDiff),
+      growthLM: lm && lm.v ? r.cs / lm.v - 1 : null, growthLY: lyOf(r.c), trx: r.ct, atv: r.cBs, upt: r.cUpt,
+      week: { sales: w1 ? Math.round(w1.v) : 0, prevWeek: w0 ? Math.round(w0.v) : 0, wow: w1 && w0 && w0.v ? w1.v / w0.v - 1 : null } };
+  }).sort((a, b) => (b.achTD ?? -1) - (a.achTD ?? -1));
+  const T = R.t, lmT = [...LM.values()].reduce((a, x) => a + x.v, 0), lmTrx = [...LM.values()].reduce((a, x) => a + x.trx.size, 0);
+  const w1T = [...W1.values()].reduce((a, x) => a + x.v, 0), w0T = [...W0.values()].reduce((a, x) => a + x.v, 0);
+  const P = picaData(null, D, R, 'cum'), PR = picaRules(P);
+  const remDays = dim(m) - day, rem = Math.max(0, (T.T || 0) - (T.cs || 0));
+  const branch = { target: Math.round(T.T || 0), targetTD: Math.round(T.cT || 0), sales: Math.round(T.cs || 0), achTD: T.cAch, achMonth: T.mAch, gap: Math.round(T.cDiff || 0),
+    growthLM: lmT ? T.cs / lmT - 1 : null, growthLY: P.gy ? P.gy.mtd : null, trx: T.ct, trxLM: lmTrx, atv: T.cBs, upt: T.cUpt,
+    remainingDays: remDays, needPerDay: remDays ? Math.round(rem / remDays) : 0,
+    week: { label: `${fmtDateS(addDays(D, -6))}–${fmtDateS(D)}`, sales: Math.round(w1T), prevLabel: `${fmtDateS(addDays(D, -13))}–${fmtDateS(addDays(D, -7))}`, prevWeek: Math.round(w0T), wow: w0T ? w1T / w0T - 1 : null },
+    storesGreen: stores.filter(s => s.achTD != null && s.achTD >= G).length, storesRed: stores.filter(s => s.achTD != null && s.achTD < .9).length, storesTotal: stores.length };
+  /* --- PICA: area + 3 toko dengan ach terendah --- */
+  const low = stores.filter(s => s.achTD != null && s.target > 0).slice().sort((a, b) => a.achTD - b.achTD).slice(0, 3);
+  const pica = { area: { problems: PR.prob.slice(0, 5).map(x => wbrStrip(x.t)), actions: PR.act.slice(0, 5).map(wbrStrip) }, stores: [] };
+  for (const s of low) { try { const Ps = picaData(s.c, D, R, 'cum'), Rs = picaRules(Ps); pica.stores.push({ c: s.c, name: s.name, achTD: s.achTD, problems: Rs.prob.slice(0, 3).map(x => wbrStrip(x.t)), actions: Rs.act.slice(0, 3).map(wbrStrip) }); } catch (e) { } }
+  /* --- inventory & promo --- */
+  const codes = activeStores().filter(c => App.stock[c]); let inv = null;
+  if (codes.length) {
+    const rows = prodStockBase(codes), sum = (f) => rows.reduce((a, r) => a + f(r), 0), sd = codes.map(c => App.stock[c].date).filter(Boolean).sort();
+    const cat = {}; for (const k of ['S', 'D', 'P', 'N']) cat[{ S: 'SMDS', D: 'DCNP', P: 'PromoLain', N: 'Normal' }[k]] = { qty: sum(r => r.cq[k]), value: Math.round(sum(r => r.cv[k])) };
+    const l3 = new Map(); for (const r of rows) { const x = l3.get(r.l3) || { qty: 0, value: 0 }; x.qty += r.q; x.value += r.v; l3.set(r.l3, x); }
+    inv = { stockDate: sd.length ? sd[sd.length - 1] : null, qty: sum(r => r.q), value: Math.round(sum(r => r.v)), articles: rows.length, byCategory: cat,
+      topMCLv3: [...l3.entries()].sort((a, b) => b[1].value - a[1].value).slice(0, 6).map(([k, x]) => ({ mc: k, qty: x.qty, value: Math.round(x.value) })) };
+  }
+  const lost = (App.lost || []).filter(x => typeOk(x.s) && x.d >= m + '-01' && x.d <= D);
+  const lostTop = Object.entries(lost.reduce((o, x) => { const k = artName(x.name) || x.name; o[k] = (o[k] || 0) + (x.q || 1); return o; }, {})).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([k, q]) => ({ artikel: k, qty: q }));
+  const promoL = linesIn(m + '-01', D), promoV = promoL.filter(l => l.pv > 0).reduce((a, l) => a + VAL(l), 0), allV = promoL.reduce((a, l) => a + VAL(l), 0);
+  const pm2 = new Map(); for (const l of promoL) if (l.pv > 0 && l.pn) pm2.set(l.pn, (pm2.get(l.pn) || 0) + VAL(l));
+  const promo = { shareSalesPromo: allV ? promoV / allV : null, topPromo: [...pm2.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5).map(([k, v]) => ({ promo: k, sales: Math.round(v) })) };
+  const det = P.det ? { displayedPct: P.det.gP, genericNotDisplayed: (P.det.gW || 0) - (P.det.gS || 0) } : null;
+  /* --- approval & task (Operational Hub) --- */
+  const H = App.hub || { approval: [], task: [] }, today = todayISO();
+  const tasks = (H.task || []).filter(t => ((t.deadline || t.date || '').slice(0, 7) === m) || (taskState(t, today).st !== 'Selesai' && (t.deadline || '') < m + '-01'));
+  const TS = tasks.map(t => ({ t, S: taskState(t, today) }));
+  const stCount = k => TS.filter(x => x.S.st === k).length;
+  const perStore = {}; for (const { t, S } of TS) for (const c of S.targets) { const o = perStore[c] || (perStore[c] = { total: 0, done: 0 }); o.total++; if (t.done && t.done[c]) o.done++; }
+  const task = { month: m, total: TS.length, selesai: stCount('Selesai'), onProgress: stCount('On Progress'), belumMulai: stCount('Belum Mulai'), overdue: stCount('Overdue'),
+    completion: TS.length ? TS.reduce((a, x) => a + x.S.pct, 0) / TS.length : null,
+    perStore: Object.entries(perStore).map(([c, o]) => ({ c, name: hubName(c), done: o.done, total: o.total, pct: o.total ? o.done / o.total : null })).sort((a, b) => a.pct - b.pct),
+    overdueList: TS.filter(x => x.S.st === 'Overdue').slice(0, 6).map(({ t, S }) => ({ task: t.title, pic: t.pic || '', deadline: t.deadline, pct: S.pct, belum: S.miss.slice(0, 8).map(hubName) })) };
+  const ap = H.approval || [], apS = k => ap.filter(a => a.status === k).length;
+  const open = ap.filter(a => ['Menunggu', 'Proses Review', 'Revisi'].includes(a.status));
+  const approval = { menunggu: apS('Menunggu'), prosesReview: apS('Proses Review'), revisi: apS('Revisi'), disetujuiBulanIni: ap.filter(a => a.status === 'Disetujui' && (a.updated || a.created || '').slice(0, 7) === m).length, ditolakBulanIni: ap.filter(a => a.status === 'Ditolak' && (a.updated || a.created || '').slice(0, 7) === m).length,
+    openList: open.map(a => ({ toko: hubName(a.store), jenis: a.jenis, status: a.status, next: a.next || '', umurHari: a.created ? dayDiff(String(a.created).slice(0, 10), today) : null, remarks: a.remarks || '' })).sort((a, b) => (b.umurHari || 0) - (a.umurHari || 0)).slice(0, 8) };
+  return { D, m, week: wbrWeek(D), valueBasis: VL(), branch, stores, pica, inv, lost: { input: lost.length, value: Math.round(lost.reduce((a, x) => a + lostAmt(x).v, 0)), topArtikel: lostTop }, promo, det, task, approval, at: new Date().toISOString() };
+}
+/* prompt untuk Claude: bangun PPT dari template + data */
+function wbrPrompt(X) {
+  const pc = v => v == null ? null : Math.round(v * 1000) / 10;
+  const data = JSON.parse(JSON.stringify(X, (k, v) => typeof v === 'number' && !Number.isInteger(v) && Math.abs(v) < 20 ? Math.round(v * 10000) / 10000 : v));
+  return `Kamu membantu Branch Manager EIGER Jateng 01 menyiapkan bahan WBR (Weekly Business Review) mingguan dalam PowerPoint.
+Saya melampirkan template "Master_PPT_Eigerindo_2.pptx". Buatkan file .pptx BARU memakai template itu, berisi data di bawah (data dari dashboard Integrated Hub, JANGAN mengarang angka).
+
+## Template (wajib dipakai)
+- Slide 1 template = cover (latar navy, logo Eigerindo, teks "JATENG 01", judul). Ganti judul jadi "Weekly Business Review" dan tambahkan subjudul "Week ${X.week} · ${fmtMonth(X.m)} · data s/d ${fmtDate(X.D)}".
+- Slide 2 template = desain isi (sidebar kiri putih + logo, garis oranye bawah). Pakai desain ini untuk SEMUA slide isi; area konten mulai x ≥ 1,3 inch, y 0,35–6,9 inch (jangan menimpa sidebar & garis oranye).
+- Slide 3 template = penutup "Thank You!", taruh di akhir.
+- Warna: navy #063365, oranye #F63D00, hijau #15803D (ach ≥ 100%), kuning #CA8A04 (90–99,9%), merah #B91C1C (< 90%), abu #64748B. Font Arial. Judul slide 26–28pt bold navy, isi minimal 12pt. Rupiah ringkas: "Rp 1,23 M" / "Rp 456 jt". Persen 1 desimal.
+- Rapi & tidak padat: maksimal 1 grafik/tabel utama + 1 kotak insight per slide. Grafik pakai chart native PowerPoint (bisa diedit), bukan gambar.
+
+## Susunan slide (total 9)
+1. Cover.
+2. Daftar Isi: (1) Approval & Task, (2) Performance Bulan Berjalan, (3) Informasi Tambahan. Tambahkan kotak kecil "Aturan main meeting": timebox 45 menit · setiap toko 1 komitmen · keputusan dicatat di slide Action Plan.
+3. Approval & Task: kiri = status task bulan ini (bar/donut: Selesai, On Progress, Belum Mulai, Overdue) + % penyelesaian per toko (bar horizontal, urut terendah, merah bila < 80%); kanan = kotak status approval (Menunggu, Proses Review, Revisi, Disetujui & Ditolak bulan ini) + daftar approval terbuka paling lama. Bawah: daftar task overdue + toko yang belum.
+4. Performance 1/4 — Scorecard Branch: kotak KPI (Sales MTD, Ach s/d tanggal, Ach 1 bulan, Gap, kebutuhan sales/hari sisa ${X.branch.remainingDays} hari, Growth vs bulan lalu & vs tahun lalu, Transaksi, Basket size/ATV, UPT) + perbandingan minggu ini vs minggu lalu.
+5. Performance 2/4 — Per Toko: tabel ranking (Toko, Sales MTD, Ach s/d tgl, Growth vs LM, Growth vs LY, ATV, UPT, WoW) dengan warna sel sesuai ach; tandai Top 3 ⭐ & Bottom 3 ⚠.
+6. Performance 3/4 — Inventory & Promo: stok total (qty & value), komposisi SMDS / DCNP / Normal, MC Lv3 terbesar, porsi sales promo & promo terlaris, lost sales (top artikel), detention bila ada.
+7. Performance 4/4 — PICA & Action Plan: tabel Problem → Penyebab → Aksi → PIC → Deadline, diisi dari data PICA (area + 3 toko terendah). Kolom PIC & Deadline dikosongkan untuk diisi saat meeting.
+8. Informasi Tambahan: slide kosong terstruktur (3 poin placeholder "(diisi BM)") — nanti saya tambahkan isinya.
+9. Thank You.
+
+## Supaya INTERAKTIF dengan tim (wajib di slide 3–7)
+- Kotak "🗣️ Diskusi" berisi 2 pertanyaan pemantik yang spesifik dari data (sebut toko/angkanya), mis. "Toko X: apa yang menahan transaksi turun 12% minggu ini?".
+- Kotak "✅ Komitmen minggu ini": tabel kosong 3 baris (Toko | Aksi | PIC | Deadline) untuk diisi live saat meeting.
+- Slide 5: panggil Top 1 untuk "share best practice 2 menit", Bottom 3 menyampaikan rencana.
+- Slide 7: "Vote fokus minggu depan" — 3 pilihan fokus (dari problem PICA terbesar) dengan kotak centang.
+- Speaker notes tiap slide: 3–5 poin talking points + urutan bicara.
+
+## Data (JSON)
+\`\`\`json
+${JSON.stringify(data)}
+\`\`\`
+Keterangan data: achTD = sales ÷ target s/d tanggal data (mengikuti bobot harian); achMonth = sales ÷ target 1 bulan; growthLM = vs tanggal yang sama bulan lalu; growthLY = vs periode sama tahun lalu; wow = 7 hari terakhir vs 7 hari sebelumnya; nilai sales memakai ${X.valueBasis}; angka desimal = rasio (0,953 = 95,3%).
+
+Setelah file jadi, tampilkan ringkasan 3 poin per slide, lalu tanya apakah ada tambahan slide/informasi yang mau saya masukkan.`;
+}
+function wbrPill(v, G) { if (v == null) return '–'; const c = v >= G ? 'var(--ok)' : v >= .9 ? '#CA8A04' : 'var(--bad)'; return `<b style="color:${c}">${fmtPct(v, 1)}</b>`; }
+function pageWbr(view) {
+  setHead('Ringkasan WBR', 'Bahan Weekly Business Review bulan berjalan · Approval & Task · Performance · Inventory · PICA → salin ke Claude untuk dibuatkan PPT');
+  const X = App.wbr;
+  if (!X || X.D !== repLast() || App.ui.wbrStale) {
+    App.ui.wbrStale = false;
+    view.innerHTML = '<div class="loading"><span class="spin"></span>Menyusun ringkasan WBR (penjualan, stok, PICA, task & approval)…</div>';
+    wbrData().then(d => { App.wbr = d || { empty: 1 }; if (App.page === 'wbr') render(); }, e => { App.wbr = { err: errMsg(e) }; if (App.page === 'wbr') render(); });
+    return;
+  }
+  if (X.err || X.empty) { view.innerHTML = `<div class="empty-state"><h2>Ringkasan belum bisa disusun</h2><p class="muted">${esc(X.err || 'Belum ada data penjualan bulan ini.')}</p><button class="btn primary" id="wbrRe">⟳ Coba lagi</button></div>`; return; }
+  const B = X.branch, G = SET().achGreen / 100, I = X.inv, Tk = X.task, Ap = X.approval;
+  const tile = (l, v, s, bg) => `<div class="pt-tile" ${bg ? `style="background:${bg}"` : ''}><span>${l}</span><b>${v}</b><small>${s || ''}</small></div>`;
+  const top3 = X.stores.filter(s => s.achTD != null).slice(0, 3), bot3 = X.stores.filter(s => s.achTD != null && s.target).slice(-3).reverse();
+  view.innerHTML = `<div class="stack">
+  <section class="card wbr-cta"><div><b>🎯 WBR Week ${X.week} · ${esc(fmtMonth(X.m))}</b><p class="small" style="margin:4px 0 0">Data s/d <b>${esc(fmtDate(X.D))}</b>. Cara buat PPT: 1) klik <b>Salin prompt PPT</b> · 2) buka <b>claude.ai</b>, lampirkan file <b>Master_PPT_Eigerindo_2.pptx</b> · 3) tempel prompt lalu kirim. Tambahan slide/informasi bisa diminta langsung di Claude.</p></div>
+    <div class="wbr-btns"><button class="btn primary" id="wbrCopy">📋 Salin prompt PPT</button><a class="btn" href="https://claude.ai/new" target="_blank" rel="noopener">Buka claude.ai ↗</a><button class="btn" id="wbrXls">⬇ Excel</button><button class="btn" id="wbrRe">⟳</button></div><p class="small" id="wbrMsg" style="margin:6px 0 0;flex-basis:100%"></p></section>
+  <section class="card"><div class="card-h"><h3>1 · Approval & Task</h3><span class="small muted">task ${esc(fmtMonth(X.m))} + overdue sebelumnya</span></div>
+    <div class="pt-tiles" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr))">
+      ${tile('Penyelesaian task', Tk.completion == null ? '–' : fmtPct(Tk.completion, 0), `${Tk.selesai}/${Tk.total} task selesai`, '#0B1B4A')}${tile('On progress', fmtN(Tk.onProgress), 'task')}${tile('Belum mulai', fmtN(Tk.belumMulai), 'task')}${tile('Overdue', fmtN(Tk.overdue), 'task', Tk.overdue ? '#B91C1C' : '')}
+      ${tile('Approval menunggu', fmtN(Ap.menunggu + Ap.prosesReview), `review ${Ap.prosesReview}`)}${tile('Revisi', fmtN(Ap.revisi), 'menunggu perbaikan toko', Ap.revisi ? '#C2410C' : '')}${tile('Disetujui bln ini', fmtN(Ap.disetujuiBulanIni), `ditolak ${Ap.ditolakBulanIni}`, '#15803D')}
+    </div>
+    <div class="wbr-2">
+      <div><h4>% task selesai per toko</h4>${Tk.perStore.length ? Tk.perStore.map(s => `<div class="wbr-bar"><span>${esc(s.name)}</span><i><em style="width:${Math.round((s.pct || 0) * 100)}%;background:${(s.pct || 0) < .8 ? 'var(--bad)' : 'var(--ok)'}"></em></i><b>${fmtPct(s.pct, 0)}</b></div>`).join('') : '<p class="muted small">Belum ada task bulan ini.</p>'}</div>
+      <div><h4>Overdue & approval terbuka terlama</h4>${Tk.overdueList.map(o => `<p class="small" style="margin:0 0 6px">🔴 <b>${esc(o.task)}</b> · deadline ${esc(fmtDateS(o.deadline || ''))} · ${fmtPct(o.pct, 0)}${o.belum.length ? '<br><span class="muted">belum: ' + esc(o.belum.join(', ')) + '</span>' : ''}</p>`).join('') || '<p class="small muted">Tidak ada task overdue 👍</p>'}
+        ${Ap.openList.map(a => `<p class="small" style="margin:0 0 6px">${(APST[a.status] || ['•'])[0]} <b>${esc(a.toko)}</b> · ${esc(a.jenis)} · ${esc(a.status)}${a.umurHari != null ? ' · ' + a.umurHari + ' hari' : ''}</p>`).join('')}</div></div></section>
+  <section class="card"><div class="card-h"><h3>2 · Performance bulan berjalan</h3><span class="small muted">1–${+X.D.slice(8)} ${esc(fmtMonth(X.m))} · ${esc(X.valueBasis)}</span></div>
+    <div class="pt-tiles" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))">
+      ${tile('Sales MTD', fmtRpS(B.sales), `target bulan ${fmtRpS(B.target)}`, '#0B1B4A')}${tile('Ach s/d tanggal', B.achTD == null ? '–' : fmtPct(B.achTD, 1), `gap ${fmtRpS(B.gap)}`, B.achTD >= G ? '#15803D' : B.achTD >= .9 ? '#CA8A04' : '#B91C1C')}${tile('Ach 1 bulan', B.achMonth == null ? '–' : fmtPct(B.achMonth, 1), `butuh ${fmtRpS(B.needPerDay)}/hari · ${B.remainingDays} hari lagi`)}
+      ${tile('Growth vs bln lalu', B.growthLM == null ? '–' : (B.growthLM >= 0 ? '+' : '') + fmtPct(B.growthLM, 1), 'tanggal yang sama')}${tile('Growth vs thn lalu', B.growthLY == null ? '–' : (B.growthLY >= 0 ? '+' : '') + fmtPct(B.growthLY, 1), 'MTD')}
+      ${tile('Transaksi · ATV · UPT', fmtN(B.trx), `${fmtRpS(B.atv)} · UPT ${fmtX(B.upt, 2)}`)}${tile('Minggu ini', fmtRpS(B.week.sales), `${B.week.wow == null ? '' : (B.week.wow >= 0 ? '▲ ' : '▼ ') + fmtPct(Math.abs(B.week.wow), 1)} vs ${esc(B.week.prevLabel)}`)}
+    </div>
+    <p class="small" style="margin:8px 0">⭐ Top 3: ${top3.map(s => `<b>${esc(s.name)}</b> ${wbrPill(s.achTD, G)}`).join(' · ')} &nbsp; ⚠ Bottom 3: ${bot3.map(s => `<b>${esc(s.name)}</b> ${wbrPill(s.achTD, G)}`).join(' · ')}</p>
+    <div id="wbrT"></div></section>
+  <section class="card"><div class="card-h"><h3>3 · Inventory & promo</h3>${I && I.stockDate ? `<span class="small muted">stok per ${esc(fmtDate(I.stockDate))}</span>` : ''}</div>
+    ${I ? `<div class="pt-tiles" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))">${tile('Total stok', fmtN(I.qty) + ' pcs', fmtRpS(I.value) + ' · ' + fmtN(I.articles) + ' artikel', '#0B1B4A')}
+      ${['SMDS', 'DCNP', 'Normal'].map(k => tile(k, fmtN(I.byCategory[k].qty) + ' pcs', fmtRpS(I.byCategory[k].value) + ' · ' + fmtPct(I.qty ? I.byCategory[k].qty / I.qty : null, 1))).join('')}
+      ${tile('Sales berpromo', X.promo.shareSalesPromo == null ? '–' : fmtPct(X.promo.shareSalesPromo, 1), 'porsi sales MTD')}${tile('Lost sales MTD', fmtN(X.lost.input) + ' input', fmtRpS(X.lost.value), X.lost.input ? '#C2410C' : '')}
+      ${X.det ? tile('Detention display', fmtPct(X.det.displayedPct, 1), fmtN(X.det.genericNotDisplayed) + ' generic belum display') : ''}</div>
+      <p class="small muted" style="margin:8px 0 0">MC Lv3 terbesar: ${I.topMCLv3.map(x => esc(x.mc) + ' ' + fmtRpS(x.value)).join(' · ')}${X.promo.topPromo.length ? '<br>Promo terlaris: ' + X.promo.topPromo.slice(0, 3).map(x => esc(x.promo) + ' ' + fmtRpS(x.sales)).join(' · ') : ''}${X.lost.topArtikel.length ? '<br>Lost sales terbanyak: ' + X.lost.topArtikel.map(x => esc(x.artikel) + ' (' + x.qty + ')').join(', ') : ''}</p>` : '<p class="muted small">Data stok belum diupload.</p>'}</section>
+  <section class="card"><div class="card-h"><h3>4 · PICA</h3><span class="small muted">area + 3 toko ach terendah</span></div>
+    <div class="wbr-2"><div><h4>Area Jateng 01</h4><ul class="small">${X.pica.area.problems.map(p => `<li>${esc(p)}</li>`).join('')}</ul><h4>Aksi</h4><ul class="small">${X.pica.area.actions.map(p => `<li>${esc(p)}</li>`).join('')}</ul></div>
+    <div>${X.pica.stores.map(s => `<h4>${esc(s.name)} · ${wbrPill(s.achTD, G)}</h4><ul class="small">${s.problems.map(p => `<li>${esc(p)}</li>`).join('')}</ul>`).join('')}</div></div></section></div>`;
+  $('#wbrT').innerHTML = tbl('wbrT', { rows: X.stores, limit: 30, cols: [
+    { k: 'name', label: 'Toko', h: s => `<b>${esc(s.name)}</b>` }, { k: 'sales', label: 'Sales MTD', r: 1, h: s => fmtRpS(s.sales) }, { k: 'achTD', label: 'Ach s/d tgl', r: 1, h: s => wbrPill(s.achTD, G) },
+    { k: 'achMonth', label: 'Ach bulan', r: 1, h: s => fmtPct(s.achMonth, 1) }, { k: 'growthLM', label: 'vs bln lalu', r: 1, h: s => chgH(s.growthLM) }, { k: 'growthLY', label: 'vs thn lalu', r: 1, h: s => chgH(s.growthLY) },
+    { k: 'atv', label: 'ATV', r: 1, h: s => fmtRpS(s.atv) }, { k: 'upt', label: 'UPT', r: 1, h: s => fmtX(s.upt, 2) }, { k: 'wow', label: 'WoW', r: 1, v: s => s.week.wow, h: s => chgH(s.week.wow) }] });
+}
+async function wbrCopy() {
+  const X = App.wbr; if (!X || X.err) return; const text = wbrPrompt(X); let ok = false;
+  try { await navigator.clipboard.writeText(text); ok = true; } catch (e) { const ta = document.createElement('textarea'); ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0'; document.body.appendChild(ta); ta.select(); try { ok = document.execCommand('copy'); } catch (er) { } ta.remove(); }
+  const m = $('#wbrMsg'); if (m) m.innerHTML = ok ? '✅ Prompt + data tersalin. Di claude.ai: lampirkan <b>Master_PPT_Eigerindo_2.pptx</b>, tempel (Ctrl+V), kirim.' : '⚠️ Gagal menyalin otomatis, coba di Chrome/Safari terbaru.';
+  toast(ok ? 'Prompt WBR tersalin' : 'Gagal menyalin');
+}
+async function wbrExcel() {
+  const X = App.wbr; if (!X || X.err || !(await needXLSX())) return; const wb = XLSX.utils.book_new(), B = X.branch;
+  const add = (n, a, w) => { const ws = XLSX.utils.aoa_to_sheet(a); ws['!cols'] = (w || []).map(x => ({ wch: x })); XLSX.utils.book_append_sheet(wb, ws, n); };
+  add('Branch', [['WBR Week ' + X.week + ' ' + fmtMonth(X.m), 'data s/d ' + X.D], [], ['Target bulan', B.target], ['Target s/d tgl', B.targetTD], ['Sales MTD', B.sales], ['Ach s/d tgl', B.achTD], ['Ach bulan', B.achMonth], ['Gap', B.gap], ['Kebutuhan/hari', B.needPerDay], ['Growth vs bln lalu', B.growthLM], ['Growth vs thn lalu', B.growthLY], ['Transaksi', B.trx], ['ATV', Math.round(B.atv || 0)], ['UPT', B.upt], ['Sales minggu ini', B.week.sales], ['Sales minggu lalu', B.week.prevWeek], ['WoW', B.week.wow]], [24, 18]);
+  add('Per toko', [['Kode', 'Toko', 'Target', 'Target s/d tgl', 'Sales MTD', 'Ach s/d tgl', 'Ach bulan', 'Growth vs bln lalu', 'Growth vs thn lalu', 'Transaksi', 'ATV', 'UPT', 'Sales minggu ini', 'WoW'], ...X.stores.map(s => [s.c, s.name, s.target, s.targetTD, s.sales, s.achTD, s.achMonth, s.growthLM, s.growthLY, s.trx, Math.round(s.atv || 0), s.upt, s.week.sales, s.week.wow])], [7, 32, 14, 14, 14, 10, 10, 12, 12, 10, 12, 7, 14, 8]);
+  add('Task & Approval', [['Status task', 'Jumlah'], ['Selesai', X.task.selesai], ['On Progress', X.task.onProgress], ['Belum Mulai', X.task.belumMulai], ['Overdue', X.task.overdue], [], ['Toko', '% selesai', 'Selesai', 'Total'], ...X.task.perStore.map(s => [s.name, s.pct, s.done, s.total]), [], ['Approval', 'Jumlah'], ['Menunggu', X.approval.menunggu], ['Proses Review', X.approval.prosesReview], ['Revisi', X.approval.revisi], ['Disetujui bulan ini', X.approval.disetujuiBulanIni], ['Ditolak bulan ini', X.approval.ditolakBulanIni]], [30, 12, 10, 10]);
+  add('PICA', [['Lingkup', 'Problem / Aksi', 'Isi'], ...X.pica.area.problems.map(p => ['Area', 'Problem', p]), ...X.pica.area.actions.map(p => ['Area', 'Aksi', p]), ...X.pica.stores.flatMap(s => [...s.problems.map(p => [s.name, 'Problem', p]), ...s.actions.map(p => [s.name, 'Aksi', p])])], [26, 12, 100]);
+  (await getDownloads()).save({ filename: `WBR_Jateng01_W${X.week}_${X.m}.xlsx`, data: new Blob([XLSX.write(wb, { bookType: 'xlsx', type: 'array' })]) });
+}
+document.addEventListener('click', e => {
+  const t = e.target; if (!t || App.page !== 'wbr') return;
+  if (t.id === 'wbrCopy') { wbrCopy(); return; }
+  if (t.id === 'wbrXls') { wbrExcel(); return; }
+  if (t.id === 'wbrRe') { App.ui.wbrStale = true; App.wbr = null; render(); return; }
+});
 
 /* ================= SA-TR & SA-BO: monitoring bin harian (dari Export by Bin) ================= */
 async function loadSaBin(force) { if (App.saBin && !force) return App.saBin; const r = await api('sabin'); App.saBin = r.rows || []; return App.saBin; }

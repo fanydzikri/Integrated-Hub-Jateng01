@@ -2764,16 +2764,8 @@ function raAssign(rows, months) {
   }
   return out;
 }
-function pageRA(view) {
-  const R = periodRange(), U = App.ui, codes = activeStores();
-  const st = U.raStore && codes.includes(U.raStore) ? U.raStore : '';
-  const minT = U.raMin != null ? U.raMin : 10;
-  setHead('RA Performance' + (st ? ' · ' + sName(st) : ''), R.label + ' · per sales person · ' + VLL().toLowerCase());
-  /* ===== perhitungan sama dengan HO =====
-     1) Total sales tagging seluruh RA = total sales bruto toko (semua transaksi & item).
-     2) Sales yang bukan milik RA terdaftar (4 komponen omni, transaksi tanpa nama, nama di luar daftar target, item lain)
-        dikumpulkan jadi satu "pool" per toko per bulan, lalu dibagi RATA ke semua RA di daftar target toko itu
-        (termasuk RA tanpa penjualan sendiri). Bila target bulan itu belum ada, dibagi rata ke RA yang punya penjualan. */
+/* perhitungan sales tagging & target per head RA (dipakai RA Performance & Ringkasan Performance) */
+function raCalc(R, st) {
   const isOmni = l => OMNI.some(o => o[2](l));
   const inScope = c => st ? c === st : typeOk(c);
   const storeTot = new Map(); let grand = 0;
@@ -2841,6 +2833,19 @@ function pageRA(view) {
     /* RA Performance: target 1 bulan penuh sesuai setting Breakdown Target (tidak diprorata bobot harian) */
     r.tgt = any ? tm : null; r.ach = r.tgt ? r.v / r.tgt : null;
   }
+  return { byDay, days, eligSet, grand, isWs, lines, poolAll, poolLost, retMoves, retOn, rows, spOf, tmons, isOmni, inScope };
+}
+function pageRA(view) {
+  const R = periodRange(), U = App.ui, codes = activeStores();
+  const st = U.raStore && codes.includes(U.raStore) ? U.raStore : '';
+  const minT = U.raMin != null ? U.raMin : 10;
+  setHead('RA Performance' + (st ? ' · ' + sName(st) : ''), R.label + ' · per sales person · ' + VLL().toLowerCase());
+  /* ===== perhitungan sama dengan HO =====
+     1) Total sales tagging seluruh RA = total sales bruto toko (semua transaksi & item).
+     2) Sales yang bukan milik RA terdaftar (4 komponen omni, transaksi tanpa nama, nama di luar daftar target, item lain)
+        dikumpulkan jadi satu "pool" per toko per bulan, lalu dibagi RATA ke semua RA di daftar target toko itu
+        (termasuk RA tanpa penjualan sendiri). Bila target bulan itu belum ada, dibagi rata ke RA yang punya penjualan. */
+  const { byDay, days, eligSet, grand, isWs, lines, poolAll, poolLost, retMoves, retOn, rows, spOf, tmons, isOmni, inScope } = raCalc(R, st);
   const tot = rows.reduce((a, r) => { a.trx += r.trx; a.q += r.q; return a; }, { trx: 0, q: 0 }); tot.v = grand;
   const tg = rows.filter(r => r.tgt != null), tgT = tg.reduce((a, r) => a + r.tgt, 0), tgV = tg.reduce((a, r) => a + r.v, 0);
   const achCol = a => a >= SET().achGreen / 100 ? 'var(--ok)' : a >= SET().achYellow / 100 ? 'var(--orange-deep)' : 'var(--bad)';
@@ -6284,7 +6289,7 @@ async function perfData() {
   /* per toko (branch) / per RA (toko) */
   const LMs = new Map(); for (const l of linesIn(pm + '-01', pm + '-' + pad(pd))) LMs.set(l.s, (LMs.get(l.s) || 0) + VAL(l));
   const stores = R.rows.filter(r => r.T || r.cs).map(r => ({ c: r.c, name: r.name, sales: r.cs, target: r.T, achTD: r.cAch, achM: r.mAch, gLM: LMs.get(r.c) ? r.cs / LMs.get(r.c) - 1 : null, trx: r.ct, atv: r.cBs, upt: r.cUpt }));
-  const ra = sc ? (() => { const o = new Map(); for (const l of L) { const k = spName(l.sp); if (k === '(TANPA NAMA)') continue; const x = o.get(k) || { v: 0, q: 0, trx: new Set() }; x.v += VAL(l); if (!isPB(l.sku)) x.q += l.q; if (l.q > 0) x.trx.add(l.d + l.o); o.set(k, x); } return [...o.entries()].map(([k, x]) => ({ k, v: x.v, trx: x.trx.size, upt: x.trx.size ? x.q / x.trx.size : null, atv: x.trx.size ? x.v / x.trx.size : null })).filter(x => x.trx >= 3).sort((a, b) => b.v - a.v); })() : null;
+  const ra = sc ? (() => { const C = raCalc({ from: m + '-01', to: D }, sc); return C.rows.filter(r => r.sp !== '(TANPA NAMA)' && !r.out && (r.trx > 0 || r.tgt)).map(r => ({ k: r.sp, v: r.v, own: r.own, trx: r.trx, upt: r.upt, atv: r.bs, tgt: r.tgt, gap: r.tgt != null ? r.v - r.tgt : null, ach: r.ach })).sort((a, b) => (b.ach != null) - (a.ach != null) || (b.ach || 0) - (a.ach || 0) || b.v - a.v); })() : null;
   /* stok */
   const sc2 = codes.filter(c => App.stock[c]); let stock = null;
   if (sc2.length) {
@@ -6346,7 +6351,9 @@ function perfAdvice(X) {
   if (ps > .5 && gs != null && gs < 0) add(2, '🏷️', 'Promo', `Sales bergantung promo (${fmtPct(ps, 0)}) tapi tetap turun`, 'Evaluasi promo yang tidak menarik pembeli; dorong juga artikel normal lewat new arrival & storytelling produk.');
   /* 8. tim RA (mode toko) */
   if (X.sc && X.ra && X.ra.length >= 2) {
-    const r = X.ra.filter(x => x.upt != null).sort((a, b) => a.upt - b.upt), best = X.ra[0];
+    const r = X.ra.filter(x => x.upt != null).sort((a, b) => a.upt - b.upt), best = X.ra.filter(x => r.length && x !== r[0]).sort((a, b) => (b.upt || 0) - (a.upt || 0))[0] || X.ra[0];
+    const lowA = X.ra.filter(x => x.ach != null && x.ach < .9).sort((a, b) => a.ach - b.ach);
+    if (lowA.length) add(1, '🎯', 'Target RA', `${lowA.length} RA masih jauh dari target tagging`, lowA.slice(0, 4).map(x => `${x.k} ${fmtPct(x.ach, 0)} (kurang ${fmtRpS(-x.gap)})`).join(' · ') + `. Sisa ${X.remDays} hari: bagi kekurangan per hari & dampingi saat jam ramai.`);
     if (r.length) add(2, '🧑‍💼', 'Tim', `Coaching ${r[0].k} (UPT ${fmtX(r[0].upt, 2)})`, `Bandingkan dengan ${best.k} (sales ${fmtRpS(best.v)}, UPT ${fmtX(best.upt, 2)}). Role play add-on & closing 10 menit sebelum buka.`);
   }
   if (X.gLY != null && X.gLY < 0) add(2, '📉', 'Growth', `Di bawah tahun lalu (${pct(X.gLY)})`, 'Cek apa yang berbeda dari tahun lalu: promo, event, stok artikel andalan, jumlah RA.');
@@ -6400,7 +6407,7 @@ function pagePerf(view) {
     <section class="card"><div class="card-h"><h3>🧥 Kontribusi MC Lv3</h3><span class="small muted">sales MTD vs bln lalu</span></div><div id="perfMC"></div></section>
     <section class="card"><div class="card-h"><h3>🔥 Artikel terlaris</h3><span class="small muted">qty MTD · klik untuk detail</span></div><div id="perfArt"></div></section>
   </div>
-  <section class="card"><div class="card-h"><h3>${X.sc ? '🧑‍💼 Performa tim RA' : '🏬 Performa per toko'}</h3><span class="small muted">${X.sc ? 'MTD per sales person' : 'urut Ach s/d tanggal · klik toko untuk ringkasan toko itu'}</span></div><div id="perfST"></div></section>
+  <section class="card"><div class="card-h"><h3>${X.sc ? '🧑‍💼 Performa tim RA' : '🏬 Performa per toko'}</h3><span class="small muted">${X.sc ? 'MTD · target tagging per head 1 bulan penuh · sales tagging sama dengan menu RA Performance' : 'urut Ach s/d tanggal · klik toko untuk ringkasan toko itu'}</span></div><div id="perfST"></div></section>
   <section class="card"><div class="card-h"><h3>📦 Stok</h3>${st && st.date ? `<span class="small muted">stok per ${esc(fmtDate(st.date))}</span>` : ''}</div>
     ${st ? `<div class="perf-kpi five">
       ${tile('Total stok', fmtN(st.qty) + ' pcs', fmtRpS(st.value) + ' · ' + fmtN(st.arts) + ' artikel', '#0B1B4A')}
@@ -6428,7 +6435,11 @@ function pagePerf(view) {
   $('#perfArt').innerHTML = tbl('perfArt', { rows: X.art.slice(0, N), limit: N, onRow: r => openProduct(r.k, X.sc || null), cols: [
     { k: 'name', label: 'Artikel', h: r => `<b>${esc(r.name)}</b><div class="small muted">${esc(r.k)}</div>` }, { k: 'q', label: 'Qty', r: 1, h: r => fmtN(r.q) }, { k: 'v', label: 'Sales', r: 1, h: r => fmtRpS(r.v) }] });
   $('#perfST').innerHTML = X.sc
-    ? tbl('perfRA', { rows: X.ra, limit: 20, empty: 'Belum ada data sales person.', cols: [{ k: 'k', label: 'RA', h: r => `<b>${esc(r.k)}</b>` }, { k: 'v', label: 'Sales', r: 1, h: r => fmtRpS(r.v) }, { k: 'trx', label: 'Trx', r: 1, h: r => fmtN(r.trx) }, { k: 'atv', label: 'ATV', r: 1, h: r => fmtRpS(r.atv) }, { k: 'upt', label: 'UPT', r: 1, h: r => fmtX(r.upt, 2) }] })
+    ? tbl('perfRA', { rows: X.ra, limit: 20, sort: { k: 'ach', dir: 'desc' }, empty: 'Belum ada data sales person.', cols: [{ k: 'k', label: 'RA', h: r => `<b>${esc(r.k)}</b>` },
+      { k: 'tgt', label: 'Target tagging', r: 1, h: r => r.tgt != null ? fmtRpS(r.tgt) : '<span class="muted">belum ada</span>' }, { k: 'v', label: 'Sales tagging', r: 1, h: r => fmtRpS(r.v) },
+      { k: 'gap', label: 'GAP', r: 1, h: r => r.gap == null ? '–' : `<b style="color:${r.gap >= 0 ? '#15803D' : '#B91C1C'}">${r.gap >= 0 ? '+' : '−'}${fmtRpS(Math.abs(r.gap))}</b>` },
+      { k: 'ach', label: '% Ach', r: 1, h: r => r.ach == null ? '–' : `<b style="color:${col(r.ach)}">${fmtPct(r.ach, 1)}</b><div class="perf-mini" style="margin-left:auto"><i style="width:${Math.min(100, Math.round(r.ach * 100))}%;background:${col(r.ach)}"></i></div>` },
+      { k: 'trx', label: 'Trx', r: 1, h: r => fmtN(r.trx) }, { k: 'atv', label: 'ATV', r: 1, h: r => fmtRpS(r.atv) }, { k: 'upt', label: 'UPT', r: 1, h: r => fmtX(r.upt, 2) }] })
     : tbl('perfST', { rows: X.stores, sort: { k: 'achTD', dir: 'desc' }, limit: 30, onRow: r => { App.ui.scope = r.c; App.perf = null; render(); window.scrollTo(0, 0); }, cols: [
       { k: 'name', label: 'Toko', h: r => `<b>${esc(r.name)}</b>` }, { k: 'sales', label: 'Sales MTD', r: 1, h: r => fmtRpS(r.sales) }, { k: 'achTD', label: 'Ach s/d tgl', r: 1, h: r => `<b style="color:${col(r.achTD)}">${fmtPct(r.achTD, 1)}</b>` },
       { k: 'achM', label: 'Ach bulan', r: 1, h: r => fmtPct(r.achM, 1) }, { k: 'gLM', label: 'vs bln lalu', r: 1, h: r => chgH(r.gLM) }, { k: 'trx', label: 'Trx', r: 1, h: r => fmtN(r.trx) }, { k: 'atv', label: 'ATV', r: 1, h: r => fmtRpS(r.atv) }, { k: 'upt', label: 'UPT', r: 1, h: r => fmtX(r.upt, 2) }] });

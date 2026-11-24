@@ -2095,7 +2095,7 @@ function render() {
     const pg = App.page; loadStock().catch(e => { App.stockLoaded = true; toast('Data stok gagal dimuat: ' + (e.message || e.code)); }).then(() => { App.stockLoaded = true; if (App.page === pg) render(); });
     return;
   }
-  const fn = { wbr: pageWbr, ai: pageAI, links: pageLinks, bm_target: pageBmTarget, bm_dinas: pageBmDinas, satr: v => pageSaBin(v, 'TR'), sabo: v => pageSaBin(v, 'BO'), area: pageArea, report: pageReport, trend: pageTrend, promo: pagePromo, omni: pageOmni, eac: pageEac, ra: pageRA, pareto: pagePareto, lost: pageLost, promostock: pagePromoStock, detention: pageDetention, growth: pageGrowth, transfer: pageTransfer, ro: pageRO, pica: pagePica, juknis: pageJuknis, home: pageHome, bc: pageBC, omset: pageOmset, ops_approval: pageApproval, ops_task: pageTask, ops_info: pageInfo, ops_ess: pageEss, toko: pageStore, produk: pageProduct, stok: pageStock, admin: pageAdmin, settings: pageSettings }[App.page] || pageReport;
+  const fn = { wbr: pageWbr, ai: pageAI, links: pageLinks, bm_target: pageBmTarget, bm_dinas: pageBmDinas, satr: v => pageSaBin(v, 'TR'), sabo: v => pageSaBin(v, 'BO'), area: pageArea, report: pageReport, trend: pageTrend, promo: pagePromo, omni: pageOmni, eac: pageEac, ra: pageRA, pareto: pagePareto, lost: pageLost, promostock: pagePromoStock, detention: pageDetention, growth: pageGrowth, transfer: pageTransfer, ro: pageRO, pica: pagePica, juknis: pageJuknis, home: pageHome, bc: pageBC, omset: pageOmset, ops_approval: pageApproval, ops_task: pageTask, ops_info: pageInfo, ops_ess: v => (typeof pageEss === 'function' ? pageEss(v) : (v.innerHTML = '<div class="loading"><span class="spin"></span>Memuat modul ESS…</div>', setTimeout(() => { if (App.page === 'ops_ess') render(); }, 500))), toko: pageStore, produk: pageProduct, stok: pageStock, admin: pageAdmin, settings: pageSettings }[App.page] || pageReport;
   try { fn(view); renderAsOf(); lockScopedSelects(view); if (App.page === 'admin') renderUsers(); if ((App.loadWarn || []).length) view.insertAdjacentHTML('afterbegin', `<div class="note" style="margin-bottom:14px">Sebagian data belum termuat (${esc(App.loadWarn.join(', '))}). Tekan <b>Muat ulang</b> di kanan atas untuk mencoba lagi.</div>`); } catch (e) { console.error(e); view.innerHTML = `<div class="empty-state"><h2>Halaman gagal ditampilkan</h2><p class="muted">${esc(e.message)}</p></div>`; }
 }
 
@@ -7461,7 +7461,8 @@ async function init() {
 document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target && $('#authWall')) { if (e.target.closest('#authLogin')) { e.preventDefault(); doAuthLogin(); } else if (e.target.closest('#authReg')) { e.preventDefault(); doAuthReg(); } } });
 document.addEventListener('change', e => { const r = e.target.closest && e.target.closest('[data-usrole]'); if (r) { const st = $(`[data-usstore="${CSS.escape(r.dataset.usrole)}"]`); if (st) st.style.display = r.value === 'toko' ? '' : 'none'; } });
 document.addEventListener('click', e => { if (e.target && e.target.id === 'lgGo2') doLogin('2'); });
-init();
+/* jalankan setelah SEMUA script halaman (termasuk modul ESS di bawah) selesai dimuat, supaya tidak ada fungsi yang belum terdefinisi */
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 </script>
 <script src="ess-data.js"></script>
 <style>

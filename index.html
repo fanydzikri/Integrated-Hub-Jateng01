@@ -826,6 +826,34 @@ button.pd-sz:hover{box-shadow:0 0 0 3px rgba(15,49,146,.12)}
   .wbr-bar{display:grid;grid-template-columns:minmax(120px,1fr) 2fr 44px;gap:8px;align-items:center;font-size:12.5px;margin:3px 0}.wbr-bar span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .wbr-bar i{display:block;height:10px;background:#EEF2F6;border-radius:6px;overflow:hidden}.wbr-bar em{display:block;height:100%;border-radius:6px}.wbr-bar b{text-align:right}
   @media (max-width:760px){.wbr-2{grid-template-columns:1fr}}
+  .perf-kpi{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}.perf-kpi.five{margin-bottom:14px}.perf-kpi .pt-tile{min-height:104px}
+  .perf-chart{height:320px}
+  .perf-legend{display:flex;gap:14px;flex-wrap:wrap;margin:0 0 8px;color:var(--muted,#64748B)}.perf-legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+  .perf-legend i.ln{height:3px;width:18px;border-radius:2px;vertical-align:3px}.perf-legend i.dash{background:repeating-linear-gradient(90deg,#CA8A04 0 5px,transparent 5px 9px)}
+  .perf-strip{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-top:12px}.perf-strip>div{background:#F4F6FB;border-radius:10px;padding:8px 12px;display:flex;flex-direction:column;gap:2px;justify-content:center}
+  .perf-strip span{font-size:11.5px;color:var(--muted,#64748B)}.perf-strip b{font-size:15px}.perf-strip small{font-size:11.5px;color:var(--muted,#64748B)}.perf-strip .btn{align-self:flex-start}
+  .perf-adv{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+  .adv{border:1px solid var(--line,#E2E8F0);border-left:4px solid var(--c);border-radius:12px;padding:10px 14px;background:#fff;display:flex;flex-direction:column;gap:4px}
+  .adv-h{display:flex;align-items:center;gap:8px}.adv-ic{font-size:18px}.adv-tag{font-size:11.5px;font-weight:800;color:var(--navy,#0F3192);text-transform:uppercase;letter-spacing:.4px}
+  .adv-p{margin-left:auto;font-size:11px;font-weight:800;color:#fff;background:var(--c);border-radius:999px;padding:2px 9px}.adv b{font-size:14.5px}.adv p{margin:0;font-size:13px;color:#334155;line-height:1.45}
+  .perf-2{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:stretch}.perf-2>section{margin:0;display:flex;flex-direction:column}
+  .perf-3{display:grid;grid-template-columns:1fr 1fr;gap:16px}.perf-col{display:flex;flex-direction:column;gap:14px}.perf-adv>.adv:last-child:nth-child(odd){grid-column:1/-1}.perf-h4{margin:0 0 8px;font-size:14px;color:var(--navy,#0F3192)}
+  .perf-mini{height:4px;background:#EEF2F6;border-radius:3px;margin-top:4px;max-width:160px}.perf-mini i{display:block;height:100%;background:#0F3192;border-radius:3px}
+  @media (max-width:1100px){.perf-kpi{grid-template-columns:repeat(3,1fr)}.perf-kpi.five{grid-template-columns:repeat(3,1fr)}.perf-strip{grid-template-columns:repeat(3,1fr)}}
+  @media (max-width:760px){.perf-kpi,.perf-kpi.five{grid-template-columns:repeat(2,1fr)}.perf-kpi>.pt-tile:last-child:nth-child(odd){grid-column:1/-1}.perf-strip{grid-template-columns:repeat(2,1fr)}.perf-adv,.perf-2,.perf-3{grid-template-columns:1fr}.perf-chart{height:260px}}
+  #nav .nav-perf{background:linear-gradient(135deg,#0F3192,#1D4ED8);color:#fff!important;border-radius:999px;padding:6px 14px;margin:0 0 0 6px;font-weight:800}
+  #nav .nav-perf.on,#nav .nav-perf:hover{filter:brightness(1.12);box-shadow:0 4px 14px rgba(15,49,146,.35)}
+  #bnav .bn-perf svg{stroke:#1D4ED8}#bnav .bn-perf span{color:#0F3192;font-weight:800}
+  .home-perf{display:flex;align-items:center;gap:14px;width:100%;text-align:left;border:0;cursor:pointer;border-radius:16px;padding:14px 18px;background:linear-gradient(135deg,#0F3192,#1D4ED8);color:#fff;font:inherit;box-shadow:0 6px 18px rgba(15,49,146,.25)}
+  .home-perf .ic{font-size:28px}.home-perf b{display:block;font-size:16px}.home-perf small{opacity:.85;font-size:12.5px}.home-perf .go{margin-left:auto;font-weight:800;background:rgba(255,255,255,.18);border-radius:999px;padding:6px 14px;white-space:nowrap}
+  .ck-stack{display:flex;flex-direction:column;gap:14px}.ck-col.wide{grid-column:span 2}.ck-col.wide ul{display:grid;grid-template-columns:1fr 1fr;align-items:start}
+  @media (max-width:1100px){.ck-col.wide{grid-column:auto}.ck-col.wide ul{display:flex}}
+  .mp-groups{display:block!important;columns:3 300px;column-gap:12px}.mp-groups>.mp-grp{break-inside:avoid;margin-bottom:12px;display:block}
+  .bc-adv{grid-template-columns:repeat(auto-fit,minmax(200px,1fr))!important}
+  body[data-pg="ai"] footer{display:none}
+  @media (max-width:760px){.pt-tiles>.pt-tile:last-child:nth-child(odd),.perf-strip>div:last-child:nth-child(odd){grid-column:1/-1}.mp-groups{columns:1}}
+  @media (max-width:1240px){#nav .nav-perf .nl{display:none}#nav .nav-perf,#nav .nav-ai{padding:6px 11px;margin:0 3px}}
+  @media (max-width:1100px){#nav .nav-search .nl{display:none}}
 </style>
 </head>
 <body>
@@ -1997,11 +2025,11 @@ function renderNav() {
   const svg = k => `<svg viewBox="0 0 24 24" aria-hidden="true">${ICON[k] || ''}</svg>`;
   const item = x => { const bd = menuBadge(x.k); return `<button role="menuitem" data-menu="${x.k}" class="${App.page === x.k ? 'on' : ''}"><span class="ic">${MENU_IC[x.k] || '•'}</span><span class="tx"><b>${esc(x.l)}</b><small>${esc(x.d)}</small></span>${bd ? `<span class="bd">${bd}</span>` : ''}</button>`; };
   /* PC: Beranda + 4 kelompok (menu turun berisi bagian-bagian) + tombol cari */
-  $('#nav').innerHTML = !logged ? '' : `<button data-go="home" class="${App.page === 'home' ? 'on' : ''}">${svg('home')}Beranda</button><button data-menu="ai" class="nav-ai ${App.page === 'ai' ? 'on' : ''}">✨ Tanya AI</button>` + menuCatalog().map(g => {
+  $('#nav').innerHTML = !logged ? '' : `<button data-go="home" class="${App.page === 'home' ? 'on' : ''}">${svg('home')}Beranda</button><button data-menu="perf" class="nav-perf ${App.page === 'perf' ? 'on' : ''}">📊 <span class="nl">Ringkasan </span>Performance</button><button data-menu="ai" class="nav-ai ${App.page === 'ai' ? 'on' : ''}">✨ Tanya AI</button>` + menuCatalog().map(g => {
     const bd = groupBadge(MENU_GROUPS.find(x => x.k === g.k));
     return `<div class="nav-g ${open === g.k ? 'open' : ''}"><button data-navg="${g.k}" class="${G && G.k === g.k ? 'on' : ''}" aria-haspopup="true" aria-expanded="${open === g.k}">${svg(MENU_GROUPS.find(x => x.k === g.k).icon)}${esc(g.t)}${bd ? `<span class="nbd">${bd}</span>` : ''}<span class="car">▼</span></button>
       <div class="nav-m mega" role="menu" style="--cols:${g.secs.length}">${g.secs.map(([st, items]) => `<div class="mm-sec">${st ? `<h5>${esc(st)}</h5>` : ''}${items.map(item).join('')}</div>`).join('')}</div></div>`;
-  }).join('') + `<button class="nav-search" data-menupal="1" title="Cari menu">🔍 Cari menu</button>`;
+  }).join('') + `<button class="nav-search" data-menupal="1" title="Cari menu">🔍<span class="nl"> Cari menu</span></button>`;
   /* sub menu sekelompok: tombol cepat di bawah judul halaman */
   const sub = $('#subnav'), cr = $('#crumb'), cat = G && logged ? menuCatalog().find(x => x.k === G.k) : null;
   if (sub) {
@@ -2016,6 +2044,7 @@ function renderNav() {
     const opsB = groupBadge(MENU_GROUPS.find(x => x.k === 'g_ops'));
     const tab = (attr, ic, lbl, on, bd) => `<button ${attr} class="${on ? 'on' : ''}">${svg(ic)}<span>${lbl}</span>${bd ? `<span class="bd">${bd}</span>` : ''}</button>`;
     bn.innerHTML = !logged ? '' : tab('data-go="home"', 'home', 'Beranda', App.page === 'home')
+      + `<button data-menu="perf" class="bn-perf ${App.page === 'perf' ? 'on' : ''}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V10"/><path d="M10 20V4"/><path d="M16 20v-7"/><path d="M22 20H2"/></svg><span>Performa</span></button>`
       + tab('data-bsheet="g_sales"', 'area', 'Penjualan', G && G.k === 'g_sales')
       + tab('data-bsheet="g_stock"', 'produk', 'Stok', G && G.k === 'g_stock')
       + tab('data-bsheet="g_ops"', 'task', 'Operasional', G && G.k === 'g_ops' && App.page !== 'links', opsB)
@@ -2031,7 +2060,7 @@ function renderPeriod() {
   if (App.page === 'home' || isOps(App.page)) { box.innerHTML = ''; return; }
   const tsel = hasTypes() && App.page !== 'toko' && !scopeOn() ? `<label class="small muted" for="typeSel">Jenis toko</label><select id="typeSel" class="inp"><option value="">Semua toko</option>${['rg', 'bz', 'ot'].filter(t => storeCodes().some(c => sType(c) === t)).map(t => `<option value="${t}" ${App.ui.typeF === t ? 'selected' : ''}>${TYPE_LABEL[t]}</option>`).join('')}</select>` : '';
   if (['report', 'promo', 'omni', 'eac', 'lost', 'detention', 'growth', 'stok', 'transfer', 'ro', 'pica', 'juknis', 'bc', 'omset', 'satr', 'sabo', 'ai'].includes(App.page)) { box.innerHTML = tsel; return; }
-  if (!App.lastDate || ['admin', 'settings', 'links', 'bm_target', 'bm_dinas', 'produk', 'wbr'].includes(App.page)) { box.innerHTML = ''; return; }
+  if (!App.lastDate || ['admin', 'settings', 'links', 'bm_target', 'bm_dinas', 'produk', 'wbr', 'perf'].includes(App.page)) { box.innerHTML = ''; return; }
   const L = App.lastDate, cm = L.slice(0, 7);
   const months = Object.keys(App.index.sales).sort().reverse().filter(m => m !== cm);
   const p = App.period;
@@ -2077,7 +2106,7 @@ function lockScopedSelects(view) {
 }
 function setHead(t, sub) { if (scopeOn() && !String(t).includes(sName(App.ui.scope))) t += ' · ' + sName(App.ui.scope); $('#pageTitle').textContent = t; $('#pageSub').textContent = sub || ''; }
 function render() {
-  destroyCharts(); App.tables = {};
+  destroyCharts(); App.tables = {}; document.body.dataset.pg = App.page || '';
   if (App.booted) syncHash(false);
   renderNav(); renderPeriod(); addShotBtn($('#periodBox'));
   const view = $('#view');
@@ -2088,14 +2117,14 @@ function render() {
   }
   if (App.page === 'stok') App.page = 'transfer';
   if (BM_ONLY.includes(App.page) && !App.superAdmin) App.page = 'report';
-  if (!isOps(App.page) && App.page !== 'home' && !App.lastDate && !['admin', 'report', 'settings', 'lost', 'detention', 'juknis', 'bc', 'omset', 'satr', 'sabo', 'bm_target', 'bm_dinas', 'links', 'ai', 'wbr'].includes(App.page)) { App.page = srLast() ? 'report' : 'detention'; }
+  if (!isOps(App.page) && App.page !== 'home' && !App.lastDate && !['admin', 'report', 'settings', 'lost', 'detention', 'juknis', 'bc', 'omset', 'satr', 'sabo', 'bm_target', 'bm_dinas', 'links', 'ai', 'wbr', 'perf'].includes(App.page)) { App.page = srLast() ? 'report' : 'detention'; }
   const NEED_STOCK = ['produk', 'transfer', 'ro', 'promostock', 'detention', 'pica', 'toko', 'stok', 'area', 'lost', 'settings'];
   if (NEED_STOCK.includes(App.page) && !App.stockLoaded && Object.keys(App.index.stock || {}).length) {
     view.innerHTML = '<div class="loading"><span class="spin"></span>Memuat data stok…</div>';
     const pg = App.page; loadStock().catch(e => { App.stockLoaded = true; toast('Data stok gagal dimuat: ' + (e.message || e.code)); }).then(() => { App.stockLoaded = true; if (App.page === pg) render(); });
     return;
   }
-  const fn = { wbr: pageWbr, ai: pageAI, links: pageLinks, bm_target: pageBmTarget, bm_dinas: pageBmDinas, satr: v => pageSaBin(v, 'TR'), sabo: v => pageSaBin(v, 'BO'), area: pageArea, report: pageReport, trend: pageTrend, promo: pagePromo, omni: pageOmni, eac: pageEac, ra: pageRA, pareto: pagePareto, lost: pageLost, promostock: pagePromoStock, detention: pageDetention, growth: pageGrowth, transfer: pageTransfer, ro: pageRO, pica: pagePica, juknis: pageJuknis, home: pageHome, bc: pageBC, omset: pageOmset, ops_approval: pageApproval, ops_task: pageTask, ops_info: pageInfo, ops_ess: v => (typeof pageEss === 'function' ? pageEss(v) : (v.innerHTML = '<div class="loading"><span class="spin"></span>Memuat modul ESS…</div>', setTimeout(() => { if (App.page === 'ops_ess') render(); }, 500))), toko: pageStore, produk: pageProduct, stok: pageStock, admin: pageAdmin, settings: pageSettings }[App.page] || pageReport;
+  const fn = { perf: pagePerf, wbr: pageWbr, ai: pageAI, links: pageLinks, bm_target: pageBmTarget, bm_dinas: pageBmDinas, satr: v => pageSaBin(v, 'TR'), sabo: v => pageSaBin(v, 'BO'), area: pageArea, report: pageReport, trend: pageTrend, promo: pagePromo, omni: pageOmni, eac: pageEac, ra: pageRA, pareto: pagePareto, lost: pageLost, promostock: pagePromoStock, detention: pageDetention, growth: pageGrowth, transfer: pageTransfer, ro: pageRO, pica: pagePica, juknis: pageJuknis, home: pageHome, bc: pageBC, omset: pageOmset, ops_approval: pageApproval, ops_task: pageTask, ops_info: pageInfo, ops_ess: v => (typeof pageEss === 'function' ? pageEss(v) : (v.innerHTML = '<div class="loading"><span class="spin"></span>Memuat modul ESS…</div>', setTimeout(() => { if (App.page === 'ops_ess') render(); }, 500))), toko: pageStore, produk: pageProduct, stok: pageStock, admin: pageAdmin, settings: pageSettings }[App.page] || pageReport;
   try { fn(view); renderAsOf(); lockScopedSelects(view); if (App.page === 'admin') renderUsers(); if ((App.loadWarn || []).length) view.insertAdjacentHTML('afterbegin', `<div class="note" style="margin-bottom:14px">Sebagian data belum termuat (${esc(App.loadWarn.join(', '))}). Tekan <b>Muat ulang</b> di kanan atas untuk mencoba lagi.</div>`); } catch (e) { console.error(e); view.innerHTML = `<div class="empty-state"><h2>Halaman gagal ditampilkan</h2><p class="muted">${esc(e.message)}</p></div>`; }
 }
 
@@ -2958,10 +2987,8 @@ function pagePareto(view) {
     <section class="card"><div class="card-h"><h3>Pareto produk (generic)</h3><p class="small muted"><b>${fmtN(n80)}</b> dari ${fmtN(gens.length)} generic (${fmtPct(gens.length ? n80 / gens.length : null, 0)}) menghasilkan 80% sales</p></div>
       <div class="chart-box"><canvas id="cPareto"></canvas></div>
       <div class="legend"><span><span class="abc A">A</span> penyumbang 80% sales pertama (${fmtN(cnt('A'))} generic)</span><span><span class="abc B">B</span> 15% berikutnya (${fmtN(cnt('B'))})</span><span><span class="abc C">C</span> 5% terakhir (${fmtN(cnt('C'))})</span></div></section>
-    <div class="grid g2">
-      <section class="card"><div class="card-h"><h3>Generic</h3><p class="small muted">klik untuk detail</p></div><div id="tb_gen"></div></section>
-      <section class="card"><div class="card-h"><h3>Location</h3></div><div id="tb_loc"></div></section>
-    </div>
+    <section class="card"><div class="card-h"><h3>Generic</h3><p class="small muted">klik untuk detail</p></div><div id="tb_gen"></div></section>
+    <section class="card"><div class="card-h"><h3>Location</h3><p class="small muted">klik toko untuk melihat pareto toko itu</p></div><div id="tb_loc"></div></section>
     <p class="small muted">Category Gender: nama artikel berawalan WS atau JR dihitung WOMAN SERIES, selain itu MAN SERIES. Category Lv.2 dari master artikel Katalog Produk; Lv.3 & Lv.4 dari Item DSR. Paper bag & produk yang dikecualikan di Pengaturan tidak dihitung pada kategori & generic.</p>
   </div>`;
   const ink = css('--muted');
@@ -3225,6 +3252,7 @@ function pageDetention(view) {
   for (const d of scope) { const list = basis === 'g' ? d.G : d.V; for (const x of list) { const mc = detMC(x.g, x.sku)[lvl]; const m = MC.get(mc) || { k: mc, w: 0, s: 0 }; m.w++; if (x.sa) m.s++; MC.set(mc, m); } }
   const mcRows = [...MC.values()].map(m => ({ ...m, miss: m.w - m.s, p: m.w ? m.s / m.w : 1 }));
   const sel = st ? ok.find(d => d.c === st) : null;
+  const dtHasHist = new Set((App.detHist || []).filter(r => codes.includes(r.c)).map(r => r.d)).size > 1;
   view.innerHTML = `<div class="stack">
     <a class="dt-link" href="https://fanydzikri.github.io/Detention-Stock/" target="_blank" rel="noopener">
       <span class="dt-link-ic" aria-hidden="true">↗</span>
@@ -3242,7 +3270,7 @@ function pageDetention(view) {
     </div>
     <section class="card"><div class="card-h"><h3>Coverage display per toko</h3><p class="small muted">kiri = generic · kanan = varian · garis = target 95% · klik toko untuk detail</p></div>
       <div>${ok.slice().sort((a, b) => (basis === 'g' ? a.gP - b.gP : a.vP - b.vP)).map(d => `<div class="dt-row" data-dtstore="${esc(d.c)}"><div class="nm">${esc(sName(d.c))}<small>${esc(d.c)} · stok per ${fmtDateS(d.date)}</small></div>${bar(d.gP, 'Generic')}${bar(d.vP, 'Varian')}</div>`).join('')}</div></section>
-    <section class="card"><div class="card-h"><h3>Progress harian ${basis === 'g' ? 'generic' : 'varian'} terdisplay${st ? ' · ' + esc(sName(st)) : ' · area'}</h3><p class="small muted">dari ringkasan yang tersimpan setiap upload Export by Bin</p></div><div class="chart-box"><canvas id="dtTrend"></canvas></div><div id="dtHistNote"></div></section>
+    <section class="card"><div class="card-h"><h3>Progress harian ${basis === 'g' ? 'generic' : 'varian'} terdisplay${st ? ' · ' + esc(sName(st)) : ' · area'}</h3><p class="small muted">dari ringkasan yang tersimpan setiap upload Export by Bin</p></div>${dtHasHist ? '<div class="chart-box"><canvas id="dtTrend"></canvas></div>' : ''}<div id="dtHistNote"></div></section>
     <section class="card"><div class="card-h"><h3>% ${basis === 'g' ? 'generic' : 'varian'} terdisplay per toko per tanggal</h3><p class="small muted">hijau ≥ 95% · oranye 80–95% · merah &lt; 80% · * = hari libur, disamakan dengan data tarikan terdekat</p></div><div class="rp-wrap" style="max-height:60vh"><div id="dtMatrix"></div></div></section>
     ${st ? `<section class="card"><div class="card-h"><h3>Progress per MC · ${esc(sName(st))}</h3><div class="seg" role="group" aria-label="Level MC trend">${[['MC Lv2', 'Lv2'], ['MC Lv3', 'Lv3']].map(([k, l]) => `<button data-dtml="${k}" class="${(U.dtMcLv || 'MC Lv3') === k ? 'on' : ''}">${l}</button>`).join('')}</div></div><div class="rp-wrap" style="max-height:50vh"><div id="dtMcHist"><p class="muted small" style="padding:12px">Memuat…</p></div></div></section>` : ''}
     <section class="card"><div class="card-h"><h3>Rekap per toko</h3></div><div id="dtStoreT"></div></section>
@@ -3270,7 +3298,7 @@ function pageDetention(view) {
   const dates = [...new Set(H.map(r => r.d))].sort();
   const pk = basis === 'g' ? ['gW', 'gS'] : ['vW', 'vS'];
   const series = dates.map(d => { const rs = H.filter(r => r.d === d && (!st || r.c === st)); const w = rs.reduce((a, r) => a + r[pk[0]], 0), s0 = rs.reduce((a, r) => a + r[pk[1]], 0); return w ? +(s0 / w * 100).toFixed(2) : null; });
-  if (typeof Chart !== 'undefined' && dates.length) {
+  if (typeof Chart !== 'undefined' && dates.length > 1 && $('#dtTrend')) {
     const ink = css('--muted');
     App.charts.push(new Chart($('#dtTrend'), { type: 'line', data: { labels: dates.map(fmtDateS), datasets: [
       { label: '% terdisplay', data: series, borderColor: css('--navy'), backgroundColor: css('--navy'), tension: .2, pointRadius: 3, spanGaps: true },
@@ -4051,7 +4079,9 @@ function uploadChecklist() {
   const todo = vis([...daily, ...mon]).filter(x => x.s === 'bad' || x.s === 'warn').length;
   return `<section class="card"><div class="card-h"><h3>Checklist upload</h3><div class="seg" role="group" aria-label="Tampilkan tugas">${[['', 'Semua'], ['IC', 'Tugas IC'], ['AD', 'Tugas Admin']].map(([k, l]) => `<button data-ckpic="${k}" class="${pf === k ? 'on' : ''}">${l}</button>`).join('')}</div><p class="small muted">${todo ? `<b style="color:var(--bad)">${todo} item perlu diperhatikan</b>` : '<b style="color:var(--ok)">Semua data terbaru ✓</b>'}</p></div>
     <p class="small muted" style="margin:0 0 10px"><span class="pic ic">IC</span> = diupload <b>Inventory Control</b> (Export by Bin, Stok gudang HO, Master Artikel, Master Foto, List Artikel Promo) · <span class="pic ad">Admin</span> = diupload admin.</p>
-    <div class="ck-grid">${col('Harian', 'DSR/lost/BC = H-1 · stok = hari H', daily)}${col('Mingguan', 'cek ringan', weekly)}${col('Bulanan', late ? 'mulai tgl 20: siapkan ' + fmtMonth(nm) : 'awal bulan / bila ada perubahan', mon)}${col('Tahunan', 'sekali setahun', yearly)}</div>
+    <div class="ck-grid">${(() => { const cD = col('Harian', 'DSR/lost/BC = H-1 · stok = hari H', daily), cW = col('Mingguan', 'cek ringan', weekly), cY = col('Tahunan', 'sekali setahun', yearly), cM = col('Bulanan', late ? 'mulai tgl 20: siapkan ' + fmtMonth(nm) : 'awal bulan / bila ada perubahan', mon);
+      const nM = vis(mon).length, side = cW || cY ? `<div class="ck-stack">${cW}${cY}</div>` : '';
+      return cD + side + (nM >= 5 ? cM.replace('class="ck-col"', 'class="ck-col wide"') : cM); })()}</div>
     <p class="small muted" style="margin:10px 0 0">Tip: target, bobot, OmniChannel & EAC cukup lewat <b>Download template</b> di bawah, diisi, lalu diupload sekali. Master Artikel & Master Foto diupload apa adanya dari HO. List promo bisa dari file HO atau <b>Template List Promo</b>. Semua file bisa diupload bersamaan.</p></section>`;
 }
 
@@ -4229,10 +4259,10 @@ const PRIO = { Tinggi: '🔥', Sedang: '⚡', Rendah: '🌿' };
 const APST = { Menunggu: ['⏳', 'or'], 'Proses Review': ['🔍', 'or'], Revisi: ['🔄', 'red'], Disetujui: ['✅', 'ok'], Ditolak: ['❌', 'red'] };
 /* ---------- beranda: pilih hub ---------- */
 /* ===== katalog menu: satu pintu untuk Store Management & Operational Hub ===== */
-const MENU_IC = { wbr: '🗂️', ai: '✨', links: '🔗', bm_target: '🎯', bm_dinas: '🧾', omset: '💬', report: '🎯', trend: '📈', promo: '🏷️', omni: '🛒', eac: '👥', ra: '🧑‍💼', pareto: '📊', growth: '📅', produk: '👕', transfer: '🔁', ro: '📦', promostock: '💸', detention: '🗄️', bc: '🔢', satr: '🚚', sabo: '📌', lost: '⚠️', pica: '💡', juknis: '🎁', admin: '⬆️', settings: '⚙️', ops_approval: '✅', ops_task: '📋', ops_info: '📢', ops_ess: '📝' };
-const MENU_EXTRA = { wbr: ['Ringkasan WBR', 'Bahan Weekly Business Review: task, approval, performance, inventory, PICA → PPT'], ai: ['Tanya AI', 'Tanya data penjualan, promo, stok & target ke AI'], links: ['Kumpulan Link', 'Link kerja daily, weekly, monthly & lainnya'], bm_target: ['Setting Target Store', 'Bagi target HO ke toko, adjust per toko, terapkan'], bm_dinas: ['Rekap Dinas', 'Transport bulanan & dinas luar kota dari foto nota'], lost: ['Lost Sales', 'Barang dicari customer tapi tidak tersedia'], pica: ['Analisa PICA', 'Cari masalah & tindakan perbaikan toko'], juknis: ['Info Promo', 'Buka website Promo Eigerindo'], admin: ['Kelola data', 'Upload data, akun & daftar toko'], settings: ['Pengaturan', 'Pengaturan dashboard'],
+const MENU_IC = { perf: '📊', wbr: '🗂️', ai: '✨', links: '🔗', bm_target: '🎯', bm_dinas: '🧾', omset: '💬', report: '🎯', trend: '📈', promo: '🏷️', omni: '🛒', eac: '👥', ra: '🧑‍💼', pareto: '📊', growth: '📅', produk: '👕', transfer: '🔁', ro: '📦', promostock: '💸', detention: '🗄️', bc: '🔢', satr: '🚚', sabo: '📌', lost: '⚠️', pica: '💡', juknis: '🎁', admin: '⬆️', settings: '⚙️', ops_approval: '✅', ops_task: '📋', ops_info: '📢', ops_ess: '📝' };
+const MENU_EXTRA = { perf: ['Ringkasan Performance', 'Penjualan, target harian, saran tindakan, produk & stok'], wbr: ['Ringkasan WBR', 'Bahan Weekly Business Review: task, approval, performance, inventory, PICA → PPT'], ai: ['Tanya AI', 'Tanya data penjualan, promo, stok & target ke AI'], links: ['Kumpulan Link', 'Link kerja daily, weekly, monthly & lainnya'], bm_target: ['Setting Target Store', 'Bagi target HO ke toko, adjust per toko, terapkan'], bm_dinas: ['Rekap Dinas', 'Transport bulanan & dinas luar kota dari foto nota'], lost: ['Lost Sales', 'Barang dicari customer tapi tidak tersedia'], pica: ['Analisa PICA', 'Cari masalah & tindakan perbaikan toko'], juknis: ['Info Promo', 'Buka website Promo Eigerindo'], admin: ['Kelola data', 'Upload data, akun & daftar toko'], settings: ['Pengaturan', 'Pengaturan dashboard'],
   ops_approval: ['Approval', 'Ajukan & pantau persetujuan BM'], ops_task: ['Task', 'Checklist tugas tiap toko'], ops_info: ['Informasi', 'Info & materi terbaru dari HO'], ops_ess: ['ESS Self Assessment', 'Self assessment RA saat briefing siang'] };
-const MENU_KW = { wbr: 'wbr weekly business review ppt presentasi meeting mingguan ringkasan performance', ai: 'ai tanya chat analisa growth efektivitas promo pertanyaan data', links: 'link url form daily weekly monthly sop lembur ipm vm sga memo materi', satr: 'sa tr satr transit bin plus minus', sabo: 'sa bo sabo booking bin', produk: 'artikel sku lokasi bin cek stok toko lain', omset: 'piket share omset per 2 jam sales report care', report: 'achievement target daily report pencapaian', ra: 'sales person karyawan upt basket tagging target per head', transfer: 'pindah stok antar toko', ro: 'order gudang ho repeat', detention: 'display gudang pajang', bc: 'stock opname so', ops_ess: 'briefing journey', ops_task: 'tugas checklist', ops_approval: 'pengajuan memo lembur', juknis: 'promo diskon', lost: 'kosong tidak ada stok' };
+const MENU_KW = { perf: 'ringkasan performance summary penjualan stok target harian kinerja saran', wbr: 'wbr weekly business review ppt presentasi meeting mingguan ringkasan performance', ai: 'ai tanya chat analisa growth efektivitas promo pertanyaan data', links: 'link url form daily weekly monthly sop lembur ipm vm sga memo materi', satr: 'sa tr satr transit bin plus minus', sabo: 'sa bo sabo booking bin', produk: 'artikel sku lokasi bin cek stok toko lain', omset: 'piket share omset per 2 jam sales report care', report: 'achievement target daily report pencapaian', ra: 'sales person karyawan upt basket tagging target per head', transfer: 'pindah stok antar toko', ro: 'order gudang ho repeat', detention: 'display gudang pajang', bc: 'stock opname so', ops_ess: 'briefing journey', ops_task: 'tugas checklist', ops_approval: 'pengajuan memo lembur', juknis: 'promo diskon', lost: 'kosong tidak ada stok' };
 /* ===== SATU struktur menu untuk semua tempat (menu atas PC, bar bawah HP, beranda, pencarian, sub-menu) =====
    4 kelompok besar, tiap kelompok dibagi beberapa bagian kecil. Semua 24 sub menu tetap ada. */
 const MENU_GROUPS = [
@@ -4315,6 +4345,7 @@ function pageHome(view) {
   view.innerHTML = `<div class="stack">
     <section class="home-hero"><div><h2>Halo${nm ? ', ' + esc(nm) : ''} 👋</h2><p>${me.role === 'toko' && me.store ? 'Toko ' + esc(me.store) + ' · ' : ''}Semua menu Store Management & Operational Hub ada di satu tempat.</p></div>
       <button class="home-search" data-menupal="1">🔍 <span>Cari menu… (mis. omset, stok, task)</span></button></section>
+    <button class="home-perf" data-menu="perf"><span class="ic">📊</span><span><b>Ringkasan Performance</b><small>${me.role === 'toko' ? 'Pencapaian toko hari ini, target harian, saran tindakan & stok' : 'Pencapaian area & semua toko, target harian, saran tindakan & stok'}</small></span><span class="go">Buka →</span></button>
     <div id="homeBody">${menuBody('')}</div>
   </div>`;
   if (!App.hub) loadHub().then(() => { if (App.page === 'home') { const b = $('#homeBody'); if (b) b.innerHTML = menuBody(''); } }).catch(() => { });
@@ -4418,7 +4449,7 @@ function pageTask(view) {
     <div class="filters" style="margin:0"><div class="seg" role="group">${['Aktif', 'Overdue', 'Selesai', 'Semua'].map(k => `<button data-tktab="${k}" class="${tab === k ? 'on' : ''}">${k}</button>`).join('')}</div>
       <select class="inp" id="tkMon"><option value="">Semua bulan</option>${months.map(m => `<option value="${m}" ${m === mon ? 'selected' : ''}>${fmtMonth(m)}</option>`).join('')}</select>
       <div class="seg" role="group"><button data-tkv="list" class="${view2 === 'list' ? 'on' : ''}">Daftar</button><button data-tkv="grid" class="${view2 === 'grid' ? 'on' : ''}">Checklist toko</button><button data-tkv="perf" class="${view2 === 'perf' ? 'on' : ''}">Performance</button></div>
-      <input class="inp" id="tkQ" type="search" placeholder="Cari task / PIC" value="${esc(U.tkQ || '')}" style="flex:1 1 160px">${App.admin ? '<button class="btn" id="hubImp">⬆ Import Excel</button>' : ''}<button class="btn" id="tkXls">Download Excel</button></div>
+      <input class="inp" id="tkQ" type="search" placeholder="Cari task / PIC" value="${esc(U.tkQ || '')}" style="flex:1 1 100px;min-width:100px">${App.admin ? '<button class="btn" id="hubImp">⬆ Import Excel</button>' : ''}<button class="btn" id="tkXls">Download Excel</button></div>
     ${view2 === 'perf' ? `<div class="grid g2"><section class="card"><div class="card-h"><h3>🏆 Performance per PIC</h3></div><div class="tbl-wrap"><table class="tbl"><thead><tr><th>PIC</th><th class="r">Task</th><th class="r">Selesai</th><th class="r">Progress</th><th class="r">Overdue</th><th class="r">%</th><th></th></tr></thead><tbody>${perfPic.map((r, i, a) => `<tr><td><b>${esc(r.k)}</b></td><td class="r">${r.n}</td><td class="r">${r.sel}</td><td class="r">${r.op}</td><td class="r" style="color:${r.od ? 'var(--bad)' : 'inherit'}">${r.od}</td><td class="r"><b>${fmtPct(r.p, 0)}</b></td><td>${medal(r, i, a)}</td></tr>`).join('') || '<tr><td colspan="7" class="empty">–</td></tr>'}</tbody></table></div></section>
       <section class="card"><div class="card-h"><h3>🏬 Performance per toko</h3></div><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Toko</th><th class="r">Task</th><th class="r">Selesai</th><th class="r">Belum</th><th class="r">Overdue</th><th class="r">%</th><th></th></tr></thead><tbody>${perfStore.map((r, i, a) => `<tr><td><span class="nm">${esc(r.name)}</span><span class="sub">${esc(r.k)}</span></td><td class="r">${r.n}</td><td class="r">${r.sel}</td><td class="r">${r.op}</td><td class="r" style="color:${r.od ? 'var(--bad)' : 'inherit'}">${r.od}</td><td class="r"><b>${fmtPct(r.p, 0)}</b></td><td>${medal(r, i, a)}</td></tr>`).join('')}</tbody></table></div></section></div>`
     : view2 === 'grid' ? `<div class="rp-wrap"><table class="tk-grid"><thead><tr><th class="nm">Task</th><th>Deadline</th><th>%</th>${cols.map(c => `<th title="${esc(hubName(c))}">${esc(c)}<small>${esc(hubName(c).split(' ')[0])}</small></th>`).join('')}</tr></thead><tbody>
@@ -4606,14 +4637,14 @@ function pageBC(view) {
       <div class="rp-wrap"><table class="tbl" style="min-width:880px"><thead><tr><th class="s" data-bcs="name">Toko</th>${sh('sar', 'Stock Accuracy')}${sh('ot', 'On Time Sample')}${sh('bin', 'Bin Accuracy')}${sh('mc', 'MC4 Complete')}${sh('tot', 'Total skor')}<th class="r">Selisih stok</th><th class="r">MC4 sisa</th></tr></thead><tbody>
       ${rows.map(x => `<tr><td><span class="nm">${esc(x.name)}</span><span class="sub">${esc(x.c)}${x.started ? '' : ' · belum mulai'}</span></td>${pc(x.sar)}${pc(x.ot)}${pc(x.bin)}${pc(x.mc)}<td class="r"><b class="bc-v ${bcCls(x.tot)}">${fmtX(x.tot, 2)}%</b></td><td class="r">${fmtN(x.a - x.t)}</td><td class="r">${fmtN(Math.max(0, x.mt - x.md))}</td></tr>`).join('')}
       </tbody></table></div></section>
-    <section class="card"><div class="card-h"><h3>Progres harian${U.bcStore ? ' · ' + esc(sName(U.bcStore)) : ' · seluruh area'}</h3><p class="small muted">${dates.length} hari data · ${fmtDateS(dates[0])} – ${fmtDateS(dates[dates.length - 1])}</p></div><div class="chart-box" style="height:290px"><canvas id="bcTrend"></canvas></div></section>
+    <section class="card"><div class="card-h"><h3>Progres harian${U.bcStore ? ' · ' + esc(sName(U.bcStore)) : ' · seluruh area'}</h3><p class="small muted">${dates.length} hari data · ${fmtDateS(dates[0])} – ${fmtDateS(dates[dates.length - 1])}</p></div>${dates.length > 1 ? '<div class="chart-box" style="height:290px"><canvas id="bcTrend"></canvas></div>' : '<p class="small muted" style="margin:0">Grafik progres muncul setelah ada data minimal 2 hari.</p>'}</section>
     <section class="card"><div class="card-h"><h3>Saran tindakan</h3><p class="small muted">untuk toko terendah di tiap parameter</p></div>
       <div class="bc-adv">${BC_PAR.map(([k, l]) => { const w = worst(k); if (!w || w[k] >= 99.5) return `<div class="bc-a ok"><b>${l}</b><p>Semua toko sudah di atas 99,5%. Pertahankan.</p></div>`; return `<div class="bc-a ${bcCls(w[k])}"><b>${l} · ${esc(w.name)} (${fmtX(w[k], 2)}%)</b><p>${bcAdvice(k, w)}</p>${act.filter(x => x !== w && x[k] < 85).length ? `<p class="small muted">Juga di bawah 85%: ${act.filter(x => x !== w && x[k] < 85).sort((a, b) => a[k] - b[k]).slice(0, 5).map(x => esc(x.name) + ' ' + fmtX(x[k], 1) + '%').join(', ')}</p>` : ''}</div>`; }).join('')}
       ${notStarted.length ? `<div class="bc-a low"><b>Belum mulai blind counting</b><p>${notStarted.map(x => esc(x.name) + ' (' + esc(x.c) + ')').join(', ')} — pastikan jadwal & PIC sudah ditentukan.</p></div>` : ''}</div></section>
   </div>`;
   if (typeof Chart !== 'undefined' && dates.length) {
     const ink = css('--muted'), cols = { tot: '#0B1B4A', sar: css('--navy'), ot: css('--orange'), bin: '#13806F', mc: '#7A4FB5' };
-    App.charts.push(new Chart($('#bcTrend'), { type: 'line', data: { labels: dates.map(fmtDateS), datasets: [['tot', 'Total skor'], ...BC_PAR.map(p => [p[0], p[1]])].map(([k, l]) => ({ label: l, data: byD.map(v => v[k] == null ? null : +v[k].toFixed(2)), borderColor: cols[k], backgroundColor: cols[k], borderWidth: k === 'tot' ? 3 : 2, pointRadius: 3, tension: .2, spanGaps: true })) },
+    if ($('#bcTrend')) App.charts.push(new Chart($('#bcTrend'), { type: 'line', data: { labels: dates.map(fmtDateS), datasets: [['tot', 'Total skor'], ...BC_PAR.map(p => [p[0], p[1]])].map(([k, l]) => ({ label: l, data: byD.map(v => v[k] == null ? null : +v[k].toFixed(2)), borderColor: cols[k], backgroundColor: cols[k], borderWidth: k === 'tot' ? 3 : 2, pointRadius: 3, tension: .2, spanGaps: true })) },
       options: { maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { labels: { color: ink, boxWidth: 12 } }, tooltip: { callbacks: { label: c => c.dataset.label + ': ' + fmtX(c.parsed.y, 2) + '%' } } },
         scales: { x: { ticks: { color: ink }, grid: { display: false } }, y: { suggestedMin: 50, max: 100, ticks: { color: ink, callback: v => v + '%' }, grid: { color: css('--line') } } } } }));
   }
@@ -6223,6 +6254,192 @@ document.addEventListener('click', e => {
   if (t.id === 'wbrXls') { wbrExcel(); return; }
   if (t.id === 'wbrRe') { App.ui.wbrStale = true; App.wbr = null; render(); return; }
 });
+
+/* ================= RINGKASAN PERFORMANCE (branch = semua toko · pilih toko di Branch = per toko) =================
+   Penjualan → target harian → mix produk → per toko / per RA → stok, dalam satu halaman */
+async function perfData() {
+  const D = repLast(); if (!D) return null;
+  const m = D.slice(0, 7), day = +D.slice(8), pm = addMonths(m, -1), pd = Math.min(day, dim(pm)), sc = scopeOn() ? App.ui.scope : '';
+  await ensureMonths(pm + '-01', D);
+  if (!App.daily) await loadDaily().catch(() => { App.daily = { map: new Map(), names: {} }; });
+  if (!Object.keys(App.stock || {}).length) await loadStock().catch(() => { });
+  if (App.mst && App.mst.status === 'idle') loadMaster();
+  const codes = activeStores(), R = reportData(D, App.ui.rpVal || SET().defaultValue || 'g'), T = R.t;
+  const agg = L => { const x = { v: 0, q: 0, trx: new Set(), pv: 0, vp: 0 }; for (const l of L) { const v = VAL(l); x.v += v; if (!isPB(l.sku)) x.q += l.q; if (l.q > 0) x.trx.add(l.s + l.d + l.o); if (l.pv > 0) { x.pv += l.pv; x.vp += v; } } return x; };
+  const cur = agg(linesIn(m + '-01', D)), lm = agg(linesIn(pm + '-01', pm + '-' + pad(pd)));
+  let ly = 0, lyTy = 0; for (const c of codes) for (let d = m + '-01'; d <= D; d = addDays(d, 1)) { const y = lyVal(c, d, 'date'), v = tyVal(c, d); if (y != null && v != null) { ly += y; lyTy += v; } }
+  /* harian: sales vs target harian (target bulan × bobot hari) */
+  const days = []; let cS = 0, cT = 0;
+  for (let i = 1; i <= dim(m); i++) {
+    const d = m + '-' + pad(i), tg = codes.reduce((a, c) => a + monthTarget(c, m) * dayWeight(d), 0);
+    const s = d <= D ? linesIn(d, d).reduce((a, l) => a + VAL(l), 0) : null;
+    if (s != null) { cS += s; cT += tg; }
+    days.push({ d, tg, s, ach: s != null && tg ? s / tg : null, cum: s != null && cT ? cS / cT : null });
+  }
+  /* mix produk */
+  const L = linesIn(m + '-01', D), byK = f => { const o = new Map(); for (const l of L) { const k = f(l); if (!k) continue; const x = o.get(k) || { v: 0, q: 0 }; x.v += VAL(l); if (!isPB(l.sku)) x.q += l.q; o.set(k, x); } return o; };
+  const mcLM = new Map(); for (const l of linesIn(pm + '-01', pm + '-' + pad(pd))) { const k = artInfo(artOf(l.sku)).c3 || '–'; mcLM.set(k, (mcLM.get(k) || 0) + VAL(l)); }
+  const mc = [...byK(l => artInfo(artOf(l.sku)).c3 || '–').entries()].map(([k, x]) => ({ k, v: x.v, q: x.q, g: mcLM.get(k) ? x.v / mcLM.get(k) - 1 : null })).sort((a, b) => b.v - a.v);
+  const art = [...byK(l => isPB(l.sku) ? '' : artOf(l.sku)).entries()].map(([k, x]) => ({ k, name: artInfo(k).name, v: x.v, q: x.q })).sort((a, b) => b.q - a.q).slice(0, 10);
+  /* per toko (branch) / per RA (toko) */
+  const LMs = new Map(); for (const l of linesIn(pm + '-01', pm + '-' + pad(pd))) LMs.set(l.s, (LMs.get(l.s) || 0) + VAL(l));
+  const stores = R.rows.filter(r => r.T || r.cs).map(r => ({ c: r.c, name: r.name, sales: r.cs, target: r.T, achTD: r.cAch, achM: r.mAch, gLM: LMs.get(r.c) ? r.cs / LMs.get(r.c) - 1 : null, trx: r.ct, atv: r.cBs, upt: r.cUpt }));
+  const ra = sc ? (() => { const o = new Map(); for (const l of L) { const k = spName(l.sp); if (k === '(TANPA NAMA)') continue; const x = o.get(k) || { v: 0, q: 0, trx: new Set() }; x.v += VAL(l); if (!isPB(l.sku)) x.q += l.q; if (l.q > 0) x.trx.add(l.d + l.o); o.set(k, x); } return [...o.entries()].map(([k, x]) => ({ k, v: x.v, trx: x.trx.size, upt: x.trx.size ? x.q / x.trx.size : null, atv: x.trx.size ? x.v / x.trx.size : null })).filter(x => x.trx >= 3).sort((a, b) => b.v - a.v); })() : null;
+  /* stok */
+  const sc2 = codes.filter(c => App.stock[c]); let stock = null;
+  if (sc2.length) {
+    const rows = prodStockBase(sc2), sum = f => rows.reduce((a, r) => a + f(r), 0), sd = sc2.map(c => App.stock[c].date).filter(Boolean).sort();
+    const qty = sum(r => r.q), soldPerDay = cur.q / Math.max(1, day);
+    const l3 = new Map(); for (const r of rows) { const x = l3.get(r.l3) || { q: 0, v: 0 }; x.q += r.q; x.v += r.v; l3.set(r.l3, x); }
+    const soldArt = byK(l => isPB(l.sku) ? '' : artOf(l.sku)), stArt = new Map(rows.map(r => [r.art, r.q]));
+    const oos = [...soldArt.entries()].filter(([k, x]) => x.q >= 3 && !(stArt.get(k) > 0)).sort((a, b) => b[1].q - a[1].q).slice(0, 8).map(([k, x]) => ({ k, name: artInfo(k).name, q: x.q }));
+    const slow = rows.filter(r => r.q >= 10 && !soldArt.get(r.art)).sort((a, b) => b.v - a.v).slice(0, 8).map(r => ({ k: r.art, name: r.name, q: r.q, v: r.v }));
+    stock = { date: sd.length ? sd[sd.length - 1] : null, qty, value: sum(r => r.v), arts: rows.length, cover: soldPerDay ? qty / soldPerDay : null,
+      cat: ['S', 'D', 'N'].map(k => ({ k: { S: 'SMDS', D: 'DCNP', N: 'Normal' }[k], q: sum(r => r.cq[k]), v: sum(r => r.cv[k]) })),
+      mc: [...l3.entries()].map(([k, x]) => ({ k, q: x.q, v: x.v, sold: (mc.find(y => y.k === k) || {}).q || 0 })).sort((a, b) => b.v - a.v).slice(0, 8), oos, slow };
+  }
+  return { D, m, sc, day, T, cur, lm, gLY: ly ? lyTy / ly - 1 : null, days, mc, art, stores, ra, stock, remDays: dim(m) - day };
+}
+/* saran & tindakan otomatis dari data (seperti PICA) — untuk area (branch) atau toko */
+function perfAdvice(X) {
+  const A = [], T = X.T, G = SET().achGreen / 100, cur = X.cur, lm = X.lm, trx = cur.trx.size, trxL = lm.trx.size, who = X.sc ? 'toko' : 'area';
+  const add = (p, ic, tag, t, d) => A.push({ p, ic, tag, t, d });
+  const g = (a, b) => b ? a / b - 1 : null, pct = v => (v >= 0 ? '+' : '') + fmtPct(v, 1);
+  const atv = trx ? cur.v / trx : 0, atvL = trxL ? lm.v / trxL : 0, upt = trx ? cur.q / trx : 0, uptL = trxL ? lm.q / trxL : 0;
+  const rem = Math.max(0, (T.T || 0) - (T.cs || 0)), need = X.remDays ? rem / X.remDays : 0, trxDay = trx / Math.max(1, X.day);
+  /* 1. target */
+  if (T.cAch != null) {
+    if (T.cAch < G) add(T.cAch < .9 ? 1 : 2, '🎯', 'Target', `Kejar ${fmtRpS(need)}/hari selama ${X.remDays} hari`, `Ach s/d tanggal ${fmtPct(T.cAch, 1)}. Dengan basket ${fmtRpS(atv)}, butuh ±${fmtN(Math.ceil(atv ? need / atv : 0))} transaksi/hari (sekarang ±${fmtN(Math.round(trxDay))}/hari). Bagi target harian ke tiap ${X.sc ? 'RA' : 'toko'} dan cek tiap jam 15.00.`);
+    else add(3, '🏆', 'Target', `On track (${fmtPct(T.cAch, 1)}) — kunci di atas 100%`, `Sisa ${fmtRpS(rem)} (${fmtRpS(need)}/hari). Pertahankan ritme, dorong artikel margin baik & member baru.`);
+  }
+  /* 2. toko tertinggal (mode branch) */
+  if (!X.sc) {
+    const low = X.stores.filter(s => s.achTD != null && s.target && s.achTD < .9).sort((a, b) => a.achTD - b.achTD);
+    if (low.length) add(1, '🏬', 'Toko', `Prioritas kunjungan & coaching ${low.length} toko di bawah 90%`, low.slice(0, 5).map(s => `${s.name} ${fmtPct(s.achTD, 1)}`).join(' · ') + '. Bahas gap harian & rencana aksi dengan Store Head minggu ini.');
+    const top = X.stores.filter(s => s.achTD != null).sort((a, b) => b.achTD - a.achTD)[0];
+    if (top && low.length) add(3, '⭐', 'Best practice', `Bagikan cara kerja ${top.name} (${fmtPct(top.achTD, 1)})`, 'Minta Store Head toko terbaik share 2 menit di grup/briefing: display, cara closing, aktivitas member.');
+  }
+  /* 3. traffic / basket / UPT */
+  const gt = g(trx, trxL), ga = g(atv, atvL), gu = g(upt, uptL);
+  if (gt != null && gt < -.03) add(gt < -.1 ? 1 : 2, '🚶', 'Traffic', `Transaksi turun ${pct(gt)} vs bulan lalu`, `Aktifkan sapaan & ajakan masuk di depan toko, broadcast WA member, pasang promo pintu masuk, pastikan RA di lantai saat jam ramai.`);
+  if (ga != null && ga < -.03) add(2, '🛍️', 'Basket', `Basket size turun ${pct(ga)} (${fmtRpS(atv)})`, 'Dorong bundling / Buy More Save More, tawarkan artikel harga lebih tinggi (jaket, sepatu, tas) saat closing.');
+  if (upt && (upt < 1.5 || (gu != null && gu < -.03))) add(2, '➕', 'UPT', `UPT ${fmtX(upt, 2)}${gu != null ? ' (' + pct(gu) + ')' : ''} — target +0,1`, 'Biasakan tawaran add-on di kasir: kaos kaki, topi, botol, dompet, gloves. Pasang aksesori di dekat kasir.');
+  /* 4. pola harian */
+  const past = X.days.filter(d => d.ach != null), wk = past.filter(d => [0, 6].includes(dowOf(d.d))), wd = past.filter(d => ![0, 6].includes(dowOf(d.d)));
+  const achOf = L => { const s = L.reduce((a, d) => a + d.s, 0), t = L.reduce((a, d) => a + d.tg, 0); return t ? s / t : null; };
+  const aWk = achOf(wk), aWd = achOf(wd);
+  if (aWd != null && aWk != null && aWd < .9 && aWk >= aWd + .1) add(2, '📅', 'Pola hari', `Weekday lemah (${fmtPct(aWd, 0)}) vs weekend ${fmtPct(aWk, 0)}`, 'Buat program Senin–Kamis: event komunitas kecil, WA blast member, jadwal RA weekday diperketat di jam ramai.');
+  const last3 = past.slice(-3); if (last3.length === 3 && last3.every(d => d.ach < 1)) add(1, '⏱️', 'Tren', '3 hari terakhir di bawah target harian', last3.map(d => `${fmtDateS(d.d)} ${fmtPct(d.ach, 0)}`).join(' · ') + '. Briefing pagi fokus target hari ini & cek artikel laris tersedia di display.');
+  /* 5. kategori */
+  const tot = X.mc.reduce((a, x) => a + x.v, 0) || 1, mcDown = X.mc.filter(x => x.v / tot >= .05 && x.g != null && x.g < -.05).sort((a, b) => a.g - b.g)[0];
+  if (mcDown) add(2, '🧥', 'Kategori', `${mcDown.k} turun ${pct(mcDown.g)} vs bulan lalu`, `Kontribusi ${fmtPct(mcDown.v / tot, 0)}. Cek kelengkapan size/warna & posisi display ${mcDown.k}, pertimbangkan promo kategori.`);
+  /* 6. stok */
+  const st = X.stock;
+  if (st) {
+    if (st.oos.length) add(1, '📦', 'Stok', `${st.oos.length} artikel laris stoknya habis`, st.oos.slice(0, 4).map(x => x.name).join(', ') + '. Ajukan transfer antar toko / repeat order hari ini (menu Saran Transfer & Repeat Order).');
+    const hi = st.mc.filter(x => x.sold && x.q / (x.sold / X.day) > 90).sort((a, b) => b.v - a.v)[0];
+    if (hi) add(2, '🐢', 'Stok', `Stok ${hi.k} cukup ±${fmtN(Math.round(hi.q / (hi.sold / X.day)))} hari`, `Value ${fmtRpS(hi.v)}. Pindahkan ke display depan, rekomendasikan saat closing, atau usulkan promo.`);
+    if (st.slow.length) add(3, '🔄', 'Stok', `${st.slow.length} artikel belum terjual bulan ini`, st.slow.slice(0, 3).map(x => `${x.name} (${fmtN(x.q)} pcs)`).join(', ') + '. Rotasi display / transfer ke toko yang lebih laku.');
+  }
+  /* 7. promo */
+  const ps = cur.v ? cur.vp / cur.v : 0, gs = g(cur.v, lm.v);
+  if (ps > .5 && gs != null && gs < 0) add(2, '🏷️', 'Promo', `Sales bergantung promo (${fmtPct(ps, 0)}) tapi tetap turun`, 'Evaluasi promo yang tidak menarik pembeli; dorong juga artikel normal lewat new arrival & storytelling produk.');
+  /* 8. tim RA (mode toko) */
+  if (X.sc && X.ra && X.ra.length >= 2) {
+    const r = X.ra.filter(x => x.upt != null).sort((a, b) => a.upt - b.upt), best = X.ra[0];
+    if (r.length) add(2, '🧑‍💼', 'Tim', `Coaching ${r[0].k} (UPT ${fmtX(r[0].upt, 2)})`, `Bandingkan dengan ${best.k} (sales ${fmtRpS(best.v)}, UPT ${fmtX(best.upt, 2)}). Role play add-on & closing 10 menit sebelum buka.`);
+  }
+  if (X.gLY != null && X.gLY < 0) add(2, '📉', 'Growth', `Di bawah tahun lalu (${pct(X.gLY)})`, 'Cek apa yang berbeda dari tahun lalu: promo, event, stok artikel andalan, jumlah RA.');
+  return A.sort((a, b) => a.p - b.p).slice(0, 8);
+}
+function pagePerf(view) {
+  setHead('Ringkasan Performance', (scopeOn() ? 'Toko ' + sName(App.ui.scope) : 'Branch Jateng 01 · semua toko') + ' · penjualan, pencapaian target harian, saran tindakan, produk & stok bulan berjalan');
+  const key = (scopeOn() ? App.ui.scope : 'all') + '|' + repLast() + '|' + (App.ui.typeF || '');
+  if (!App.perf || App.perf.key !== key) {
+    view.innerHTML = '<div class="loading"><span class="spin"></span>Menyusun ringkasan performance…</div>';
+    perfData().then(d => { App.perf = { key, X: d }; if (App.page === 'perf') render(); }, e => { App.perf = { key, err: errMsg(e) }; if (App.page === 'perf') render(); });
+    return;
+  }
+  const X = App.perf.X; if (!X) { view.innerHTML = `<div class="empty-state"><h2>Belum ada data</h2><p class="muted">${esc(App.perf.err || 'Upload Item DSR bulan ini.')}</p></div>`; return; }
+  const T = X.T, G = SET().achGreen / 100, cur = X.cur, lm = X.lm, trx = cur.trx.size, trxL = lm.trx.size;
+  const g = (a, b) => b ? a / b - 1 : null, sg = v => v == null ? '–' : (v >= 0 ? '▲ ' : '▼ ') + fmtPct(Math.abs(v), 1);
+  const col = v => v == null ? '#64748B' : v >= G ? '#15803D' : v >= .9 ? '#CA8A04' : '#B91C1C';
+  const tile = (l, v, s, bg) => `<div class="pt-tile" ${bg ? `style="background:${bg}"` : ''}><span>${l}</span><b>${v}</b><small>${s || ''}</small></div>`;
+  const rem = Math.max(0, (T.T || 0) - (T.cs || 0)), need = X.remDays ? rem / X.remDays : 0;
+  const past = X.days.filter(d => d.ach != null), okDays = past.filter(d => d.ach >= 1).length;
+  const achOf = L => { const s = L.reduce((a, d) => a + d.s, 0), t = L.reduce((a, d) => a + d.tg, 0); return t ? s / t : null; };
+  const wk = past.filter(d => [0, 6].includes(dowOf(d.d))), wd = past.filter(d => ![0, 6].includes(dowOf(d.d)));
+  const best = past.slice().sort((a, b) => b.ach - a.ach)[0], worst = past.slice().sort((a, b) => a.ach - b.ach)[0];
+  const st = X.stock, ADV = perfAdvice(X), PR = { 1: ['Prioritas', '#B91C1C'], 2: ['Penting', '#C2410C'], 3: ['Pertahankan', '#15803D'] };
+  view.innerHTML = `<div class="stack perf">
+  <div class="perf-kpi">
+    ${tile('Sales MTD', fmtRpS(cur.v), 'target bulan ' + fmtRpS(T.T), '#0B1B4A')}
+    ${tile('Ach s/d tanggal', T.cAch == null ? '–' : fmtPct(T.cAch, 1), 'target s/d tgl ' + fmtRpS(T.cT), col(T.cAch))}
+    ${tile('Ach 1 bulan', T.mAch == null ? '–' : fmtPct(T.mAch, 1), `butuh ${fmtRpS(need)}/hari · ${X.remDays} hari lagi`)}
+    ${tile('Growth vs bln lalu', sg(g(cur.v, lm.v)), 'tgl sama · ' + fmtRpS(lm.v))}
+    ${tile('Growth vs thn lalu', sg(X.gLY), 'MTD tahun lalu')}
+    ${tile('Transaksi', fmtN(trx), sg(g(trx, trxL)) + ' vs bln lalu')}
+    ${tile('Basket size', fmtRpS(trx ? cur.v / trx : 0), sg(g(trx ? cur.v / trx : 0, trxL ? lm.v / trxL : 0)) + ' vs bln lalu')}
+    ${tile('UPT', fmtX(trx ? cur.q / trx : null, 2), sg(g(trx ? cur.q / trx : 0, trxL ? lm.q / trxL : 0)) + ' vs bln lalu')}
+    ${tile('Porsi sales promo', fmtPct(cur.v ? cur.vp / cur.v : null, 1), 'potongan ' + fmtRpS(cur.pv))}
+    ${tile('Hari capai target', `${okDays}/${past.length}`, 'hari sales ≥ target harian', okDays / Math.max(1, past.length) >= .5 ? '#15803D' : '#C2410C')}
+  </div>
+  <section class="card"><div class="card-h"><h3>🎯 Pencapaian sales vs target per hari</h3><span class="small muted">1–${X.day} ${esc(fmtMonth(X.m))} · ${esc(VL())}</span></div>
+    <div class="perf-legend small"><span><i style="background:#15803D"></i>sales ≥ target hari itu</span><span><i style="background:#F26B21"></i>di bawah target</span><span><i class="ln" style="background:#0F3192"></i>target harian (bobot harian)</span><span><i class="ln dash"></i>Ach kumulatif (%)</span></div>
+    <div class="perf-chart"><canvas id="perfC"></canvas></div>
+    <div class="perf-strip">
+      <div><span>Weekday (Sen–Jum)</span><b style="color:${col(achOf(wd))}">${fmtPct(achOf(wd), 1)}</b></div>
+      <div><span>Weekend (Sab–Min)</span><b style="color:${col(achOf(wk))}">${fmtPct(achOf(wk), 1)}</b></div>
+      <div><span>Hari terbaik</span><b>${best ? DOW[dowOf(best.d)].slice(0, 3) + ', ' + fmtDateS(best.d) : '–'}</b><small>${best ? fmtPct(best.ach, 0) + ' · ' + fmtRpS(best.s) : ''}</small></div>
+      <div><span>Hari terlemah</span><b>${worst ? DOW[dowOf(worst.d)].slice(0, 3) + ', ' + fmtDateS(worst.d) : '–'}</b><small>${worst ? fmtPct(worst.ach, 0) + ' · ' + fmtRpS(worst.s) : ''}</small></div>
+      <div><span>Tabel harian</span><button class="btn sm" id="perfDTb">Lihat ▾</button></div>
+    </div><div id="perfDT" hidden></div></section>
+  <section class="card"><div class="card-h"><h3>💡 Saran & tindakan untuk ${X.sc ? 'toko' : 'area'}</h3><span class="small muted">disusun otomatis dari data · urut prioritas</span></div>
+    <div class="perf-adv">${ADV.map(a => `<div class="adv" style="--c:${PR[a.p][1]}"><div class="adv-h"><span class="adv-ic">${a.ic}</span><span class="adv-tag">${esc(a.tag)}</span><span class="adv-p">${PR[a.p][0]}</span></div><b>${esc(a.t)}</b><p>${esc(a.d)}</p></div>`).join('') || '<p class="muted small">Belum ada saran — data bulan ini masih sedikit.</p>'}</div></section>
+  <div class="perf-2">
+    <section class="card"><div class="card-h"><h3>🧥 Kontribusi MC Lv3</h3><span class="small muted">sales MTD vs bln lalu</span></div><div id="perfMC"></div></section>
+    <section class="card"><div class="card-h"><h3>🔥 Artikel terlaris</h3><span class="small muted">qty MTD · klik untuk detail</span></div><div id="perfArt"></div></section>
+  </div>
+  <section class="card"><div class="card-h"><h3>${X.sc ? '🧑‍💼 Performa tim RA' : '🏬 Performa per toko'}</h3><span class="small muted">${X.sc ? 'MTD per sales person' : 'urut Ach s/d tanggal · klik toko untuk ringkasan toko itu'}</span></div><div id="perfST"></div></section>
+  <section class="card"><div class="card-h"><h3>📦 Stok</h3>${st && st.date ? `<span class="small muted">stok per ${esc(fmtDate(st.date))}</span>` : ''}</div>
+    ${st ? `<div class="perf-kpi five">
+      ${tile('Total stok', fmtN(st.qty) + ' pcs', fmtRpS(st.value) + ' · ' + fmtN(st.arts) + ' artikel', '#0B1B4A')}
+      ${tile('Stock cover', st.cover == null ? '–' : fmtN(Math.round(st.cover)) + ' hari', 'stok ÷ qty terjual/hari', st.cover != null && st.cover > 120 ? '#C2410C' : '')}
+      ${st.cat.map(c => tile(c.k, fmtN(c.q) + ' pcs', fmtRpS(c.v) + ' · ' + fmtPct(st.qty ? c.q / st.qty : null, 1))).join('')}
+    </div>
+    <div class="perf-3"><div><h4 class="perf-h4">Stok vs terjual per MC Lv3</h4><div id="perfSM"></div></div>
+      <div class="perf-col"><div><h4 class="perf-h4">⚠ Laris tapi stok habis</h4><div id="perfOOS"></div></div>
+      <div><h4 class="perf-h4">🐢 Belum terjual bulan ini</h4><div id="perfSlow"></div></div></div></div>`
+    : '<p class="muted small">Stok belum diupload (Export by Bin).</p>'}</section></div>`;
+  const cv = $('#perfC');
+  if (cv && typeof Chart !== 'undefined') App.charts.push(new Chart(cv, { data: { labels: X.days.map(d => +d.d.slice(8)), datasets: [
+    { type: 'bar', label: 'Sales', data: X.days.map(d => d.s), backgroundColor: X.days.map(d => d.ach == null ? '#CBD5E1' : d.ach >= 1 ? '#15803D' : '#F26B21'), borderRadius: 4, order: 3, yAxisID: 'y' },
+    { type: 'line', label: 'Target harian', data: X.days.map(d => d.tg), borderColor: '#0F3192', backgroundColor: '#0F3192', pointRadius: 0, borderWidth: 2, stepped: 'middle', order: 1, yAxisID: 'y' },
+    { type: 'line', label: 'Ach kumulatif', data: X.days.map(d => d.cum == null ? null : d.cum * 100), borderColor: '#CA8A04', borderDash: [5, 4], pointRadius: 2, borderWidth: 2, order: 0, yAxisID: 'y2' }] },
+    options: { maintainAspectRatio: false, animation: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { display: false }, tooltip: { callbacks: { title: it => fmtDate(X.days[it[0].dataIndex].d), label: c => c.dataset.yAxisID === 'y2' ? 'Ach kumulatif ' + fmtPct(c.raw / 100, 1) : c.dataset.label + ': ' + fmtRp(Math.round(c.raw || 0)), afterBody: it => { const d = X.days[it[0].dataIndex]; return d.ach == null ? '' : 'Ach hari ini ' + fmtPct(d.ach, 1); } } } },
+      scales: { y: { ticks: { callback: v => fmtRpS(v).replace('Rp ', '') } }, y2: { position: 'right', min: 0, suggestedMax: 120, grid: { display: false }, ticks: { callback: v => v + '%' } }, x: { grid: { display: false } } } } }));
+  $('#perfDT').innerHTML = tbl('perfDT', { rows: past.slice().reverse(), limit: 31, cols: [
+    { k: 'd', label: 'Tanggal', h: d => `${DOW[dowOf(d.d)].slice(0, 3)}, ${fmtDateS(d.d)}` }, { k: 's', label: 'Sales', r: 1, h: d => fmtRp(Math.round(d.s)) }, { k: 'tg', label: 'Target harian', r: 1, h: d => fmtRp(Math.round(d.tg)) },
+    { k: 'ach', label: 'Ach hari itu', r: 1, h: d => `<b style="color:${col(d.ach)}">${fmtPct(d.ach, 1)}</b>` }, { k: 'cum', label: 'Ach kumulatif', r: 1, h: d => fmtPct(d.cum, 1) }] });
+  const tot = X.mc.reduce((a, x) => a + x.v, 0) || 1, N = Math.min(8, Math.max(5, X.mc.length));
+  $('#perfMC').innerHTML = tbl('perfMC', { rows: X.mc.slice(0, N), limit: N, cols: [
+    { k: 'k', label: 'MC Lv3', h: x => `<b>${esc(x.k)}</b><div class="perf-mini"><i style="width:${Math.round(x.v / (X.mc[0].v || 1) * 100)}%"></i></div>` },
+    { k: 'v', label: 'Sales', r: 1, h: x => fmtRpS(x.v) }, { k: 'sh', label: 'Kontribusi', r: 1, v: x => x.v / tot, h: x => fmtPct(x.v / tot, 1) }, { k: 'g', label: 'vs bln lalu', r: 1, h: x => chgH(x.g) }] });
+  $('#perfArt').innerHTML = tbl('perfArt', { rows: X.art.slice(0, N), limit: N, onRow: r => openProduct(r.k, X.sc || null), cols: [
+    { k: 'name', label: 'Artikel', h: r => `<b>${esc(r.name)}</b><div class="small muted">${esc(r.k)}</div>` }, { k: 'q', label: 'Qty', r: 1, h: r => fmtN(r.q) }, { k: 'v', label: 'Sales', r: 1, h: r => fmtRpS(r.v) }] });
+  $('#perfST').innerHTML = X.sc
+    ? tbl('perfRA', { rows: X.ra, limit: 20, empty: 'Belum ada data sales person.', cols: [{ k: 'k', label: 'RA', h: r => `<b>${esc(r.k)}</b>` }, { k: 'v', label: 'Sales', r: 1, h: r => fmtRpS(r.v) }, { k: 'trx', label: 'Trx', r: 1, h: r => fmtN(r.trx) }, { k: 'atv', label: 'ATV', r: 1, h: r => fmtRpS(r.atv) }, { k: 'upt', label: 'UPT', r: 1, h: r => fmtX(r.upt, 2) }] })
+    : tbl('perfST', { rows: X.stores, sort: { k: 'achTD', dir: 'desc' }, limit: 30, onRow: r => { App.ui.scope = r.c; App.perf = null; render(); window.scrollTo(0, 0); }, cols: [
+      { k: 'name', label: 'Toko', h: r => `<b>${esc(r.name)}</b>` }, { k: 'sales', label: 'Sales MTD', r: 1, h: r => fmtRpS(r.sales) }, { k: 'achTD', label: 'Ach s/d tgl', r: 1, h: r => `<b style="color:${col(r.achTD)}">${fmtPct(r.achTD, 1)}</b>` },
+      { k: 'achM', label: 'Ach bulan', r: 1, h: r => fmtPct(r.achM, 1) }, { k: 'gLM', label: 'vs bln lalu', r: 1, h: r => chgH(r.gLM) }, { k: 'trx', label: 'Trx', r: 1, h: r => fmtN(r.trx) }, { k: 'atv', label: 'ATV', r: 1, h: r => fmtRpS(r.atv) }, { k: 'upt', label: 'UPT', r: 1, h: r => fmtX(r.upt, 2) }] });
+  if (st) {
+    const M6 = 6;
+    $('#perfSM').innerHTML = tbl('perfSM', { rows: st.mc.slice(0, M6), limit: M6, cols: [{ k: 'k', label: 'MC Lv3', h: r => `<b>${esc(r.k)}</b>` }, { k: 'q', label: 'Stok', r: 1, h: r => fmtN(r.q) }, { k: 'sold', label: 'Terjual', r: 1, h: r => fmtN(r.sold) }, { k: 'cov', label: 'Cover', r: 1, v: r => r.sold ? r.q / (r.sold / X.day) : null, h: r => r.sold ? fmtN(Math.round(r.q / (r.sold / X.day))) + ' hr' : '–' }] });
+    $('#perfOOS').innerHTML = tbl('perfOOS', { rows: st.oos.slice(0, M6), limit: M6, empty: 'Tidak ada 👍', cols: [{ k: 'name', label: 'Artikel', h: r => `<b>${esc(r.name)}</b><div class="small muted">${esc(r.k)}</div>` }, { k: 'q', label: 'Terjual', r: 1, h: r => fmtN(r.q) }], onRow: r => openProduct(r.k, X.sc || null) });
+    $('#perfSlow').innerHTML = tbl('perfSlow', { rows: st.slow.slice(0, M6), limit: M6, empty: 'Tidak ada 👍', cols: [{ k: 'name', label: 'Artikel', h: r => `<b>${esc(r.name)}</b><div class="small muted">${esc(r.k)}</div>` }, { k: 'q', label: 'Stok', r: 1, h: r => fmtN(r.q) }, { k: 'v', label: 'Value', r: 1, h: r => fmtRpS(r.v) }], onRow: r => openProduct(r.k, X.sc || null) });
+  }
+}
+document.addEventListener('click', e => { const t = e.target; if (!t || App.page !== 'perf') return; if (t.id === 'perfDTb') { const b = $('#perfDT'); if (b) { b.hidden = !b.hidden; t.textContent = b.hidden ? 'Lihat ▾' : 'Tutup ▴'; } } });
 
 /* ================= SA-TR & SA-BO: monitoring bin harian (dari Export by Bin) ================= */
 async function loadSaBin(force) { if (App.saBin && !force) return App.saBin; const r = await api('sabin'); App.saBin = r.rows || []; return App.saBin; }

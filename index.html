@@ -2060,7 +2060,7 @@ function renderPeriod() {
   if (App.page === 'home' || isOps(App.page)) { box.innerHTML = ''; return; }
   const tsel = hasTypes() && App.page !== 'toko' && !scopeOn() ? `<label class="small muted" for="typeSel">Jenis toko</label><select id="typeSel" class="inp"><option value="">Semua toko</option>${['rg', 'bz', 'ot'].filter(t => storeCodes().some(c => sType(c) === t)).map(t => `<option value="${t}" ${App.ui.typeF === t ? 'selected' : ''}>${TYPE_LABEL[t]}</option>`).join('')}</select>` : '';
   if (['report', 'promo', 'omni', 'eac', 'lost', 'detention', 'growth', 'stok', 'transfer', 'ro', 'pica', 'juknis', 'bc', 'omset', 'satr', 'sabo', 'ai'].includes(App.page)) { box.innerHTML = tsel; return; }
-  if (!App.lastDate || ['admin', 'settings', 'links', 'bm_target', 'bm_dinas', 'produk', 'wbr', 'perf'].includes(App.page)) { box.innerHTML = ''; return; }
+  if (!App.lastDate || ['admin', 'settings', 'links', 'bm_target', 'bm_dinas', 'produk', 'wbr'].includes(App.page)) { box.innerHTML = ''; return; }
   const L = App.lastDate, cm = L.slice(0, 7);
   const months = Object.keys(App.index.sales).sort().reverse().filter(m => m !== cm);
   const p = App.period;
@@ -3136,7 +3136,7 @@ function pagePromoStock(view) {
       rowsSku.push({ c, sku, art: artOf(sku), key: pr.key, d: pr.d, p: pr.p || (mi && mi.p) || 0, t, l2: it.l2 || (mi && mi.l2) || '–', l3: it.l3 || (mi && mi.l3) || '–', l4: (mi && mi.l4) || it.l4 || (App.sku[sku] || [])[2] || '–', n: it.n || (mi && mi.n) || '', cat: pr.c || it.c || '', pd: it.pd ?? null, u: it.u || '' }); } }
   /* kategori SMDS / DCNP & update terakhir di tengah bulan */
   const lastUpd = ((MS.promo.upd || []).filter(x => x.mode === 'merge').pop()) || null;
-  const catPcs = k => rowsSku.filter(r => r.cat === k).reduce((a, r) => a + r.t, 0);
+  const catP0 = { S: 0, D: 0 }; for (const r of rowsSku) if (r.cat in catP0) catP0[r.cat] += r.t; const catPcs = k => catP0[k] || 0;
   const rowsAll = rowsSku.length; for (let i = rowsSku.length - 1; i >= 0; i--) { const r = rowsSku[i]; if ((U.psCat && r.cat !== U.psCat) || (U.psNew && !(lastUpd && r.u === lastUpd.id))) rowsSku.splice(i, 1); }
   /* filter diskon & lv2 */
   const discs = [...new Set(rowsSku.map(r => r.d))].sort((a, b) => a - b), l2s = [...new Set(rowsSku.map(r => r.l2))].sort();
@@ -3172,11 +3172,13 @@ function pagePromoStock(view) {
     <div class="filters" style="margin:0"><div class="seg" role="group" aria-label="Kategori promo">${[['', 'Semua'], ['S', 'SMDS'], ['D', 'DCNP']].map(([k, l]) => `<button data-pscat="${k}" class="${(U.psCat || '') === k ? 'on' : ''}">${l}${k ? ` <small>${fmtN(catPcs(k))} pcs</small>` : ''}</button>`).join('')}</div>
       ${lastUpd ? `<label class="small" style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="psNew" ${U.psNew ? 'checked' : ''}> Hanya artikel baru / diskon berubah di update ${esc(fmtDateS(lastUpd.at))} <span class="muted">(${fmtN(lastUpd.add)} baru · ${fmtN(lastUpd.up)} naik${lastUpd.down ? ' · ' + fmtN(lastUpd.down) + ' turun' : ''})</span></label>` : ''}</div>
     <div class="pt-tiles" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr))">
-      <div class="pt-tile"><span>Stok ${U.psCat ? PCAT[U.psCat] : 'DCNP/SMDS'}</span><b>${fmtN(tot.pcs)} pcs</b><small>${fmtPct(allPcs ? tot.pcs / allPcs : null, 1)} dari total stok</small></div>
-      <div class="pt-tile"><span>Artikel-warna</span><b>${fmtN(tot.keys.size)}</b><small>dari ${fmtN(Object.keys(MS.promo.items).length)} di list promo</small></div>
-      <div class="pt-tile"><span>Nilai stok (harga normal)</span><b>${fmtRpS(tot.val)}</b><small>setelah diskon ${fmtRpS(tot.net)}</small></div>
+      ${(() => { const lbl = U.psCat ? PCAT[U.psCat] : 'DCNP & SMDS', vc = k => F.filter(r => r.cat === k).reduce((x, r) => x + r.t * r.p, 0);
+        const nArt = new Set(F.map(r => r.art)).size, nSku = new Set(F.map(r => r.sku)).size;
+        return `<div class="pt-tile" style="background:#0B1B4A"><span>Value stok ${esc(lbl)}</span><b>${fmtRpS(tot.val)}</b><small>${U.psCat ? 'setelah diskon ' + fmtRpS(tot.net) : 'SMDS ' + fmtRpS(vc('S')) + ' · DCNP ' + fmtRpS(vc('D'))}</small></div>
+      <div class="pt-tile"><span>Qty total ${esc(lbl)}</span><b>${fmtN(tot.pcs)} pcs</b><small>${fmtPct(allPcs ? tot.pcs / allPcs : null, 1)} dari total stok toko</small></div>
       <div class="pt-tile"><span>Terjual periode ini</span><b>${fmtN(S0.q)} pcs</b><small>${fmtRpS(S0.v)} gross</small></div>
-      <div class="pt-tile" style="background:#0B1B4A"><span>Sell-through</span><b>${fmtPct(S0.q + tot.pcs ? S0.q / (S0.q + tot.pcs) : null, 1)}</b><small>terjual ÷ (terjual + stok)</small></div>
+      <div class="pt-tile"><span>Sell-through</span><b>${fmtPct(S0.q + tot.pcs ? S0.q / (S0.q + tot.pcs) : null, 1)}</b><small>terjual ÷ (terjual + stok)</small></div>
+      <div class="pt-tile"><span>Jumlah Generic / SKU</span><b>${fmtN(nArt)} / ${fmtN(nSku)}</b><small>generic / SKU · ${fmtN(tot.keys.size)} artikel-warna</small></div>`; })()}
     </div>
     <section class="card"><div class="card-h"><h3>Detail stok per MC Lv2 › Lv3 › Lv4</h3><p class="small muted">klik baris untuk membuka / menutup</p></div>
       <div class="tbl-wrap"><table class="tbl tree"><thead><tr><th>Kategori</th><th class="r">Artikel</th><th class="r">Stok (pcs)</th><th class="r">% stok</th><th class="r">Nilai stok</th><th class="r">Terjual</th><th class="r">Sales</th><th class="r">Cover (bln)</th></tr></thead><tbody>${trs || '<tr><td colspan="8" class="empty">Tidak ada stok barang promo.</td></tr>'}</tbody></table></div>
@@ -6262,8 +6264,10 @@ document.addEventListener('click', e => {
 
 /* ================= RINGKASAN PERFORMANCE (branch = semua toko · pilih toko di Branch = per toko) =================
    Penjualan → target harian → mix produk → per toko / per RA → stok, dalam satu halaman */
+/* tanggal akhir Ringkasan Performance dari pilihan Periode: bulan berjalan = data terakhir, bulan lalu = akhir bulan itu, hari/rentang = s/d tanggal (akhir) itu */
+function perfEnd() { const L = repLast(); if (!L) return null; let d = L; try { const R = periodRange(); if (R && R.to) d = R.to < L ? R.to : L; } catch (e) { } return d; }
 async function perfData() {
-  const D = repLast(); if (!D) return null;
+  const D = perfEnd(); if (!D) return null;
   const m = D.slice(0, 7), day = +D.slice(8), pm = addMonths(m, -1), pd = Math.min(day, dim(pm)), sc = scopeOn() ? App.ui.scope : '';
   await ensureMonths(pm + '-01', D);
   if (!App.daily) await loadDaily().catch(() => { App.daily = { map: new Map(), names: {} }; });
@@ -6360,8 +6364,8 @@ function perfAdvice(X) {
   return A.sort((a, b) => a.p - b.p).slice(0, 8);
 }
 function pagePerf(view) {
-  setHead('Ringkasan Performance', (scopeOn() ? 'Toko ' + sName(App.ui.scope) : 'Branch Jateng 01 · semua toko') + ' · penjualan, pencapaian target harian, saran tindakan, produk & stok bulan berjalan');
-  const key = (scopeOn() ? App.ui.scope : 'all') + '|' + repLast() + '|' + (App.ui.typeF || '');
+  { const e = perfEnd(); setHead('Ringkasan Performance', (scopeOn() ? 'Toko ' + sName(App.ui.scope) : 'Branch Jateng 01 · semua toko') + (e ? ` · periode 1–${+e.slice(8)} ${fmtMonth(e.slice(0, 7))}${App.period.mode === 'range' || App.period.mode === 'day' ? ' (MTD s/d tanggal terpilih)' : ''}` : '') + ' · penjualan, target harian, saran tindakan, produk & stok'); }
+  const key = (scopeOn() ? App.ui.scope : 'all') + '|' + perfEnd() + '|' + (App.ui.typeF || '');
   if (!App.perf || App.perf.key !== key) {
     view.innerHTML = '<div class="loading"><span class="spin"></span>Menyusun ringkasan performance…</div>';
     perfData().then(d => { App.perf = { key, X: d }; if (App.page === 'perf') render(); }, e => { App.perf = { key, err: errMsg(e) }; if (App.page === 'perf') render(); });

@@ -854,6 +854,19 @@ button.pd-sz:hover{box-shadow:0 0 0 3px rgba(15,49,146,.12)}
   @media (max-width:760px){.pt-tiles>.pt-tile:last-child:nth-child(odd),.perf-strip>div:last-child:nth-child(odd){grid-column:1/-1}.mp-groups{columns:1}}
   @media (max-width:1240px){#nav .nav-perf .nl{display:none}#nav .nav-perf,#nav .nav-ai{padding:6px 11px;margin:0 3px}}
   @media (max-width:1100px){#nav .nav-search .nl{display:none}}
+  .ps-cats{display:flex;align-items:center;gap:6px;flex-wrap:wrap;background:#fff;border:1px solid var(--line,#E2E8F0);border-radius:12px;padding:5px 8px}
+  .ps-cats label{display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:9px;cursor:pointer;font-weight:700;color:#334155;user-select:none}
+  .ps-cats label.on{background:var(--navy-tint,#EEF2FF);color:var(--navy,#0F3192)}.ps-cats small{color:var(--muted,#64748B);font-weight:500}.ps-cats input{width:17px;height:17px;accent-color:#0F3192;margin:0}
+  .msel{position:relative;display:inline-block}
+  .msel>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:6px;background:#fff;border:1px solid var(--line,#D9DEE8);border-radius:10px;padding:7px 12px;font-size:13.5px;white-space:nowrap;color:#1E293B;min-height:38px;box-sizing:border-box}
+  .msel>summary::-webkit-details-marker{display:none}.msel .ml{color:var(--muted,#64748B);font-weight:600}.msel .mc{font-style:normal;color:var(--muted,#64748B);font-size:11px}
+  .msel.act>summary{border-color:#0F3192;background:#EEF2FF;color:#0F3192}.msel[open]>summary{box-shadow:0 0 0 3px rgba(15,49,146,.15)}
+  .msel-pop{position:absolute;z-index:60;top:calc(100% + 6px);left:0;min-width:240px;max-width:340px;background:#fff;border:1px solid var(--line,#E2E8F0);border-radius:14px;box-shadow:0 14px 34px rgba(15,23,42,.18);padding:10px;color:#1E293B;text-align:left}
+  .msel-top{display:flex;gap:6px;margin-bottom:6px}.msel-list{max-height:280px;overflow:auto;display:flex;flex-direction:column;gap:2px}
+  .msel-list label{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:8px;cursor:pointer;font-size:13.5px}.msel-list label:hover{background:#F1F5F9}
+  .msel-list input{width:16px;height:16px;accent-color:#0F3192;margin:0;flex:none}.msel-ok{width:100%;margin-top:8px;box-sizing:border-box}.msel-pop *{box-sizing:border-box}.msel-pop label,.msel-pop label span{color:#1E293B!important;opacity:1!important;font-weight:600}.msel-pop .btn:not(.primary){background:#fff!important;color:#0F3192!important;border:1px solid #D9DEE8!important}.msel-pop .btn.primary{background:#0F3192!important;color:#fff!important}
+  .mchips button{white-space:nowrap}
+  @media (max-width:760px){.msel-pop{position:fixed;left:12px;right:12px;top:auto;bottom:84px;max-width:none;max-height:70vh;display:flex;flex-direction:column}.msel-list{max-height:none;flex:1}}
 </style>
 </head>
 <body>
@@ -1696,9 +1709,10 @@ function coverDays(c, from, to) {
 const autoType = c => /^9/.test(c) ? 'bz' : /^[257]/.test(c) ? 'rg' : 'ot';
 const sType = c => (App.stores[c] && App.stores[c].type) || autoType(c);
 const TYPE_LABEL = { rg: 'Reguler', bz: 'Bazaar', ot: 'Lainnya' };
+const typeLbl = () => String(App.ui.typeF || '').split(',').filter(Boolean).map(t => TYPE_LABEL[t] || t).join(' + ');
 /* mode tampilan: '' = branch (semua toko), atau kode toko (store head hanya melihat tokonya) */
 const scopeOn = () => !!App.ui.scope && !['admin', 'settings', 'home', 'omset'].includes(App.page) && !isOps(App.page);
-const typeOk = c => inArea(c) && (!scopeOn() || c === App.ui.scope) && (!App.ui.typeF || sType(c) === App.ui.typeF);
+const typeOk = c => inArea(c) && (!scopeOn() || c === App.ui.scope) && (!App.ui.typeF || App.ui.typeF.split(',').includes(sType(c)));
 const activeStores = () => storeCodes().filter(typeOk);
 const hasTypes = () => new Set(storeCodes().map(sType)).size > 1;
 /* ---- data Sales Report: harian & kumulatif per toko, [qty, bruto, netto] ---- */
@@ -1957,6 +1971,41 @@ function periodRange() {
 }
 const targetFor = (c, R) => R.monthMode ? monthTarget(c, R.month) : proratedTarget(c, R.from, R.to);
 
+/* ================= komponen pilihan ceklis (multi pilih) =================
+   kosong = semua (tanpa filter). Perubahan diterapkan saat tombol Terapkan / pilihan ditutup. */
+const ML = v => Array.isArray(v) ? v.map(String) : (v == null || v === '' ? [] : [String(v)]);
+const inML = (v, x) => { const a = ML(v); return !a.length || a.includes(String(x)); };
+const MSEL_SET = {
+  typeF: a => { App.ui.typeF = a.join(','); App.cache.tr = null; }
+};
+function msel(key, label, opts, cur) {
+  opts = opts.map(o => Array.isArray(o) ? [String(o[0]), String(o[1])] : [String(o), String(o)]);
+  const C = ML(cur), on = opts.filter(o => C.includes(o[0])), part = on.length && on.length < opts.length;
+  const sum = !part ? 'Semua' : on.length <= 2 ? on.map(o => o[1]).join(', ') : on.length + ' dipilih';
+  return `<details class="msel${part ? ' act' : ''}" data-msel="${esc(key)}"><summary><span class="ml">${esc(label)}</span><b>${esc(sum)}</b><i class="mc">▾</i></summary><div class="msel-pop">
+    <div class="msel-top"><button type="button" class="btn sm" data-mselall="1">☑ Pilih semua</button><button type="button" class="btn sm" data-mselall="0">☐ Kosongkan</button></div>
+    <div class="msel-list">${opts.map(([v, t]) => `<label><input type="checkbox" value="${esc(v)}" ${C.includes(v) ? 'checked' : ''}><span>${esc(t)}</span></label>`).join('') || '<p class="small muted">Tidak ada pilihan.</p>'}</div>
+    <button type="button" class="btn primary sm msel-ok" data-mselok="1">Terapkan</button></div></details>`;
+}
+function mselApply(d) {
+  const key = d.dataset.msel, box = [...d.querySelectorAll('.msel-list input')], vals = box.filter(i => i.checked).map(i => i.value);
+  const arr = vals.length === box.length ? [] : vals; delete d.dataset.dirty;
+  (MSEL_SET[key] || (a => { App.ui[key] = a; }))(arr); App.ui.more = {}; render();
+}
+document.addEventListener('click', e => {
+  const t = e.target; if (!t || !t.closest) return;
+  const all = t.closest('[data-mselall]'); if (all) { const d = all.closest('.msel'); d.querySelectorAll('.msel-list input').forEach(i => { i.checked = all.dataset.mselall === '1'; }); d.dataset.dirty = 1; return; }
+  const ok = t.closest('[data-mselok]'); if (ok) { const d = ok.closest('.msel'); d.dataset.dirty = 1; d.open = false; return; }
+  document.querySelectorAll('details.msel[open]').forEach(d => { if (!d.contains(t)) d.open = false; });
+}, true);
+document.addEventListener('change', e => { const d = e.target && e.target.closest && e.target.closest('.msel'); if (d) d.dataset.dirty = 1; }, true);
+document.addEventListener('toggle', e => { const d = e.target; if (!d.classList || !d.classList.contains('msel')) return;
+  if (d.open) { document.querySelectorAll('details.msel[open]').forEach(x => { if (x !== d) x.open = false; }); const pop = d.querySelector('.msel-pop'); if (pop && innerWidth > 760) { pop.style.left = ''; pop.style.right = ''; const r = pop.getBoundingClientRect(); if (r.right > innerWidth - 8) { pop.style.left = 'auto'; pop.style.right = '0'; } } return; }
+  if (d.dataset.dirty) mselApply(d); }, true);
+/* tombol pilihan (chip) yang bisa dipilih lebih dari satu: klik = centang/lepas, "Semua" = kosongkan */
+const chipsML = (attr, list, cur) => { const C = ML(cur); return `<div class="seg mchips" role="group"><button ${attr}="" class="${!C.length ? 'on' : ''}">Semua</button>${list.map(c => `<button ${attr}="${esc(c)}" class="${C.includes(String(c)) ? 'on' : ''}">${C.includes(String(c)) ? '☑' : '☐'} ${esc(c)}</button>`).join('')}</div>`; };
+const toggleML = (cur, v) => { if (v === '') return []; const C = ML(cur); return C.includes(v) ? C.filter(x => x !== v) : [...C, v]; };
+
 /* ================= shell ================= */
 const ICON = {
   area: '<path d="M3 20h18M5 20V10m5 10V4m5 16v-7m5 7V8"/>',
@@ -2058,7 +2107,7 @@ function renderNav() {
 function renderPeriod() {
   const box = $('#periodBox');
   if (App.page === 'home' || isOps(App.page)) { box.innerHTML = ''; return; }
-  const tsel = hasTypes() && App.page !== 'toko' && !scopeOn() ? `<label class="small muted" for="typeSel">Jenis toko</label><select id="typeSel" class="inp"><option value="">Semua toko</option>${['rg', 'bz', 'ot'].filter(t => storeCodes().some(c => sType(c) === t)).map(t => `<option value="${t}" ${App.ui.typeF === t ? 'selected' : ''}>${TYPE_LABEL[t]}</option>`).join('')}</select>` : '';
+  const tsel = hasTypes() && App.page !== 'toko' && !scopeOn() ? msel('typeF', 'Jenis toko', ['rg', 'bz', 'ot'].filter(t => storeCodes().some(c => sType(c) === t)).map(t => [t, TYPE_LABEL[t]]), String(App.ui.typeF || '').split(',').filter(Boolean)) : '';
   if (['report', 'promo', 'omni', 'eac', 'lost', 'detention', 'growth', 'stok', 'transfer', 'ro', 'pica', 'juknis', 'bc', 'omset', 'satr', 'sabo', 'ai'].includes(App.page)) { box.innerHTML = tsel; return; }
   if (!App.lastDate || ['admin', 'settings', 'links', 'bm_target', 'bm_dinas', 'produk', 'wbr'].includes(App.page)) { box.innerHTML = ''; return; }
   const L = App.lastDate, cm = L.slice(0, 7);
@@ -2358,7 +2407,7 @@ function pageReport(view) {
   const val = U.rpVal || SET().defaultValue || 'g';
   if (!App.loaded.has(D.slice(0, 7)) && App.index.sales[D.slice(0, 7)]) { view.innerHTML = '<div class="loading"><span class="spin"></span>Mengambil data…</div>'; ensureMonths(D, D).then(render, loadFail); return; }
   const R = reportData(D, val);
-  setHead('Monitoring Sales' + (App.ui.typeF ? ' · ' + TYPE_LABEL[App.ui.typeF] : ''), R.rows.length + ' site · tanggal ' + fmtDate(D) + ' · kumulatif 1–' + (+D.slice(8)) + ' ' + fmtMonth(R.m) + (R.hasW ? ' · bobot harian ' + fmtPct(R.cw, 1) : ' · bobot harian belum diupload, target dibagi rata'));
+  setHead('Monitoring Sales' + (App.ui.typeF ? ' · ' + typeLbl() : ''), R.rows.length + ' site · tanggal ' + fmtDate(D) + ' · kumulatif 1–' + (+D.slice(8)) + ' ' + fmtMonth(R.m) + (R.hasW ? ' · bobot harian ' + fmtPct(R.cw, 1) : ' · bobot harian belum diupload, target dibagi rata'));
   const st = U.rpSort || { k: 'mAch', dir: 'desc' };
   const groups = rpGroups(R.rows);
   const sh = (k, l) => `<th class="s" data-rps="${k}">${l}${st.k === k ? (st.dir === 'asc' ? ' ▲' : ' ▼') : ''}</th>`;
@@ -2402,7 +2451,7 @@ async function exportReport() {
   const line = (c, n, r) => [c, n, Math.round(r.T), r4(r.mAch), Math.round(r.cT), Math.round(r.cs), r4(r.cAch), Math.round(r.cDiff), u2(r.cUpt), rb(r.cBs), Math.round(r.dT), Math.round(r.ds), r4(r.dAch), Math.round(r.dDiff), u2(r.dUpt), rb(r.dBs)];
   const body = []; for (const g of rpGroups(R.rows)) { if (g.label) body.push(['', g.label.toUpperCase()]); for (const r of g.rows) body.push(line(r.c, r.name, r)); if (g.sub) body.push(line('', 'SUBTOTAL ' + g.label.toUpperCase(), g.sub)); }
   const aoa = [
-    ['DAILY REPORT REGIONAL 3'], ['BRANCH :', 'JATENG 01' + (App.ui.typeF ? ' (' + TYPE_LABEL[App.ui.typeF] + ')' : '')], ['Date :', fmtDate(R.D)],
+    ['DAILY REPORT REGIONAL 3'], ['BRANCH :', 'JATENG 01' + (App.ui.typeF ? ' (' + typeLbl() + ')' : '')], ['Date :', fmtDate(R.D)],
     ['Monthly Sales Achievement', r4(R.t.mAch), '', 'Cumulative Sales Achievement', r4(R.t.cAch), '', 'Daily Sales Achievement', r4(R.t.dAch)], [],
     ['Site', 'Store', 'Monthly Sales', '', 'Kumulatif Sales', '', '', '', '', '', 'Daily Sales'],
     ['', '', 'Target', '%Ach', 'Target', 'Sales', '%Ach', 'Diff', 'UPT', 'Basket Size', 'Target', 'Sales', '%Ach', 'Diff', 'UPT', 'Basket Size'],
@@ -2602,7 +2651,7 @@ function pageOmni(view) {
   const m = U.omM && allM.includes(U.omM) ? U.omM : (allM[0] || (App.lastDate || todayISO()).slice(0, 7)); U.omM = m;
   if (!App.loaded.has(m) && App.index.sales[m]) { view.innerHTML = '<div class="loading"><span class="spin"></span>Mengambil data…</div>'; ensureMonths(m + '-01', m + '-01').then(render, loadFail); return; }
   const O = omniData(m);
-  setHead('Monitoring OmniChannel' + (U.typeF ? ' · ' + TYPE_LABEL[U.typeF] : ''), fmtMonth(m) + (O.last ? ' · actual s/d ' + fmtDate(O.last) : '') + ' · ' + O.rows.length + ' site');
+  setHead('Monitoring OmniChannel' + (U.typeF ? ' · ' + typeLbl() : ''), fmtMonth(m) + (O.last ? ' · actual s/d ' + fmtDate(O.last) : '') + ' · ' + O.rows.length + ' site');
   const st = U.omSort || { k: 'totP', dir: 'desc' };
   const rows = O.rows.slice().sort((a, b) => { const x = a[st.k], y = b[st.k]; const r = typeof x === 'string' ? String(x).localeCompare(String(y), 'id') : (x ?? -Infinity) - (y ?? -Infinity); return st.dir === 'asc' ? r : -r; });
   const G = SET().achGreen / 100;
@@ -2693,7 +2742,7 @@ function pageEac(view) {
   const tot = rows.reduce((a, r) => { a.t += r.t; a.ct += r.ct; a.a += r.a; a.mtrx += r.mtrx; a.dmv += r.dmv; return a; }, { t: 0, ct: 0, a: 0, mtrx: 0, dmv: 0 });
   let allV = 0, allN = 0, allNT = 0, allDV = 0; for (const x of S.values()) { allV += x.v; allN += x.nv; allNT += x.ntrx.size; allDV += x.dv; }
   tot.pM = tot.t ? tot.a / tot.t : null; tot.pC = tot.ct ? tot.a / tot.ct : null; tot.d = tot.a - tot.ct; tot.share = allV ? tot.a / allV : null; tot.mem = CU.size; tot.mbs = tot.mtrx ? tot.a / tot.mtrx : null; tot.nbs = allNT ? allN / allNT : null; tot.dshare = allDV ? tot.dmv / allDV : null;
-  setHead('Sales Member EAC' + (U.typeF ? ' · ' + TYPE_LABEL[U.typeF] : ''), 'Kumulatif 1–' + day + ' ' + fmtMonth(m) + ' · sales dari transaksi yang mencantumkan nama customer · gross');
+  setHead('Sales Member EAC' + (U.typeF ? ' · ' + typeLbl() : ''), 'Kumulatif 1–' + day + ' ' + fmtMonth(m) + ' · sales dari transaksi yang mencantumkan nama customer · gross');
   const st = U.eaSort || { k: 'pC', dir: 'desc' };
   const srt = rows.slice().sort((a, b) => { const x = a[st.k], y = b[st.k]; const r = typeof x === 'string' ? String(x).localeCompare(String(y), 'id') : (x ?? -Infinity) - (y ?? -Infinity); return st.dir === 'asc' ? r : -r; });
   const G = SET().achGreen / 100, Y = SET().achYellow / 100;
@@ -3136,11 +3185,12 @@ function pagePromoStock(view) {
       rowsSku.push({ c, sku, art: artOf(sku), key: pr.key, d: pr.d, p: pr.p || (mi && mi.p) || 0, t, l2: it.l2 || (mi && mi.l2) || '–', l3: it.l3 || (mi && mi.l3) || '–', l4: (mi && mi.l4) || it.l4 || (App.sku[sku] || [])[2] || '–', n: it.n || (mi && mi.n) || '', cat: pr.c || it.c || '', pd: it.pd ?? null, u: it.u || '' }); } }
   /* kategori SMDS / DCNP & update terakhir di tengah bulan */
   const lastUpd = ((MS.promo.upd || []).filter(x => x.mode === 'merge').pop()) || null;
-  const catP0 = { S: 0, D: 0 }; for (const r of rowsSku) if (r.cat in catP0) catP0[r.cat] += r.t; const catPcs = k => catP0[k] || 0;
-  const rowsAll = rowsSku.length; for (let i = rowsSku.length - 1; i >= 0; i--) { const r = rowsSku[i]; if ((U.psCat && r.cat !== U.psCat) || (U.psNew && !(lastUpd && r.u === lastUpd.id))) rowsSku.splice(i, 1); }
+  const psSel = Array.isArray(U.psCats) && U.psCats.length ? U.psCats : ['S', 'D'];
+  const catP0 = { S: 0, D: 0, N: 0 }; for (const r of rowsSku) catP0[r.cat === 'S' || r.cat === 'D' ? r.cat : 'N'] += r.t; const catPcs = k => catP0[k] || 0;
+  const rowsAll = rowsSku.length; for (let i = rowsSku.length - 1; i >= 0; i--) { const r = rowsSku[i]; if (!psSel.includes(r.cat === 'S' || r.cat === 'D' ? r.cat : 'N') || (U.psNew && !(lastUpd && r.u === lastUpd.id))) rowsSku.splice(i, 1); }
   /* filter diskon & lv2 */
   const discs = [...new Set(rowsSku.map(r => r.d))].sort((a, b) => a - b), l2s = [...new Set(rowsSku.map(r => r.l2))].sort();
-  const F = rowsSku.filter(r => (!U.psD || r.d === +U.psD) && (!U.psL2 || r.l2 === U.psL2));
+  const F = rowsSku.filter(r => inML(U.psD, r.d) && inML(U.psL2, r.l2));
   /* penjualan barang promo di periode berjalan */
   const sold = new Map(); for (const l of linesIn(R.from, R.to, st || null)) { if (!MS.psku.has(l.sku)) continue; const x = sold.get(l.sku) || { q: 0, v: 0 }; x.q += l.q; x.v += l.g; sold.set(l.sku, x); }
   const soldOf = rs => { const seen = new Set(); let q = 0, v = 0; for (const r of rs) { if (seen.has(r.sku)) continue; seen.add(r.sku); const x = sold.get(r.sku); if (x) { q += x.q; v += x.v; } } return { q, v }; };
@@ -3159,22 +3209,22 @@ function pagePromoStock(view) {
     if (open[ida]) for (const b of [...a.ch.values()].sort((x, y) => y.pcs - x.pcs)) { const idb = a.k + '›' + b.k; trs += trow(2, idb, b, true);
       if (open[idb]) for (const c of [...b.ch.values()].sort((x, y) => y.pcs - x.pcs)) trs += trow(3, idb + '›' + c.k, c, false); } }
   /* per diskon & per toko */
-  const byD = new Map(); for (const r of rowsSku.filter(r => !U.psL2 || r.l2 === U.psL2)) { const x = byD.get(r.d) || { pcs: 0, val: 0 }; x.pcs += r.t; x.val += r.t * r.p; byD.set(r.d, x); }
+  const byD = new Map(); for (const r of rowsSku.filter(r => inML(U.psL2, r.l2))) { const x = byD.get(r.d) || { pcs: 0, val: 0 }; x.pcs += r.t; x.val += r.t * r.p; byD.set(r.d, x); }
   const byS = new Map(); for (const r of F) { const x = byS.get(r.c) || { pcs: 0, val: 0, keys: new Set() }; x.pcs += r.t; x.val += r.t * r.p; x.keys.add(r.key); byS.set(r.c, x); }
   const storePcs = c => { let t = 0; const S = App.stock[c]; if (S) for (const k in S.items) if (!isPB(k) && S.items[k][0] > 0) t += S.items[k][0]; return t; };
   /* per artikel-warna */
   const byK = new Map(); for (const r of F) { const x = byK.get(r.key) || { key: r.key, art: r.art, n: r.n, color: r.key.split('.').slice(1).join('.'), d: r.d, p: r.p, l4: r.l4, cat: r.cat, pd: r.pd, nw: !!(lastUpd && r.u === lastUpd.id && r.pd == null), pcs: 0, stores: new Set(), rs: [] }; x.pcs += r.t; x.stores.add(r.c); x.rs.push(r); byK.set(r.key, x); }
   view.innerHTML = `<div class="stack">
     <div class="filters" style="margin:0"><label class="small muted" for="psStore">Toko</label><select id="psStore" class="inp"><option value="">Semua toko</option>${codes.map(c => `<option value="${esc(c)}" ${c === st ? 'selected' : ''}>${esc(c)} - ${esc(sName(c))}</option>`).join('')}</select>
-      <label class="small muted" for="psD">Diskon</label><select id="psD" class="inp"><option value="">Semua</option>${discs.map(d => `<option value="${d}" ${String(d) === String(U.psD) ? 'selected' : ''}>${d}%</option>`).join('')}</select>
-      <label class="small muted" for="psL2">MC Lv2</label><select id="psL2" class="inp"><option value="">Semua</option>${l2s.map(x => `<option ${x === U.psL2 ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select>
+      ${msel('psD', 'Diskon', discs.map(d => [d, d + '%']), U.psD)}
+      ${msel('psL2', 'MC Lv2', l2s, U.psL2)}
       <span class="small muted">Terjual = ${esc(R.label.toLowerCase())}</span></div>
-    <div class="filters" style="margin:0"><div class="seg" role="group" aria-label="Kategori promo">${[['', 'Semua'], ['S', 'SMDS'], ['D', 'DCNP']].map(([k, l]) => `<button data-pscat="${k}" class="${(U.psCat || '') === k ? 'on' : ''}">${l}${k ? ` <small>${fmtN(catPcs(k))} pcs</small>` : ''}</button>`).join('')}</div>
+    <div class="filters" style="margin:0"><div class="ps-cats" role="group" aria-label="Kategori promo"><span class="small muted">Kategori:</span>${[['S', 'SMDS'], ['D', 'DCNP'], ...(catP0.N ? [['N', 'Tanpa kategori']] : [])].map(([k, l]) => `<label class="${psSel.includes(k) ? 'on' : ''}"><input type="checkbox" data-pscats="${k}" ${psSel.includes(k) ? 'checked' : ''}> ${l} <small>${fmtN(catPcs(k))} pcs</small></label>`).join('')}</div>
       ${lastUpd ? `<label class="small" style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="psNew" ${U.psNew ? 'checked' : ''}> Hanya artikel baru / diskon berubah di update ${esc(fmtDateS(lastUpd.at))} <span class="muted">(${fmtN(lastUpd.add)} baru · ${fmtN(lastUpd.up)} naik${lastUpd.down ? ' · ' + fmtN(lastUpd.down) + ' turun' : ''})</span></label>` : ''}</div>
     <div class="pt-tiles" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr))">
-      ${(() => { const lbl = U.psCat ? PCAT[U.psCat] : 'DCNP & SMDS', vc = k => F.filter(r => r.cat === k).reduce((x, r) => x + r.t * r.p, 0);
+      ${(() => { const NM = { S: 'SMDS', D: 'DCNP', N: 'tanpa kategori' }, lbl = catP0.N && psSel.length === 3 ? 'list promo' : psSel.map(k => NM[k]).join(' & '), vc = k => F.filter(r => k === 'N' ? !(r.cat === 'S' || r.cat === 'D') : r.cat === k).reduce((x, r) => x + r.t * r.p, 0);
         const nArt = new Set(F.map(r => r.art)).size, nSku = new Set(F.map(r => r.sku)).size;
-        return `<div class="pt-tile" style="background:#0B1B4A"><span>Value stok ${esc(lbl)}</span><b>${fmtRpS(tot.val)}</b><small>${U.psCat ? 'setelah diskon ' + fmtRpS(tot.net) : 'SMDS ' + fmtRpS(vc('S')) + ' · DCNP ' + fmtRpS(vc('D'))}</small></div>
+        return `<div class="pt-tile" style="background:#0B1B4A"><span>Value stok ${esc(lbl)}</span><b>${fmtRpS(tot.val)}</b><small>${psSel.length === 1 ? 'setelah diskon ' + fmtRpS(tot.net) : psSel.map(k => NM[k] + ' ' + fmtRpS(vc(k))).join(' · ')}</small></div>
       <div class="pt-tile"><span>Qty total ${esc(lbl)}</span><b>${fmtN(tot.pcs)} pcs</b><small>${fmtPct(allPcs ? tot.pcs / allPcs : null, 1)} dari total stok toko</small></div>
       <div class="pt-tile"><span>Terjual periode ini</span><b>${fmtN(S0.q)} pcs</b><small>${fmtRpS(S0.v)} gross</small></div>
       <div class="pt-tile"><span>Sell-through</span><b>${fmtPct(S0.q + tot.pcs ? S0.q / (S0.q + tot.pcs) : null, 1)}</b><small>terjual ÷ (terjual + stok)</small></div>
@@ -3471,7 +3521,7 @@ function pageTransfer(view) {
   let all = transfers().filter(r => (typeOk(r.from) || typeOk(r.to)));
   if (sc) all = all.filter(r => r.from === sc || r.to === sc);
   const c3s = [...new Set(all.map(r => r.c3))].sort();
-  let rows = all.filter(r => (!st || (dir === 'out' ? r.from === st : dir === 'in' ? r.to === st : (r.from === st || r.to === st))) && (!U.tfC3 || r.c3 === U.tfC3));
+  let rows = all.filter(r => (!st || (dir === 'out' ? r.from === st : dir === 'in' ? r.to === st : (r.from === st || r.to === st))) && inML(U.tfC3, r.c3));
   if (U.tfQ) { const q = U.tfQ.toLowerCase(); rows = rows.filter(r => (r.name + ' ' + r.art).toLowerCase().includes(q)); }
   const why = (k, cover) => k === 'DS' ? `tidak terjual ${S0.windowDays} hari` : k === 'SM' ? `stok cukup ${cover == null ? '>' : fmtX(cover, 1)} bln` : k === 'HB' ? 'stok habis' : `stok tinggal ${cover == null ? '<1' : fmtX(cover, 1)} bln`;
   const tot = rows.reduce((a, r) => { a.q += r.qty; a.arts.add(r.art); a.from.add(r.from); a.to.add(r.to); return a; }, { q: 0, arts: new Set(), from: new Set(), to: new Set() });
@@ -3480,7 +3530,7 @@ function pageTransfer(view) {
   view.innerHTML = `<div class="stack">
     <div class="filters" style="margin:0"><label class="small muted" for="tfStore">Toko</label><select id="tfStore" class="inp"><option value="">Semua toko</option>${codes.map(c => `<option value="${esc(c)}" ${c === st ? 'selected' : ''}>${esc(c)} - ${esc(sName(c))}</option>`).join('')}</select>
       <div class="seg" role="group" aria-label="Arah transfer"><button data-tfd="" class="${!dir ? 'on' : ''}">Semua</button><button data-tfd="out" class="${dir === 'out' ? 'on' : ''}">Kirim dari toko</button><button data-tfd="in" class="${dir === 'in' ? 'on' : ''}">Terima ke toko</button></div>
-      <select id="tfC3" class="inp"><option value="">Semua kategori</option>${c3s.map(c => `<option ${c === U.tfC3 ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select>
+      ${msel('tfC3', 'Kategori', c3s, U.tfC3)}
       <input id="tfQ" class="inp" type="search" placeholder="Cari artikel" value="${esc(U.tfQ || '')}" style="flex:1 1 180px">
       <button class="btn" id="tfXls">Download Excel</button></div>
     ${thin.length ? `<div class="note">${thin.length} toko belum punya cukup data penjualan (kurang dari 14 hari), sehingga belum ikut dihitung: ${thin.slice(0, 5).map(c => esc(sName(c))).join(', ')}${thin.length > 5 ? ' +' + (thin.length - 5) : ''}.</div>` : ''}
@@ -3978,8 +4028,8 @@ function pageJuknisOld(view) {
   setHead('Promo', 'Reminder promo yang sedang & akan berjalan dari juknis promo');
   if (!all.length) { view.innerHTML = `<div class="empty-state"><h2>Belum ada juknis promo</h2><p class="muted">${App.admin ? 'Upload file PDF juknis promo di Kelola data. Dashboard membaca setiap slide promo secara otomatis.' : 'Admin belum mengunggah juknis promo.'}</p></div>`; return; }
   const sc = scopeOn() ? App.ui.scope : '', bz = sc && sType(sc) === 'bz';
-  const cat = U.jkCat || '';
-  const fit = p => (!cat || p.cat === cat) && (!sc || (bz ? p.site !== 'reguler' || p.cat === 'Banking' : p.site !== 'bazaar'));
+  const cat = ML(U.jkCat);
+  const fit = p => inML(cat, p.cat) && (!sc || (bz ? p.site !== 'reguler' || p.cat === 'Banking' : p.site !== 'bazaar'));
   const list = all.filter(fit).map(p => ({ p, S: promoState(p, D) }));
   const on = list.filter(x => x.S.on).sort((a, b) => (a.S.daysLeft ?? 99) - (b.S.daysLeft ?? 99));
   const soon = list.filter(x => !x.S.on && x.S.next).sort((a, b) => a.S.daysTo - b.S.daysTo);
@@ -3993,7 +4043,7 @@ function pageJuknisOld(view) {
   const ending = on.filter(x => x.S.daysLeft != null && x.S.daysLeft <= 3).length, tomorrow = soon.filter(x => x.S.daysTo === 1).length;
   view.innerHTML = `<div class="stack">
     <div class="filters" style="margin:0"><label class="small muted" for="jkDate">Tanggal</label><input type="date" id="jkDate" class="inp" value="${D}">
-      <div class="seg" role="group" aria-label="Kategori"><button data-jkc="" class="${!cat ? 'on' : ''}">Semua</button>${cats.map(c => `<button data-jkc="${esc(c)}" class="${cat === c ? 'on' : ''}">${esc(c)}</button>`).join('')}</div>
+      ${chipsML('data-jkc', cats, cat)}
       ${sc ? `<span class="small muted">Menampilkan promo yang berlaku untuk toko ${bz ? 'bazaar' : 'reguler'} (${esc(sName(sc))})</span>` : ''}</div>
     <div class="pt-tiles" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr))">
       <div class="pt-tile" style="background:#13806F"><span>Berjalan ${D === today ? 'hari ini' : fmtDateS(D)}</span><b>${on.length} promo</b><small>${ending ? ending + ' berakhir ≤ 3 hari' : '&nbsp;'}</small></div>
@@ -4473,9 +4523,9 @@ function pageTask(view) {
 /* ---------- Informasi ---------- */
 function pageInfo(view) {
   const U = App.ui, H = App.hub, today = todayISO(), me = App.user || {};
-  const cat = U.ifCat || '', q = (U.ifQ || '').toLowerCase();
+  const cat = ML(U.ifCat), q = (U.ifQ || '').toLowerCase();
   const cats = [...new Set(['Informasi HO', 'MoM Meeting', ...H.info.map(i => i.cat).filter(Boolean)])];
-  let rows = H.info.filter(i => (!cat || (i.cat || 'Informasi HO') === cat) && (!q || (i.title + ' ' + i.desc + ' ' + (i.pic || '')).toLowerCase().includes(q)));
+  let rows = H.info.filter(i => inML(cat, i.cat || 'Informasi HO') && (!q || (i.title + ' ' + i.desc + ' ' + (i.pic || '')).toLowerCase().includes(q)));
   rows.sort((a, b) => (b.date || b.created || '').localeCompare(a.date || a.created || ''));
   const thisM = H.info.filter(i => (i.date || '').startsWith(today.slice(0, 7))).length, thisW = H.info.filter(i => i.date && dayDiff(i.date, today) <= 7).length;
   setHead('Informasi', 'Info, arahan & materi terbaru dari HO untuk seluruh toko');
@@ -4490,7 +4540,7 @@ function pageInfo(view) {
         <label class="fl">Link materi (PPT/PDF/Drive)<input class="inp" id="ifL" type="url" placeholder="https://…"></label>
         <label class="fl">Nama file (opsional)<input class="inp" id="ifN"></label>
       </div><button class="btn primary" id="ifGo">Simpan informasi</button></details>
-    <div class="filters" style="margin:0"><div class="seg" role="group"><button data-ifc="" class="${!cat ? 'on' : ''}">Semua</button>${cats.map(c => `<button data-ifc="${esc(c)}" class="${cat === c ? 'on' : ''}">${esc(c)}</button>`).join('')}</div>
+    <div class="filters" style="margin:0">${chipsML('data-ifc', cats, cat)}
       <input class="inp" id="ifQ" type="search" placeholder="Cari informasi" value="${esc(U.ifQ || '')}" style="flex:1 1 180px">${App.admin ? '<button class="btn" id="hubImp">⬆ Import Excel</button>' : ''}</div>
     <div class="hub-list">${rows.map(i => { const nw = i.date && dayDiff(i.date, today) <= 7;
       return `<div class="hub-item"><div class="hi-main"><div class="hi-top"><span class="jk-b">${esc(i.cat || 'Informasi HO')}</span>${nw ? '<span class="jk-b ok">🆕 Baru</span>' : ''}<span class="small muted">${i.date ? fmtDate(i.date) : ''}</span></div>
@@ -4764,7 +4814,7 @@ function pageOmset(view) {
   /* sales s/d kemarin dari ringkasan DSR (bila kumulatif CARE tidak ada) */
   const prevTY = c => { let t = 0; for (let d = m + '-01'; d < D; d = addDays(d, 1)) { const v = tyVal(c, d); if (v) t += v; } return t; };
   /* share omset untuk grup: selalu tampil seluruh toko area (juga untuk akun toko yang sedang piket) */
-  const tOk = c => !App.ui.typeF || sType(c) === App.ui.typeF;
+  const tOk = c => !App.ui.typeF || App.ui.typeF.split(',').includes(sType(c));
   const codes = [...area].filter(c => tOk(c) && (monthTarget(c, m) || (S && S.rows.some(r => r[0] === c))));
   const rows = codes.map(c => { const T = monthTarget(c, m), tD = T * dw, tC = T * cw, r = S ? S.rows.find(x => x[0] === c) : null, rc = C ? C.rows.find(x => x[0] === c) : null;
     const sales = r ? r[2] : null, cum = rc ? rc[2] : (sales != null ? prevTY(c) + sales : null);
@@ -4941,15 +4991,17 @@ function pageProduct(view) {
   /* filter */
   const sku12 = /^\d{12}$/.test(String(U.prodQ || '').trim()) ? String(U.prodQ).trim() : '';
   const fQ = r => { if (sku12) return r.art === artOf(sku12); if (!U.prodQ) return true; const q = U.prodQ.toLowerCase(); return (r.name + ' ' + r.art + ' ' + r.l4).toLowerCase().includes(q); };
-  const pre = base.filter(r => (!U.prodGd || r.gd === U.prodGd) && fQ(r));
+  const pre = base.filter(r => inML(U.prodGd, r.gd) && fQ(r));
   const opt = (f, k) => [...new Set(pre.filter(f).map(r => r[k]))].sort();
-  const l2s = opt(() => true, 'l2'), l3s = opt(r => !U.prodL2 || r.l2 === U.prodL2, 'l3'), l4s = opt(r => (!U.prodL2 || r.l2 === U.prodL2) && (!U.prodL3 || r.l3 === U.prodL3), 'l4');
+  const l2s = opt(() => true, 'l2'); U.prodL2 = ML(U.prodL2).filter(x => l2s.includes(x));
+  const l3s = opt(r => inML(U.prodL2, r.l2), 'l3'); U.prodL3 = ML(U.prodL3).filter(x => l3s.includes(x));
+  const l4s = opt(r => inML(U.prodL2, r.l2) && inML(U.prodL3, r.l3), 'l4'); U.prodL4 = ML(U.prodL4).filter(x => l4s.includes(x));
   const gds = [...new Set(base.map(r => r.gd).filter(Boolean))].sort();
-  const mc = pre.filter(r => (!U.prodL2 || r.l2 === U.prodL2) && (!U.prodL3 || r.l3 === U.prodL3) && (!U.prodL4 || r.l4 === U.prodL4));
-  const pc = U.prodCat || '', inCat = r => !pc || r.cq[pc] > 0;
+  const mc = pre.filter(r => inML(U.prodL2, r.l2) && inML(U.prodL3, r.l3) && inML(U.prodL4, r.l4));
+  const pcs = ML(U.prodCat), pc = pcs.join(','), inCat = r => !pcs.length || pcs.some(k => r.cq[k] > 0);
   const rows = mc.filter(inCat);
   /* ringkasan: bila filter status dipakai, qty & value hanya bagian status itu */
-  const qOf = r => pc ? r.cq[pc] : r.q, vOf = r => pc ? r.cv[pc] : r.v;
+  const qOf = r => pcs.length ? pcs.reduce((a, k) => a + (r.cq[k] || 0), 0) : r.q, vOf = r => pcs.length ? pcs.reduce((a, k) => a + (r.cv[k] || 0), 0) : r.v;
   const sum = (L, f) => L.reduce((a, r) => a + f(r), 0);
   const T = { q: sum(rows, qOf), v: sum(rows, vOf), a: rows.length, s: sum(rows, r => r.nSku) };
   const catT = k => { const L = mc.filter(r => r.cq[k] > 0); return { q: sum(L, r => r.cq[k]), v: sum(L, r => r.cv[k]), a: L.length }; };
@@ -4959,18 +5011,18 @@ function pageProduct(view) {
   const g = new Map(); for (const r of rows) { const k = r[lv]; const x = g.get(k) || { k, a: 0, s: 0, q: 0, v: 0, qS: 0, qD: 0, qN: 0 }; x.a++; x.s += r.nSku; x.q += qOf(r); x.v += vOf(r); x.qS += r.cq.S; x.qD += r.cq.D; x.qN += r.cq.N; g.set(k, x); }
   const grp = [...g.values()];
   App.ui.prodLast = { rows, grp, lv, LVN, T, pc, codes, asOf, qOf, vOf };
-  const sel = (id, label, list, cur) => `<select id="${id}" class="inp"><option value="">${label}</option>${list.map(c => `<option ${c === cur ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select>`;
-  const chips = [['prodL2', 'Lv2', U.prodL2], ['prodL3', 'Lv3', U.prodL3], ['prodL4', 'Lv4', U.prodL4]].filter(x => x[2]).map(([k, l, v]) => `<button class="btn sm" data-pclr="${k}">${l}: ${esc(v)} ✕</button>`).join('');
-  const tile = (k, lab, t) => `<button class="pt-tile pt-cat ${pc === k ? 'on' : ''}" data-pcat="${pc === k ? '' : k}" title="Klik untuk filter ${lab}"><span>${lab}</span><b>${fmtN(t.q)} pcs</b><small>${fmtRpS(t.v)} · ${fmtN(t.a)} artikel · ${fmtPct(allQ ? t.q / allQ : null, 1)}</small></button>`;
+  const sel = (id, label, list, cur) => msel(id, label, list, cur);
+  const chips = [['prodL2', 'Lv2'], ['prodL3', 'Lv3'], ['prodL4', 'Lv4'], ['prodGd', 'Gender']].flatMap(([k, l]) => ML(U[k]).map(v => `<button class="btn sm" data-pclr="${k}" data-pclv="${esc(v)}">${l}: ${esc(v)} ✕</button>`)).join('');
+  const tile = (k, lab, t) => `<button class="pt-tile pt-cat ${pcs.includes(k) ? 'on' : ''}" data-pcat="${k}" title="Centang / lepas ${lab}"><span>${pcs.includes(k) ? '☑' : '☐'} ${lab}</span><b>${fmtN(t.q)} pcs</b><small>${fmtRpS(t.v)} · ${fmtN(t.a)} artikel · ${fmtPct(allQ ? t.q / allQ : null, 1)}</small></button>`;
   view.innerHTML = `<div class="stack"><div id="binBox" data-sku="${esc(sku12)}"></div><section class="card"><div class="filters">
       <input id="pq" class="inp" type="search" inputmode="search" placeholder="Cari nama / kode artikel · ketik SKU 12 digit untuk lokasi bin semua toko" value="${esc(U.prodQ)}" style="flex:1 1 260px">
-      ${sel('pl2', 'Semua MC Lv2', l2s, U.prodL2)}${sel('pl3', 'Semua MC Lv3', l3s, U.prodL3)}${sel('pl4', 'Semua MC Lv4', l4s, U.prodL4)}
-      ${gds.length ? sel('pgd', 'Semua gender', gds, U.prodGd) : ''}
+      ${sel('prodL2', 'MC Lv2', l2s, U.prodL2)}${sel('prodL3', 'MC Lv3', l3s, U.prodL3)}${sel('prodL4', 'MC Lv4', l4s, U.prodL4)}
+      ${gds.length ? sel('prodGd', 'Gender', gds, U.prodGd) : ''}
       <select id="pst" class="inp"><option value="">Semua toko</option>${storeCodes().map(c => `<option value="${esc(c)}" ${c === U.prodStore ? 'selected' : ''}>${esc(sName(c))}</option>`).join('')}</select>
     </div>${sku12 ? '' : /^\d{6,11}$|^\d{13,}$/.test(String(U.prodQ || '').trim()) ? `<p class="small" style="margin:0 0 8px;color:var(--orange-deep)">💡 Lokasi bin muncul untuk <b>SKU lengkap 12 digit</b>. Yang diketik sekarang ${String(U.prodQ).trim().length} digit.</p>` : '<p class="small muted" style="margin:0 0 8px">💡 Ketik <b>SKU lengkap 12 digit</b> untuk melihat stok & lokasi bin artikel itu di semua toko. Penjualan per artikel ada di <b>Produk Pareto</b>.</p>'}
     ${chips ? `<div class="filters" style="margin:0 0 8px">${chips}</div>` : ''}
     <div class="pt-tiles" style="grid-template-columns:repeat(auto-fit,minmax(165px,1fr))">
-      <div class="pt-tile" style="background:#0B1B4A"><span>Total stok${pc ? ' ' + PSC[pc] : ''}</span><b>${fmtN(T.q)} pcs</b><small>${fmtRp(Math.round(T.v))}</small></div>
+      <div class="pt-tile" style="background:#0B1B4A"><span>Total stok${pcs.length ? ' ' + pcs.map(k => PSC[k]).join(' + ') : ''}</span><b>${fmtN(T.q)} pcs</b><small>${fmtRp(Math.round(T.v))}</small></div>
       <div class="pt-tile"><span>Artikel · SKU</span><b>${fmtN(T.a)} artikel</b><small>${fmtN(T.s)} SKU (ukuran/warna) · ${codes.length} toko</small></div>
       ${tile('S', 'SMDS', CT.S)}${tile('D', 'DCNP', CT.D)}${CT.P.a ? tile('P', 'Promo lain', CT.P) : ''}${tile('N', 'Normal (non promo)', CT.N)}
     </div>
@@ -4981,7 +5033,7 @@ function pageProduct(view) {
   if (sku12) showBinCard(sku12);
   const pctQ = x => fmtPct(T.q ? x.q / T.q : null, 1), pctV = x => fmtPct(T.v ? x.v / T.v : null, 1);
   $('#pG').innerHTML = tbl('prodG' + lv, {
-    rows: grp, sort: { k: 'v', dir: 'desc' }, limit: 15, onRow: x => { const f = { l2: 'prodL2', l3: 'prodL3', l4: 'prodL4' }[lv]; App.ui[f] = x.k; if (lv === 'l2') App.ui.prodLv = 'l3'; else if (lv === 'l3') App.ui.prodLv = 'l4'; render(); },
+    rows: grp, sort: { k: 'v', dir: 'desc' }, limit: 15, onRow: x => { const f = { l2: 'prodL2', l3: 'prodL3', l4: 'prodL4' }[lv]; App.ui[f] = [x.k]; if (lv === 'l2') App.ui.prodLv = 'l3'; else if (lv === 'l3') App.ui.prodLv = 'l4'; render(); },
     cols: [
       { k: 'k', label: LVN[lv], h: x => `<b>${esc(x.k)}</b>` },
       { k: 'a', label: 'Artikel', r: 1, h: x => fmtN(x.a) }, { k: 's', label: 'SKU', r: 1, h: x => fmtN(x.s) },
@@ -5004,7 +5056,7 @@ function pageProduct(view) {
 }
 async function exportProdStock() {
   const X = App.ui.prodLast; if (!X || !(await needXLSX())) return;
-  const wb = XLSX.utils.book_new(), per = `Stok ${X.codes.length === 1 ? sName(X.codes[0]) : 'semua toko'}${X.asOf ? ' per ' + X.asOf : ''}${X.pc ? ' · ' + PSC[X.pc] : ''}`;
+  const wb = XLSX.utils.book_new(), per = `Stok ${X.codes.length === 1 ? sName(X.codes[0]) : 'semua toko'}${X.asOf ? ' per ' + X.asOf : ''}${X.pc ? ' · ' + X.pc.split(',').map(k => PSC[k]).join(' + ') : ''}`;
   const money = (ws, cols, from) => { const r = XLSX.utils.decode_range(ws['!ref']); for (let i = from; i <= r.e.r; i++) cols.forEach(c => { const a = XLSX.utils.encode_cell({ r: i, c }); if (ws[a] && typeof ws[a].v === 'number') ws[a].z = '#,##0'; }); };
   for (const lv of ['l2', 'l3', 'l4']) {
     const g = new Map(); for (const r of X.rows) { const k = r[lv]; const x = g.get(k) || { a: 0, s: 0, q: 0, v: 0, qS: 0, vS: 0, qD: 0, vD: 0, qN: 0, vN: 0 }; x.a++; x.s += r.nSku; x.q += X.qOf(r); x.v += X.vOf(r); x.qS += r.cq.S; x.vS += r.cv.S; x.qD += r.cq.D; x.vD += r.cv.D; x.qN += r.cq.N; x.vN += r.cv.N; g.set(k, x); }
@@ -7353,7 +7405,7 @@ document.addEventListener('click', async e => {
   const apm = t.closest('[data-apmore]'); if (apm) { U0.apMore = (U0.apMore || 60) + 100; render(); return; }
   const tkt = t.closest('[data-tktab]'); if (tkt) { U0.tkTab = tkt.dataset.tktab; render(); return; }
   const tkv = t.closest('[data-tkv]'); if (tkv) { U0.tkView = tkv.dataset.tkv; render(); return; }
-  const ifc = t.closest('[data-ifc]'); if (ifc) { U0.ifCat = ifc.dataset.ifc; render(); return; }
+  const ifc = t.closest('[data-ifc]'); if (ifc) { U0.ifCat = toggleML(U0.ifCat, ifc.dataset.ifc); render(); return; }
   if (t.id === 'hubImp') { const f = document.createElement('input'); f.type = 'file'; f.accept = '.xlsx'; f.onchange = () => { if (f.files[0]) importHubExcel(f.files[0]); }; f.click(); return; }
   if (t.id === 'apXls') { exportHub('approval'); return; }
   if (t.id === 'tkXls') { exportHub('task'); return; }
@@ -7375,7 +7427,7 @@ document.addEventListener('click', async e => {
     if (!item.title) { toast('Isi judul informasi'); return; } if (item.link && !/^https?:\/\//i.test(item.link)) { toast('Link harus diawali https://'); return; }
     U0.ifOpen = false; hubPost('info', { op: 'add', item }, 'Informasi ditambahkan'); return; }
   const jk = t.closest('[data-jk]'); if (jk) { openJuknis(jk.dataset.jk); return; }
-  const jkc = t.closest('[data-jkc]'); if (jkc) { App.ui.jkCat = jkc.dataset.jkc; render(); return; }
+  const jkc = t.closest('[data-jkc]'); if (jkc) { App.ui.jkCat = toggleML(App.ui.jkCat, jkc.dataset.jkc); render(); return; }
   const pcv = t.closest('[data-pcv]'); if (pcv) { App.ui.pcView = pcv.dataset.pcv; render(); return; }
   const pcm = t.closest('[data-pcm]'); if (pcm) { App.ui.pcMode = pcm.dataset.pcm; render(); return; }
   const pcg = t.closest('[data-pcgo]'); if (pcg) { App.ui.pcView = 'store'; App.ui.pcStore = pcg.dataset.pcgo; render(); window.scrollTo(0, 0); return; }
@@ -7403,9 +7455,9 @@ document.addEventListener('click', async e => {
   const dtml = t.closest('[data-dtml]'); if (dtml) { App.ui.dtMcLv = dtml.dataset.dtml; render(); return; }
   const dtl = t.closest('[data-dtl]'); if (dtl) { App.ui.dtLvl = dtl.dataset.dtl; render(); return; }
   const pst = t.closest('[data-pstog]'); if (pst) { const o = App.ui.psOpen || (App.ui.psOpen = {}); o[pst.dataset.pstog] = !o[pst.dataset.pstog]; render(); return; }
-  { const pp = t.closest && t.closest('[data-pcat]'); if (pp) { App.ui.prodCat = pp.dataset.pcat; App.ui.more = {}; render(); return; } }
+  { const pp = t.closest && t.closest('[data-pcat]'); if (pp) { App.ui.prodCat = toggleML(App.ui.prodCat, pp.dataset.pcat); App.ui.more = {}; render(); return; } }
   { const pv = t.closest && t.closest('[data-plv]'); if (pv) { App.ui.prodLv = pv.dataset.plv; render(); return; } }
-  { const pz = t.closest && t.closest('[data-pclr]'); if (pz) { const k = pz.dataset.pclr; App.ui[k] = ''; if (k === 'prodL2') { App.ui.prodL3 = ''; App.ui.prodL4 = ''; } if (k === 'prodL3') App.ui.prodL4 = ''; render(); return; } }
+  { const pz = t.closest && t.closest('[data-pclr]'); if (pz) { const k = pz.dataset.pclr; App.ui[k] = ML(App.ui[k]).filter(x => x !== pz.dataset.pclv); render(); return; } }
   if (t.id === 'prXls') { exportProdStock(); return; }
   { const pc = t.closest && t.closest('[data-pscat]'); if (pc) { App.ui.psCat = pc.dataset.pscat; App.ui.more = {}; render(); return; } }
   if (t.id === 'psAll' || t.id === 'psNone') { const o = App.ui.psOpen = {}; if (t.id === 'psAll') $$('[data-pstog]').forEach(x => { o[x.dataset.pstog] = true; }); if (t.id === 'psAll') { render(); $$('[data-pstog]').forEach(x => { o[x.dataset.pstog] = true; }); } render(); return; }
@@ -7502,8 +7554,6 @@ document.addEventListener('change', async e => {
   if (t.id === 'perSel' || t.id === 'rFrom' || t.id === 'rTo') { await onPeriodChange(); return; }
   if (t.id === 'dtStore') { App.ui.dtStore = t.value; App.ui.more = {}; render(); return; }
   if (t.id === 'psStore') { App.ui.psStore = t.value; App.ui.more = {}; render(); return; }
-  if (t.id === 'psD') { App.ui.psD = t.value; render(); return; }
-  if (t.id === 'psL2') { App.ui.psL2 = t.value; render(); return; }
   if (t.id === 'lsM') { App.ui.lsM = t.value; render(); return; }
   if (t.id === 'lsStore') { App.ui.lsStore = t.value; App.ui.more = {}; render(); return; }
   if (t.id === 'ptStore') { App.ui.ptStore = t.value; App.ui.more = {}; render(); return; }
@@ -7525,13 +7575,14 @@ document.addEventListener('change', async e => {
   if (t.id === 'roStore') { App.ui.roStore = t.value; render(); return; }
   if (t.id === 'roAvail') { App.ui.roAvail = t.checked; render(); return; }
   if (t.id === 'tfStore') { App.ui.tfStore = t.value; render(); return; }
-  if (t.id === 'tfC3') { App.ui.tfC3 = t.value; render(); return; }
   if (t.id === 'gwDate') { if (t.value) { App.ui.gwDate = t.value; render(); } return; }
   if (t.id === 'gwLfl') { App.ui.gwLfl = t.checked; render(); return; }
   if (t.id === 'gwComp') { App.ui.gwComp = t.checked; render(); return; }
   if (t.id === 'raStore') { App.ui.raStore = t.value; App.ui.more = {}; render(); return; }
   if (['saDays', 'saDate', 'saSt', 'saSign'].includes(t.id)) { App.ui[t.id] = t.id === 'saDays' ? +t.value : t.value; App.ui.more = {}; render(); return; }
   if (t.id === 'psNew') { App.ui.psNew = t.checked; render(); return; }
+  if (t.dataset && t.dataset.pscats) { const cur = new Set(Array.isArray(App.ui.psCats) && App.ui.psCats.length ? App.ui.psCats : ['S', 'D']); if (t.checked) cur.add(t.dataset.pscats); else cur.delete(t.dataset.pscats);
+    if (!cur.size) { t.checked = true; toast('Minimal satu kategori dicentang.'); return; } App.ui.psCats = ['S', 'D', 'N'].filter(k => cur.has(k)); App.ui.more = {}; render(); return; }
   if (t.id === 'saAllSt') { App.ui.saAllSt = t.checked; render(); return; }
   if (t.id === 'raRet') { App.ui.raRet = t.checked; render(); return; }
   if (t.id === 'raMin') { App.ui.raMin = Math.max(0, +t.value || 0); render(); return; }
@@ -7542,10 +7593,6 @@ document.addEventListener('change', async e => {
   if (t.id === 'prDate') { if (t.value) { App.ui.prDate = t.value; render(); } return; }
   if (t.id === 'stSel') { App.ui.store = t.value; App.ui.more = {}; render(); return; }
   if (t.id === 'pc3') { App.ui.prodC3 = t.value; render(); return; }
-  if (t.id === 'pl2') { App.ui.prodL2 = t.value; App.ui.prodL3 = ''; App.ui.prodL4 = ''; render(); return; }
-  if (t.id === 'pl3') { App.ui.prodL3 = t.value; App.ui.prodL4 = ''; render(); return; }
-  if (t.id === 'pl4') { App.ui.prodL4 = t.value; render(); return; }
-  if (t.id === 'pgd') { App.ui.prodGd = t.value; render(); return; }
   if (t.id === 'pst') { App.ui.prodStore = t.value; render(); return; }
   if (t.id === 'hst') { App.ui.stStore = t.value; App.ui.more = {}; render(); return; }
   if (t.id === 'hss') { App.ui.stStatus = t.value; render(); return; }

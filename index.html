@@ -867,6 +867,7 @@ button.pd-sz:hover{box-shadow:0 0 0 3px rgba(15,49,146,.12)}
   .msel-list input{width:16px;height:16px;accent-color:#0F3192;margin:0;flex:none}.msel-ok{width:100%;margin-top:8px;box-sizing:border-box}.msel-pop *{box-sizing:border-box}.msel-pop label,.msel-pop label span{color:#1E293B!important;opacity:1!important;font-weight:600}.msel-pop .btn:not(.primary){background:#fff!important;color:#0F3192!important;border:1px solid #D9DEE8!important}.msel-pop .btn.primary{background:#0F3192!important;color:#fff!important}
   .mchips button{white-space:nowrap}
   @media (max-width:760px){.msel-pop{position:fixed;left:12px;right:12px;top:auto;bottom:84px;max-width:none;max-height:70vh;display:flex;flex-direction:column}.msel-list{max-height:none;flex:1}}
+.msel-static{display:inline-flex;align-items:center;gap:6px;background:#F1F5F9;border-radius:10px;padding:7px 12px;font-size:13.5px;color:var(--muted,#64748B)}.msel-static b{color:#0F3192}
 </style>
 </head>
 <body>
@@ -1712,7 +1713,16 @@ const TYPE_LABEL = { rg: 'Reguler', bz: 'Bazaar', ot: 'Lainnya' };
 const typeLbl = () => String(App.ui.typeF || '').split(',').filter(Boolean).map(t => TYPE_LABEL[t] || t).join(' + ');
 /* mode tampilan: '' = branch (semua toko), atau kode toko (store head hanya melihat tokonya) */
 const scopeOn = () => !!App.ui.scope && !['admin', 'settings', 'home', 'omset'].includes(App.page) && !isOps(App.page);
-const typeOk = c => inArea(c) && (!scopeOn() || c === App.ui.scope) && (!App.ui.typeF || App.ui.typeF.split(',').includes(sType(c)));
+const typeOkBase = c => inArea(c) && (!scopeOn() || c === App.ui.scope) && (!App.ui.typeF || App.ui.typeF.split(',').includes(sType(c)));
+/* pilihan toko (ceklis) per menu: kosong = semua toko; 1 toko = tampilan toko itu; beberapa toko = gabungan toko yang dicentang */
+const stPick = () => { const a = (App.ui.stPick || {})[App.page]; return Array.isArray(a) ? a : []; };
+const typeOk = c => typeOkBase(c) && (() => { const a = stPick(); return !a.length || a.includes(String(c)); })();
+const stBase = f => storeCodes().filter(c => typeOkBase(c) && (!f || f(c)));
+function stSel(key, list, label) {
+  if (scopeOn()) return `<span class="msel-static">${esc(label || 'Toko')} <b>${esc(sName(App.ui.scope))}</b></span>`;
+  const pick = stPick(), cur = App.ui[key] && list.includes(App.ui[key]) ? [App.ui[key]] : pick;
+  return msel('st:' + key, label || 'Toko', list.map(c => [c, c + ' - ' + sName(c)]), cur);
+}
 const activeStores = () => storeCodes().filter(typeOk);
 const hasTypes = () => new Set(storeCodes().map(sType)).size > 1;
 /* ---- data Sales Report: harian & kumulatif per toko, [qty, bruto, netto] ---- */
@@ -1737,7 +1747,7 @@ const repLast = () => { const a = App.lastDate, b = srLast(); return !a ? b : !b
 /* produk yang dikecualikan (paper bag, voucher, artikel disembunyikan, dll.) tidak ikut total penjualan di semua menu, kecuali Monitoring OmniChannel */
 const salesOk = l => !isEco(l.sku) && !(SET().excludeSales !== false && isPB(l.sku));
 const linesIn = (from, to, store) => {
-  const k = 'li|' + from + '|' + to + '|' + (store || '') + '|' + (store ? '' : (App.ui.typeF || '') + '|' + (scopeOn() ? App.ui.scope : ''));
+  const k = 'li|' + from + '|' + to + '|' + (store || '') + '|' + (store ? '' : (App.ui.typeF || '') + '|' + (scopeOn() ? App.ui.scope : '') + '|' + stPick().join(','));
   const c = App.cache[k]; if (c) return c;
   return (App.cache[k] = App.lines.filter(l => l.d >= from && l.d <= to && (store ? l.s === store : typeOk(l.s)) && lineOk(l) && salesOk(l)));
 };
@@ -1990,7 +2000,9 @@ function msel(key, label, opts, cur) {
 function mselApply(d) {
   const key = d.dataset.msel, box = [...d.querySelectorAll('.msel-list input')], vals = box.filter(i => i.checked).map(i => i.value);
   const arr = vals.length === box.length ? [] : vals; delete d.dataset.dirty;
-  (MSEL_SET[key] || (a => { App.ui[key] = a; }))(arr); App.ui.more = {}; render();
+  if (key.startsWith('st:')) { const k = key.slice(3); App.ui.stPick = Object.assign({}, App.ui.stPick, { [App.page]: arr }); App.ui[k] = arr.length === 1 ? arr[0] : ''; }
+  else (MSEL_SET[key] || (a => { App.ui[key] = a; }))(arr);
+  App.ui.more = {}; render();
 }
 document.addEventListener('click', e => {
   const t = e.target; if (!t || !t.closest) return;
@@ -2153,9 +2165,10 @@ function lockScopedSelects(view) {
     if (!sel.options.length) sel.add(new Option(sName(App.ui.scope), App.ui.scope));
     sel.value = App.ui.scope; sel.disabled = true; sel.title = 'Mode toko — ganti lewat tombol di kanan atas'; }
 }
-function setHead(t, sub) { if (scopeOn() && !String(t).includes(sName(App.ui.scope))) t += ' · ' + sName(App.ui.scope); $('#pageTitle').textContent = t; $('#pageSub').textContent = sub || ''; }
+function setHead(t, sub) { if (scopeOn() && !String(t).includes(sName(App.ui.scope))) t += ' · ' + sName(App.ui.scope); else if (!scopeOn() && stPick().length > 1) t += ' · ' + stPick().length + ' toko dipilih'; $('#pageTitle').textContent = t; $('#pageSub').textContent = sub || ''; }
 function render() {
   destroyCharts(); App.tables = {}; document.body.dataset.pg = App.page || '';
+  { const pk = stPick().join(','); if (App.cache._pk !== pk) { App.cache._pk = pk; App.cache.tr = null; App.cache.ro = null; App.cache.health = null; } }
   if (App.booted) syncHash(false);
   renderNav(); renderPeriod(); addShotBtn($('#periodBox'));
   const view = $('#view');
@@ -2526,7 +2539,7 @@ function pageTrend(view) {
   const tot = ords.reduce((a, o) => { a.n++; a.q += o.q; a.v += o.v; return a; }, { n: 0, q: 0, v: 0 });
   const peakH = top(new Map([...H].map(([h, x]) => [h, x.n]))), peakW = top(new Map([...Dw].map(([w, x]) => [w, x.n / (dCount.get(w) || 1)])));
   view.innerHTML = `<div class="stack">
-    <div class="filters" style="margin:0"><label class="small muted" for="tdStore">Toko</label><select id="tdStore" class="inp"><option value="">Semua toko</option>${codes.map(c => `<option value="${esc(c)}" ${c === st ? 'selected' : ''}>${esc(sName(c))}</option>`).join('')}</select></div>
+    <div class="filters" style="margin:0">${stSel('tdStore', stBase())}</div>
     <div class="kpis">
       <div class="kpi"><span>Transaksi</span><b>${fmtN(tot.n)}</b><small>rata-rata ${fmtN(tot.n / nd)} / hari</small></div>
       <div class="kpi"><span>UPT</span><b>${tot.n ? fmtX(tot.q / tot.n, 2) : '–'}</b><small>qty per transaksi</small></div>
@@ -2580,7 +2593,7 @@ function pagePromo(view) {
   const srows = [...SP.entries()].map(([c, x]) => { let tk = '', tv = 0; for (const [k, v] of x.top) if (v > tv) { tv = v; tk = k; } return { c, name: sName(c), v: x.v, pv: x.pv, share: x.v ? x.pv / x.v : null, top: tk, topShare: x.v ? tv / x.v : null }; });
   view.innerHTML = `<div class="stack">
     <div class="filters" style="margin:0"><label class="small muted" for="prDate">Tanggal</label><input type="date" id="prDate" class="inp" value="${D}" max="${maxD}">
-      <label class="small muted" for="prStore">Toko</label><select id="prStore" class="inp"><option value="">Semua toko</option>${codes.map(c => `<option value="${esc(c)}" ${c === st ? 'selected' : ''}>${esc(sName(c))}</option>`).join('')}</select></div>
+      ${stSel('prStore', stBase())}</div>
     ${legacy ? '<div class="note">Sebagian data bulan ini diupload sebelum nama promo ikut disimpan. Upload ulang Item DSR bulan ini agar kontribusi promo lengkap.</div>' : ''}
     ${(() => { const md = U.prMode || 'day'; const key = md === 'day' ? 'dv' : 'cv', T = md === 'day' ? tot.d : tot.c;
       const L = rows.filter(r => !r.none && r[key]).sort((a, b) => b[key] - a[key]), np = (rows.find(r => r.none) || {})[key] || 0, pv = T - np;
@@ -2965,7 +2978,7 @@ function pageRA(view) {
   const maxU = Math.max(2, ...[...byDay.values()].map(y => y.trx.size ? y.q / y.trx.size : 0));
   const tileHtml = (arr, cls) => arr.map(([lbl, r, f]) => `<div class="ra-tile ${cls}"><span>${lbl}</span><b>${r ? esc(r.sp) : '–'}</b><small>${r ? f(r) + ' · ' + esc(sName(r.s)) : 'belum ada'}</small></div>`).join('');
   view.innerHTML = `<div class="stack">
-    <div class="filters" style="margin:0"><label class="small muted" for="raStore">Toko</label><select id="raStore" class="inp"><option value="">Semua toko</option>${codes.map(c => `<option value="${esc(c)}" ${c === st ? 'selected' : ''}>${esc(c)} - ${esc(sName(c))}</option>`).join('')}</select>
+    <div class="filters" style="margin:0">${stSel('raStore', stBase())}
       <label class="small" style="display:flex;gap:6px;align-items:center;font-weight:700" title="Nilai retur dibebankan ke RA yang menjual barangnya, bukan RA yang memproses retur (sama seperti HO)"><input type="checkbox" id="raRet" ${retOn ? 'checked' : ''}> Retur ke penjual awal</label>
       <label class="small muted" for="raMin">Min. transaksi untuk peringkat</label><input type="number" id="raMin" class="inp sm" style="width:80px" min="0" value="${minT}">
       <span style="flex:1"></span><button class="btn" id="raXls">Download Excel</button></div>
@@ -3035,7 +3048,7 @@ function pagePareto(view) {
   gens.forEach(x => { run += x.v; x.cum = totV ? run / totV : 0; x.share = totV ? x.v / totV : 0; x.cls = x.cum - x.share < .8 ? 'A' : x.cum - x.share < .95 ? 'B' : 'C'; if (x.cls === 'A') n80++; });
   const cnt = c => gens.filter(x => x.cls === c).length;
   view.innerHTML = `<div class="stack">
-    <div class="filters" style="margin:0"><label class="small muted" for="ptStore">Toko</label><select id="ptStore" class="inp"><option value="">Semua toko</option>${codes.map(c => `<option value="${esc(c)}" ${c === st ? 'selected' : ''}>${esc(c)} - ${esc(sName(c))}</option>`).join('')}</select></div>
+    <div class="filters" style="margin:0">${stSel('ptStore', stBase())}</div>
     <div class="pt-tiles">${tile('Trans', fmtN(A.trx), gr(A.trx, B.trx))}${tile('Quantity', fmtN(A.q), gr(A.q, B.q))}${tile('UPT', A.upt == null ? '–' : fmtX(A.upt, 2), gr(A.upt, B.upt))}${tile('Basket Size', A.bs == null ? '–' : fmtRpS(A.bs).replace('Rp ', ''), gr(A.bs, B.bs))}</div>
     <div class="grid g4">${[['gd', 'Category Gender'], ['l2', 'Category Lv. 2'], ['l3', 'Category Lv. 3'], ['l4', 'Category Lv. 4']].map(([k, t]) => `<section class="card"><div class="card-h"><h3>${t}</h3></div><div class="donut"><canvas id="dn_${k}"></canvas></div><div id="tb_${k}" class="cat-box"></div></section>`).join('')}</div>
     <section class="card"><div class="card-h"><h3>Pareto produk (generic)</h3><p class="small muted"><b>${fmtN(n80)}</b> dari ${fmtN(gens.length)} generic (${fmtPct(gens.length ? n80 / gens.length : null, 0)}) menghasilkan 80% sales</p></div>
@@ -3112,7 +3125,7 @@ function pageLost(view) {
   const stockAll = a => { let t = 0; const per = []; for (const c of storeCodes()) { const s = stockByArt(c).get(a); if (s && s.t > 0) { t += s.t; per.push([c, s.t]); } } per.sort((x, y) => y[1] - x[1]); return { t, per }; };
   view.innerHTML = `<div class="stack">
     <div class="filters" style="margin:0"><label class="small muted" for="lsM">Bulan</label><select id="lsM" class="inp">${months.map(x => `<option value="${x}" ${x === m ? 'selected' : ''}>${fmtMonth(x)}</option>`).join('')}</select>
-      <label class="small muted" for="lsStore">Toko</label><select id="lsStore" class="inp"><option value="">Semua toko</option>${codes.map(c => `<option value="${esc(c)}" ${c === st ? 'selected' : ''}>${esc(c)} - ${esc(sName(c))}</option>`).join('')}</select>
+      ${stSel('lsStore', stBase())}
       <span style="flex:1"></span>${App.admin ? '<button class="btn" data-go="admin">Input lost sales</button>' : ''}<button class="btn" id="lsXls">Download Excel</button></div>
     <div class="pt-tiles" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr))">
       <div class="pt-tile"><span>Total Lost Sales</span><b>${fmtRpS(T.v)}</b>${gtxt(gr(T.v, P.v))}</div>
@@ -3215,7 +3228,7 @@ function pagePromoStock(view) {
   /* per artikel-warna */
   const byK = new Map(); for (const r of F) { const x = byK.get(r.key) || { key: r.key, art: r.art, n: r.n, color: r.key.split('.').slice(1).join('.'), d: r.d, p: r.p, l4: r.l4, cat: r.cat, pd: r.pd, nw: !!(lastUpd && r.u === lastUpd.id && r.pd == null), pcs: 0, stores: new Set(), rs: [] }; x.pcs += r.t; x.stores.add(r.c); x.rs.push(r); byK.set(r.key, x); }
   view.innerHTML = `<div class="stack">
-    <div class="filters" style="margin:0"><label class="small muted" for="psStore">Toko</label><select id="psStore" class="inp"><option value="">Semua toko</option>${codes.map(c => `<option value="${esc(c)}" ${c === st ? 'selected' : ''}>${esc(c)} - ${esc(sName(c))}</option>`).join('')}</select>
+    <div class="filters" style="margin:0">${stSel('psStore', stBase(c => App.stock[c]))}
       ${msel('psD', 'Diskon', discs.map(d => [d, d + '%']), U.psD)}
       ${msel('psL2', 'MC Lv2', l2s, U.psL2)}
       <span class="small muted">Terjual = ${esc(R.label.toLowerCase())}</span></div>
@@ -3315,7 +3328,7 @@ function pageDetention(view) {
       <span class="dt-link-ic" aria-hidden="true">↗</span>
       <span><b>Buka tools Detention Stock untuk tim toko</b><small>Toko bisa upload Export by Bin sendiri, cek barang yang belum terdisplay, dan analisa per MC — langsung di HP.</small></span>
       <span class="dt-link-go">Buka tools</span></a>
-    <div class="filters" style="margin:0"><label class="small muted" for="dtStore">Toko</label><select id="dtStore" class="inp"><option value="">Semua toko (BM)</option>${codes.map(c => `<option value="${esc(c)}" ${c === st ? 'selected' : ''}>${esc(c)} - ${esc(sName(c))}</option>`).join('')}</select>
+    <div class="filters" style="margin:0">${stSel('dtStore', stBase(c => App.stock[c]))}
       <div class="seg" role="group" aria-label="Basis"><button data-dtb="g" class="${basis === 'g' ? 'on' : ''}">Generic</button><button data-dtb="v" class="${basis === 'v' ? 'on' : ''}">Varian (generic + warna)</button></div>
       <span style="flex:1"></span><button class="btn" id="dtXls">Download Excel</button></div>
     ${old.length ? `<div class="note">${old.length} toko masih memakai data stok format lama (${old.map(d => esc(sName(d.c))).join(', ')}). Upload ulang Export by Bin toko tersebut agar ikut terhitung.</div>` : ''}
@@ -3521,14 +3534,14 @@ function pageTransfer(view) {
   let all = transfers().filter(r => (typeOk(r.from) || typeOk(r.to)));
   if (sc) all = all.filter(r => r.from === sc || r.to === sc);
   const c3s = [...new Set(all.map(r => r.c3))].sort();
-  let rows = all.filter(r => (!st || (dir === 'out' ? r.from === st : dir === 'in' ? r.to === st : (r.from === st || r.to === st))) && inML(U.tfC3, r.c3));
+  let rows = all.filter(r => (!st || (dir === 'out' ? r.from === st : dir === 'in' ? r.to === st : (r.from === st || r.to === st))) && inML(U.tfC3, r.c3) && (!stPick().length || (typeOk(r.from) && typeOk(r.to))));
   if (U.tfQ) { const q = U.tfQ.toLowerCase(); rows = rows.filter(r => (r.name + ' ' + r.art).toLowerCase().includes(q)); }
   const why = (k, cover) => k === 'DS' ? `tidak terjual ${S0.windowDays} hari` : k === 'SM' ? `stok cukup ${cover == null ? '>' : fmtX(cover, 1)} bln` : k === 'HB' ? 'stok habis' : `stok tinggal ${cover == null ? '<1' : fmtX(cover, 1)} bln`;
   const tot = rows.reduce((a, r) => { a.q += r.qty; a.arts.add(r.art); a.from.add(r.from); a.to.add(r.to); return a; }, { q: 0, arts: new Set(), from: new Set(), to: new Set() });
   const per = new Map(); for (const r of rows) { const a = per.get(r.from) || { c: r.from, outQ: 0, outN: 0, inQ: 0, inN: 0 }; a.outQ += r.qty; a.outN++; per.set(r.from, a); const b = per.get(r.to) || { c: r.to, outQ: 0, outN: 0, inQ: 0, inN: 0 }; b.inQ += r.qty; b.inN++; per.set(r.to, b); }
   const thin = codes.filter(c => (H.stores[c] || {}).days < 14);
   view.innerHTML = `<div class="stack">
-    <div class="filters" style="margin:0"><label class="small muted" for="tfStore">Toko</label><select id="tfStore" class="inp"><option value="">Semua toko</option>${codes.map(c => `<option value="${esc(c)}" ${c === st ? 'selected' : ''}>${esc(c)} - ${esc(sName(c))}</option>`).join('')}</select>
+    <div class="filters" style="margin:0">${stSel('tfStore', stBase(c => App.stock[c]))}
       <div class="seg" role="group" aria-label="Arah transfer"><button data-tfd="" class="${!dir ? 'on' : ''}">Semua</button><button data-tfd="out" class="${dir === 'out' ? 'on' : ''}">Kirim dari toko</button><button data-tfd="in" class="${dir === 'in' ? 'on' : ''}">Terima ke toko</button></div>
       ${msel('tfC3', 'Kategori', c3s, U.tfC3)}
       <input id="tfQ" class="inp" type="search" placeholder="Cari artikel" value="${esc(U.tfQ || '')}" style="flex:1 1 180px">
@@ -3640,7 +3653,7 @@ function pageRO(view) {
   const mcLabel = [lvl.l2, lvl.l3, lvl.l4].filter(Boolean).join(' › ');
   view.innerHTML = `<div class="stack">
     ${!info ? `<div class="note">Stok gudang HO belum diupload. Saran tetap dihitung, tapi semua artikel akan tercatat "tidak tersedia di HO". Upload file Data Stock gudang HO di Kelola data.</div>` : age > 1 ? `<div class="note">Data stok gudang HO terakhir <b>${fmtDate(info.date)}</b> (${age} hari lalu). Upload data terbaru agar saran RO sesuai ketersediaan gudang saat ini.</div>` : ''}
-    <div class="filters" style="margin:0"><label class="small muted" for="roStore">Toko</label><select id="roStore" class="inp"><option value="">Semua toko</option>${codes.map(c => `<option value="${esc(c)}" ${c === st ? 'selected' : ''}>${esc(c)} - ${esc(sName(c))}</option>`).join('')}</select>
+    <div class="filters" style="margin:0">${stSel('roStore', stBase(c => App.stock[c]))}
       <span class="small muted">Hanya artikel yang ada stoknya di gudang HO</span>
       <span style="flex:1"></span><button class="btn" id="roXls">Download Excel</button></div>
     <div class="pt-tiles" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr))">
@@ -4672,8 +4685,8 @@ function pageBC(view) {
   area.tot = Math.round((area.sar * .5 + area.ot * .1 + area.bin * .1 + area.mc * .3) * 100) / 100;
   const prevD = dates[dates.indexOf(D) - 1];
   /* trend harian area */
-  const byD = dates.map(d => { const xs = L.filter(x => x.d === d && (!U.bcStore || x.c === U.bcStore)).map(x => Object.assign({}, x, bcCalc(x))).filter(x => x.started); const s = k => xs.reduce((a, x) => a + x[k], 0);
-    const t = s('t'), dd = xs.reduce((a, x) => a + Math.abs(x.t - x.a), 0), mtAll = L.filter(x => x.d === d && (!U.bcStore || x.c === U.bcStore)).reduce((a, x) => a + x.mt, 0);
+  const byD = dates.map(d => { const xs = L.filter(x => x.d === d && inML(U.bcStore, x.c)).map(x => Object.assign({}, x, bcCalc(x))).filter(x => x.started); const s = k => xs.reduce((a, x) => a + x[k], 0);
+    const t = s('t'), dd = xs.reduce((a, x) => a + Math.abs(x.t - x.a), 0), mtAll = L.filter(x => x.d === d && inML(U.bcStore, x.c)).reduce((a, x) => a + x.mt, 0);
     const v = { sar: t ? 100 - dd / t * 100 : null, ot: s('ob') ? s('o') / s('ob') * 100 : null, bin: s('bt') ? s('b') / s('bt') * 100 : null, mc: mtAll ? s('md') / mtAll * 100 : null }; v.tot = v.sar == null ? null : v.sar * .5 + (v.ot || 0) * .1 + (v.bin || 0) * .1 + (v.mc || 0) * .3; return v; });
   const st = U.bcSort || { k: 'tot', dir: 'asc' };
   const rows = cur.slice().sort((a, b) => { const x = a[st.k], y = b[st.k]; const r = typeof x === 'string' ? x.localeCompare(y) : (x ?? -1) - (y ?? -1); return st.dir === 'asc' ? r : -r; });
@@ -4683,7 +4696,7 @@ function pageBC(view) {
   const sh = (k, l) => `<th class="s r" data-bcs="${k}">${l}${st.k === k ? (st.dir === 'asc' ? ' ▲' : ' ▼') : ''}</th>`;
   view.innerHTML = `<div class="stack">
     <div class="filters" style="margin:0"><label class="small muted" for="bcDate">Tanggal data</label><select id="bcDate" class="inp">${dates.slice().reverse().map(d => `<option value="${d}" ${d === D ? 'selected' : ''}>${fmtDate(d)}</option>`).join('')}</select>
-      <label class="small muted" for="bcStore">Grafik untuk</label><select id="bcStore" class="inp"><option value="">Seluruh area</option>${cur.map(x => `<option value="${esc(x.c)}" ${x.c === U.bcStore ? 'selected' : ''}>${esc(x.c)} - ${esc(x.name)}</option>`).join('')}</select></div>
+      ${msel('bcStore', 'Grafik untuk', cur.map(x => [x.c, x.c + ' - ' + sName(x.c)]), U.bcStore)}</div>
     <div class="pt-tiles" style="grid-template-columns:repeat(auto-fit,minmax(165px,1fr))">
       <div class="pt-tile" style="background:#0B1B4A"><span>Total skor area</span><b>${fmtX(area.tot, 2)}%</b><small>SAR 50% · On time 10% · Bin 10% · MC4 30%</small></div>
       ${BC_PAR.map(([k, l]) => { const pv = prevD ? (() => { const xs = L.filter(x => x.d === prevD).map(x => Object.assign({}, x, bcCalc(x))).filter(x => x.started); return null; })() : null; return `<div class="pt-tile" style="background:${area[k] >= 95 ? '#13806F' : area[k] >= 85 ? '#E46636' : '#C0392B'}"><span>${l}</span><b>${fmtX(area[k], 2)}%</b><small>${k === 'sar' ? fmtN(A.a) + ' / ' + fmtN(A.t) + ' pcs' : k === 'ot' ? fmtN(A.o) + ' / ' + fmtN(A.ob) + ' sampling' : k === 'bin' ? fmtN(A.b) + ' / ' + fmtN(A.bt) + ' bin' : fmtN(A.md) + ' / ' + fmtN(A.mt) + ' MC4'}</small></div>`; }).join('')}
@@ -4694,7 +4707,7 @@ function pageBC(view) {
       <div class="rp-wrap"><table class="tbl" style="min-width:880px"><thead><tr><th class="s" data-bcs="name">Toko</th>${sh('sar', 'Stock Accuracy')}${sh('ot', 'On Time Sample')}${sh('bin', 'Bin Accuracy')}${sh('mc', 'MC4 Complete')}${sh('tot', 'Total skor')}<th class="r">Selisih stok</th><th class="r">MC4 sisa</th></tr></thead><tbody>
       ${rows.map(x => `<tr><td><span class="nm">${esc(x.name)}</span><span class="sub">${esc(x.c)}${x.started ? '' : ' · belum mulai'}</span></td>${pc(x.sar)}${pc(x.ot)}${pc(x.bin)}${pc(x.mc)}<td class="r"><b class="bc-v ${bcCls(x.tot)}">${fmtX(x.tot, 2)}%</b></td><td class="r">${fmtN(x.a - x.t)}</td><td class="r">${fmtN(Math.max(0, x.mt - x.md))}</td></tr>`).join('')}
       </tbody></table></div></section>
-    <section class="card"><div class="card-h"><h3>Progres harian${U.bcStore ? ' · ' + esc(sName(U.bcStore)) : ' · seluruh area'}</h3><p class="small muted">${dates.length} hari data · ${fmtDateS(dates[0])} – ${fmtDateS(dates[dates.length - 1])}</p></div>${dates.length > 1 ? '<div class="chart-box" style="height:290px"><canvas id="bcTrend"></canvas></div>' : '<p class="small muted" style="margin:0">Grafik progres muncul setelah ada data minimal 2 hari.</p>'}</section>
+    <section class="card"><div class="card-h"><h3>Progres harian${ML(U.bcStore).length ? ' · ' + esc(ML(U.bcStore).map(sName).join(', ')) : ' · seluruh area'}</h3><p class="small muted">${dates.length} hari data · ${fmtDateS(dates[0])} – ${fmtDateS(dates[dates.length - 1])}</p></div>${dates.length > 1 ? '<div class="chart-box" style="height:290px"><canvas id="bcTrend"></canvas></div>' : '<p class="small muted" style="margin:0">Grafik progres muncul setelah ada data minimal 2 hari.</p>'}</section>
     <section class="card"><div class="card-h"><h3>Saran tindakan</h3><p class="small muted">untuk toko terendah di tiap parameter</p></div>
       <div class="bc-adv">${BC_PAR.map(([k, l]) => { const w = worst(k); if (!w || w[k] >= 99.5) return `<div class="bc-a ok"><b>${l}</b><p>Semua toko sudah di atas 99,5%. Pertahankan.</p></div>`; return `<div class="bc-a ${bcCls(w[k])}"><b>${l} · ${esc(w.name)} (${fmtX(w[k], 2)}%)</b><p>${bcAdvice(k, w)}</p>${act.filter(x => x !== w && x[k] < 85).length ? `<p class="small muted">Juga di bawah 85%: ${act.filter(x => x !== w && x[k] < 85).sort((a, b) => a[k] - b[k]).slice(0, 5).map(x => esc(x.name) + ' ' + fmtX(x[k], 1) + '%').join(', ')}</p>` : ''}</div>`; }).join('')}
       ${notStarted.length ? `<div class="bc-a low"><b>Belum mulai blind counting</b><p>${notStarted.map(x => esc(x.name) + ' (' + esc(x.c) + ')').join(', ')} — pastikan jadwal & PIC sudah ditentukan.</p></div>` : ''}</div></section>
@@ -5018,7 +5031,7 @@ function pageProduct(view) {
       <input id="pq" class="inp" type="search" inputmode="search" placeholder="Cari nama / kode artikel · ketik SKU 12 digit untuk lokasi bin semua toko" value="${esc(U.prodQ)}" style="flex:1 1 260px">
       ${sel('prodL2', 'MC Lv2', l2s, U.prodL2)}${sel('prodL3', 'MC Lv3', l3s, U.prodL3)}${sel('prodL4', 'MC Lv4', l4s, U.prodL4)}
       ${gds.length ? sel('prodGd', 'Gender', gds, U.prodGd) : ''}
-      <select id="pst" class="inp"><option value="">Semua toko</option>${storeCodes().map(c => `<option value="${esc(c)}" ${c === U.prodStore ? 'selected' : ''}>${esc(sName(c))}</option>`).join('')}</select>
+      ${stSel('prodStore', stBase(c => App.stock[c]))}
     </div>${sku12 ? '' : /^\d{6,11}$|^\d{13,}$/.test(String(U.prodQ || '').trim()) ? `<p class="small" style="margin:0 0 8px;color:var(--orange-deep)">💡 Lokasi bin muncul untuk <b>SKU lengkap 12 digit</b>. Yang diketik sekarang ${String(U.prodQ).trim().length} digit.</p>` : '<p class="small muted" style="margin:0 0 8px">💡 Ketik <b>SKU lengkap 12 digit</b> untuk melihat stok & lokasi bin artikel itu di semua toko. Penjualan per artikel ada di <b>Produk Pareto</b>.</p>'}
     ${chips ? `<div class="filters" style="margin:0 0 8px">${chips}</div>` : ''}
     <div class="pt-tiles" style="grid-template-columns:repeat(auto-fit,minmax(165px,1fr))">
@@ -6544,8 +6557,8 @@ function pageSaBin(view, T) {
   };
   const latest = all.filter(r => r[0] === dates[0]), pl = latest.filter(r => r[5] > 0).reduce((a, r) => a + r[5], 0), mi = latest.filter(r => r[5] < 0).reduce((a, r) => a + r[5], 0);
   /* detail artikel */
-  const dd = U.saDate && allDates.includes(U.saDate) ? U.saDate : dates[0], ds = U.saSt || '', sg = isTR ? (U.saSign || '') : '+', q = (U.saQ || '').toLowerCase();
-  const det = all.filter(r => r[0] === dd && (!ds || r[1] === ds) && (sg !== '+' || r[5] > 0) && (sg !== '-' || r[5] < 0) && (!q || (r[3] + ' ' + r[4]).toLowerCase().includes(q)))
+  const dd = U.saDate && allDates.includes(U.saDate) ? U.saDate : dates[0], ds = ML(U.saSt), sg = isTR ? (U.saSign || '') : '+', q = (U.saQ || '').toLowerCase();
+  const det = all.filter(r => r[0] === dd && inML(ds, r[1]) && (sg !== '+' || r[5] > 0) && (sg !== '-' || r[5] < 0) && (!q || (r[3] + ' ' + r[4]).toLowerCase().includes(q)))
     .map(r => ({ d: r[0], c: r[1], st: sName(r[1]), sku: r[3], n: r[4], q: r[5] }));
   App.ui.saLast = { T, dd, det };
   view.innerHTML = `<div class="stack">
@@ -6561,7 +6574,7 @@ function pageSaBin(view, T) {
     <section class="card" id="saDet"><div class="card-h"><h3>Detail artikel</h3><p class="small muted">${fmtN(det.length)} baris · ${fmtN(det.reduce((a, r) => a + r.q, 0))} qty</p></div>
       <div class="filters">
         <select id="saDate" class="inp">${allDates.map(d => `<option value="${d}" ${d === dd ? 'selected' : ''}>${esc(fmtDate(d))}</option>`).join('')}</select>
-        <select id="saSt" class="inp"><option value="">Semua toko</option>${stores.map(c => `<option value="${esc(c)}" ${c === ds ? 'selected' : ''}>${esc(c + ' ' + sName(c))}</option>`).join('')}</select>
+        ${msel('saSt', 'Toko', stores.map(c => [c, c + ' ' + sName(c)]), ds)}
         ${isTR ? `<select id="saSign" class="inp"><option value="">Plus & minus</option><option value="+" ${sg === '+' ? 'selected' : ''}>Plus (+) saja</option><option value="-" ${sg === '-' ? 'selected' : ''}>Minus (−) saja</option></select>` : ''}
         <input id="saQ" class="inp" type="search" placeholder="Cari SKU / nama artikel" value="${esc(U.saQ || '')}" style="flex:1 1 200px">
         <button class="btn" id="saXls">Download Excel</button></div>
@@ -7444,7 +7457,7 @@ document.addEventListener('click', async e => {
   if (t.id === 'raXls') { exportRA(); return; }
   if (t.id === 'saXls') { exportSaBin(); return; }
   if (t.id === 'trXls') { exportTrend(); return; }
-  { const ss = t.closest && t.closest('[data-sast]'); if (ss) { App.ui.saSt = ss.dataset.sast; App.ui.more = {}; render(); const d = $('#saDet'); if (d) d.scrollIntoView({ behavior: 'smooth', block: 'start' }); return; } }
+  { const ss = t.closest && t.closest('[data-sast]'); if (ss) { App.ui.saSt = [ss.dataset.sast]; App.ui.more = {}; render(); const d = $('#saDet'); if (d) d.scrollIntoView({ behavior: 'smooth', block: 'start' }); return; } }
   if (t.id === 'spXls') { (async () => { const X = App.ui.spLast; if (!X || !(await needXLSX())) return; const aoa = [['Tanggal', 'Jam', 'Order No', 'Sales Person', 'Bill Status', 'Tipe Transaksi', 'SKU', 'Item', 'Customer', 'Qty', 'Nilai']].concat(X.L.slice().sort((a, b) => (a.d + a.o).localeCompare(b.d + b.o)).map(l => [l.d, hhmm(l.t), l.o, spName(l.sp), l.st || '', l.ty || '', l.sku, (App.sku[l.sku] || [])[0] || '', l.cn || '', l.q, Math.round(VAL(l))])); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), 'Transaksi RA'); (await getDownloads()).save({ filename: `Transaksi_RA_${X.st}_${X.R.from}_${X.R.to}.xlsx`, data: new Blob([XLSX.write(wb, { bookType: 'xlsx', type: 'array' })]) }); })(); return; }
   if (t.id === 'poolXls') { (async () => { const X = App.ui.poolLast; if (!X || !(await needXLSX())) return; const det = [['Tanggal', 'Order No', 'Komponen', 'Tipe Transaksi', 'Bill Status', 'Sales Person', 'SKU', 'Nama Item', 'Kategori Lv4', 'Qty', 'Nilai', 'Dihitung?']]; X.O.forEach(y => y.items.forEach(i => det.push([y.d, y.o, y.c, y.ty, y.bs, y.sp, i.sku, i.n, i.c4, i.q, Math.round(i.v), i.nc ? 'tidak' : 'ya'])));
     const aoa = [['Tanggal', 'Order No', 'Komponen', 'Tipe Transaksi', 'Bill Status', 'Sales Person', 'Item', 'Qty', 'Nilai'], ...X.O.map(y => [y.d, y.o, y.c, y.ty, y.bs, y.sp, y.items.map(i => i.n + ' x' + i.q + ' = ' + Math.round(i.v)).join('; '), y.q, Math.round(y.v)])]; const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), 'Sales dilebur'); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(det), 'Per item'); (await getDownloads()).save({ filename: `Rincian_Sales_Dilebur_${X.st}_${X.R.from}_${X.R.to}.xlsx`, data: new Blob([XLSX.write(wb, { bookType: 'xlsx', type: 'array' })]) }); })(); return; }
@@ -7552,18 +7565,13 @@ document.addEventListener('change', async e => {
   if (t.closest && (t.closest('.filters') || t.closest('.phead') || t.closest('.card-h'))) App.ui.more = {};
   if (App.page === 'settings' && settingsChange(t)) return;
   if (t.id === 'perSel' || t.id === 'rFrom' || t.id === 'rTo') { await onPeriodChange(); return; }
-  if (t.id === 'dtStore') { App.ui.dtStore = t.value; App.ui.more = {}; render(); return; }
-  if (t.id === 'psStore') { App.ui.psStore = t.value; App.ui.more = {}; render(); return; }
   if (t.id === 'lsM') { App.ui.lsM = t.value; render(); return; }
-  if (t.id === 'lsStore') { App.ui.lsStore = t.value; App.ui.more = {}; render(); return; }
-  if (t.id === 'ptStore') { App.ui.ptStore = t.value; App.ui.more = {}; render(); return; }
   if (t.id === 'chatTpl') { chatPreview(); return; }
   if (t.id === 'chatGreet') { chatPreview(); return; }
   if (t.id === 'stOrd') { saveSettings({ storeOrder: t.value }, 'Urutan toko di semua menu: ' + (t.value === 'code' ? 'nomor site' : 'nama toko')); return; }
   if (t.id === 'omsDate') { App.ui.omsDate = t.value || todayISO(); render(); return; }
   if (t.id === 'omsFile') { if (t.files[0]) omsUpload(t.files[0]); t.value = ''; return; }
   if (t.id === 'bcDate') { App.ui.bcDate = t.value; render(); return; }
-  if (t.id === 'bcStore') { App.ui.bcStore = t.value; render(); return; }
   if (t.id === 'apStore') { App.ui.apStore = t.value; render(); return; }
   if (t.id === 'tkMon') { App.ui.tkMon = t.value; render(); return; }
   if (t.id === 'tkAll') { const b = $('#tkStores'); if (b) b.style.display = t.checked ? 'none' : ''; return; }
@@ -7572,13 +7580,10 @@ document.addEventListener('change', async e => {
   if (t.id === 'pcDate') { if (t.value) { App.ui.pcDate = t.value; render(); } return; }
   if (t.id === 'pcStore') { App.ui.pcStore = t.value; render(); return; }
   if (t.id === 'pcAll') { App.ui.pcAll = t.checked; render(); return; }
-  if (t.id === 'roStore') { App.ui.roStore = t.value; render(); return; }
   if (t.id === 'roAvail') { App.ui.roAvail = t.checked; render(); return; }
-  if (t.id === 'tfStore') { App.ui.tfStore = t.value; render(); return; }
   if (t.id === 'gwDate') { if (t.value) { App.ui.gwDate = t.value; render(); } return; }
   if (t.id === 'gwLfl') { App.ui.gwLfl = t.checked; render(); return; }
   if (t.id === 'gwComp') { App.ui.gwComp = t.checked; render(); return; }
-  if (t.id === 'raStore') { App.ui.raStore = t.value; App.ui.more = {}; render(); return; }
   if (['saDays', 'saDate', 'saSt', 'saSign'].includes(t.id)) { App.ui[t.id] = t.id === 'saDays' ? +t.value : t.value; App.ui.more = {}; render(); return; }
   if (t.id === 'psNew') { App.ui.psNew = t.checked; render(); return; }
   if (t.dataset && t.dataset.pscats) { const cur = new Set(Array.isArray(App.ui.psCats) && App.ui.psCats.length ? App.ui.psCats : ['S', 'D']); if (t.checked) cur.add(t.dataset.pscats); else cur.delete(t.dataset.pscats);
@@ -7588,12 +7593,9 @@ document.addEventListener('change', async e => {
   if (t.id === 'raMin') { App.ui.raMin = Math.max(0, +t.value || 0); render(); return; }
   if (t.id === 'eaDate') { if (t.value) { App.ui.eaDate = t.value; render(); } return; }
   if (t.id === 'omM') { App.ui.omM = t.value; render(); return; }
-  if (t.id === 'tdStore') { App.ui.tdStore = t.value; App.ui.more = {}; render(); return; }
-  if (t.id === 'prStore') { App.ui.prStore = t.value; App.ui.more = {}; render(); return; }
   if (t.id === 'prDate') { if (t.value) { App.ui.prDate = t.value; render(); } return; }
   if (t.id === 'stSel') { App.ui.store = t.value; App.ui.more = {}; render(); return; }
   if (t.id === 'pc3') { App.ui.prodC3 = t.value; render(); return; }
-  if (t.id === 'pst') { App.ui.prodStore = t.value; render(); return; }
   if (t.id === 'hst') { App.ui.stStore = t.value; App.ui.more = {}; render(); return; }
   if (t.id === 'hss') { App.ui.stStatus = t.value; render(); return; }
   if (t.id === 'trs') { App.ui.trStore = t.value; render(); return; }

@@ -868,6 +868,8 @@ button.pd-sz:hover{box-shadow:0 0 0 3px rgba(15,49,146,.12)}
   .mchips button{white-space:nowrap}
   @media (max-width:760px){.msel-pop{position:fixed;left:12px;right:12px;top:auto;bottom:84px;max-width:none;max-height:70vh;display:flex;flex-direction:column}.msel-list{max-height:none;flex:1}}
 .msel-static{display:inline-flex;align-items:center;gap:6px;background:#F1F5F9;border-radius:10px;padding:7px 12px;font-size:13.5px;color:var(--muted,#64748B)}.msel-static b{color:#0F3192}
+  .pt-tile b.ps-big{font-size:clamp(17px,1.65vw,23px);white-space:nowrap;letter-spacing:-.3px}
+  @media (max-width:760px){.pt-tile b.ps-big{font-size:18px}}
 </style>
 </head>
 <body>
@@ -3216,7 +3218,7 @@ function pagePromoStock(view) {
     const c = b.ch.get(r.l4) || { k: r.l4, pcs: 0, val: 0, keys: new Set(), rs: [] }; c.pcs += r.t; c.val += r.t * r.p; c.keys.add(r.key); c.rs.push(r); b.ch.set(r.l4, c); }
   const open = U.psOpen || (U.psOpen = {});
   const trow = (lv, id, g, hasCh) => { const sd = soldOf(g.rs); const rate = sd.q / Math.max(1, dayDiff(R.from, R.to) + 1) * 30;
-    return `<tr class="lv${lv}" ${hasCh ? `data-pstog="${esc(id)}"` : ''}><td class="nm">${hasCh ? `<span class="car">${open[id] ? '▾' : '▸'}</span>` : ''}${esc(g.k)}</td><td class="r">${fmtN(g.keys.size)}</td><td class="r"><b>${fmtN(g.pcs)}</b></td><td class="r">${fmtPct(tot.pcs ? g.pcs / tot.pcs : null, 1)}</td><td class="r">${fmtRpS(g.val)}</td><td class="r">${fmtN(sd.q)}</td><td class="r">${fmtRpS(sd.v)}</td><td class="r">${rate > 0 ? fmtX(g.pcs / rate, 1) : '∞'}</td></tr>`; };
+    return `<tr class="lv${lv}" ${hasCh ? `data-pstog="${esc(id)}"` : ''}><td class="nm">${hasCh ? `<span class="car">${open[id] ? '▾' : '▸'}</span>` : ''}${esc(g.k)}</td><td class="r">${fmtN(g.keys.size)}</td><td class="r"><b>${fmtN(g.pcs)}</b></td><td class="r">${fmtPct(tot.pcs ? g.pcs / tot.pcs : null, 1)}</td><td class="r">${fmtRp(g.val)}</td><td class="r">${fmtN(sd.q)}</td><td class="r">${fmtRp(sd.v)}</td><td class="r">${rate > 0 ? fmtX(g.pcs / rate, 1) : '∞'}</td></tr>`; };
   let trs = '';
   for (const a of [...tree.values()].sort((x, y) => y.pcs - x.pcs)) { const ida = a.k; trs += trow(1, ida, a, true);
     if (open[ida]) for (const b of [...a.ch.values()].sort((x, y) => y.pcs - x.pcs)) { const idb = a.k + '›' + b.k; trs += trow(2, idb, b, true);
@@ -3237,9 +3239,9 @@ function pagePromoStock(view) {
     <div class="pt-tiles" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr))">
       ${(() => { const NM = { S: 'SMDS', D: 'DCNP', N: 'tanpa kategori' }, lbl = catP0.N && psSel.length === 3 ? 'list promo' : psSel.map(k => NM[k]).join(' & '), vc = k => F.filter(r => k === 'N' ? !(r.cat === 'S' || r.cat === 'D') : r.cat === k).reduce((x, r) => x + r.t * r.p, 0);
         const nArt = new Set(F.map(r => r.art)).size, nSku = new Set(F.map(r => r.sku)).size;
-        return `<div class="pt-tile" style="background:#0B1B4A"><span>Value stok ${esc(lbl)}</span><b>${fmtRpS(tot.val)}</b><small>${psSel.length === 1 ? 'setelah diskon ' + fmtRpS(tot.net) : psSel.map(k => NM[k] + ' ' + fmtRpS(vc(k))).join(' · ')}</small></div>
+        return `<div class="pt-tile" style="background:#0B1B4A"><span>Value stok ${esc(lbl)}</span><b class="ps-big">${fmtRp(tot.val)}</b><small>${psSel.length === 1 ? 'setelah diskon ' + fmtRp(tot.net) : psSel.map(k => NM[k] + ' ' + fmtRp(vc(k))).join('<br>')}</small></div>
       <div class="pt-tile"><span>Qty total ${esc(lbl)}</span><b>${fmtN(tot.pcs)} pcs</b><small>${fmtPct(allPcs ? tot.pcs / allPcs : null, 1)} dari total stok toko</small></div>
-      <div class="pt-tile"><span>Terjual periode ini</span><b>${fmtN(S0.q)} pcs</b><small>${fmtRpS(S0.v)} gross</small></div>
+      <div class="pt-tile"><span>Terjual periode ini</span><b>${fmtN(S0.q)} pcs</b><small>${fmtRp(S0.v)} gross</small></div>
       <div class="pt-tile"><span>Sell-through</span><b>${fmtPct(S0.q + tot.pcs ? S0.q / (S0.q + tot.pcs) : null, 1)}</b><small>terjual ÷ (terjual + stok)</small></div>
       <div class="pt-tile"><span>Jumlah Generic / SKU</span><b>${fmtN(nArt)} / ${fmtN(nSku)}</b><small>generic / SKU · ${fmtN(tot.keys.size)} artikel-warna</small></div>`; })()}
     </div>
@@ -3253,15 +3255,15 @@ function pagePromoStock(view) {
     <section class="card"><div class="card-h"><h3>Artikel DCNP/SMDS</h3><p class="small muted">${fmtN(byK.size)} artikel-warna · klik untuk detail</p></div><div id="psArtT"></div></section>
     <p class="small muted">List promo: ${esc(MS.promo.source || '')}${MS.promo.src === 'hub' ? ' · bulan ' + esc(MS.promo.period || '') + ' · SMDS = Selected EIGER, DCNP = Selected DC & Selected Outlive' : ', dibuat ' + esc(MS.promo.generated || '')}. Stok = stok terakhir per toko dari Export by Bin. Cover = stok ÷ rata-rata terjual per bulan pada periode terpilih.</p>
   </div>`;
-  if (typeof Chart !== 'undefined') { const ds = [...byD.keys()].sort((a, b) => a - b); App.charts.length; mkDual($('#psDisc'), ds.map(d => d + '%'), ds.map(d => byD.get(d).pcs), ds.map(d => byD.get(d).val), 'Stok (pcs)', 'Nilai stok', v => fmtN(v), v => fmtRpS(v)); }
+  if (typeof Chart !== 'undefined') { const ds = [...byD.keys()].sort((a, b) => a - b); App.charts.length; mkDual($('#psDisc'), ds.map(d => d + '%'), ds.map(d => byD.get(d).pcs), ds.map(d => byD.get(d).val), 'Stok (pcs)', 'Nilai stok', v => fmtN(v), v => fmtRp(v)); }
   if ($('#psStoreT')) $('#psStoreT').innerHTML = tbl('psStore', { rows: [...byS.entries()].map(([c, x]) => ({ c, name: sName(c), pcs: x.pcs, val: x.val, n: x.keys.size, share: storePcs(c) ? x.pcs / storePcs(c) : null })), sort: { k: 'pcs', dir: 'desc' }, limit: 40, onRow: r => { App.ui.psStore = r.c; render(); window.scrollTo(0, 0); }, cols: [
     { k: 'name', label: 'Toko', h: r => `<span class="nm">${esc(r.name)}</span><span class="sub">${esc(r.c)}</span>` }, { k: 'n', label: 'Artikel', r: 1, h: r => fmtN(r.n) }, { k: 'pcs', label: 'Stok', r: 1, h: r => fmtN(r.pcs) },
-    { k: 'share', label: '% stok toko', r: 1, h: r => fmtPct(r.share, 1) }, { k: 'val', label: 'Nilai', r: 1, h: r => fmtRpS(r.val) }] });
+    { k: 'share', label: '% stok toko', r: 1, h: r => fmtPct(r.share, 1) }, { k: 'val', label: 'Nilai', r: 1, h: r => fmtRp(r.val) }] });
   $('#psArtT').innerHTML = tbl('psArt', { rows: [...byK.values()].map(x => { const sd = soldOf(x.rs); return { art: x.art, n: x.n, color: x.color, d: x.d, p: x.p, l4: x.l4, cat: x.cat, pd: x.pd, nw: x.nw, pcs: x.pcs, ns: x.stores.size, q: sd.q, val: x.pcs * x.p }; }), sort: { k: 'pcs', dir: 'desc' }, limit: 30, onRow: r => openProduct(r.art, st || null), cols: [
     { k: 'n', label: 'Artikel', h: r => prodCell(r.art, r.n + ' · ' + r.color, r.art + ' · ' + r.l4) }, { k: 'cat', label: 'Kategori', h: r => `<span class="pcat ${r.cat === 'S' ? 's' : r.cat === 'D' ? 'd' : ''}">${esc(PCAT[r.cat || ''])}</span>` },
     { k: 'd', label: 'Diskon', r: 1, h: r => `${r.nw ? '<span class="pnew">BARU</span> ' : ''}${r.pd != null ? `<s class="muted small">${r.pd}%</s> → ` : ''}<span class="disc">${r.d}%</span>` },
-    { k: 'p', label: 'Harga', r: 1, h: r => `<span style="text-decoration:line-through;color:var(--muted)">${fmtRpS(r.p)}</span><span class="sub">${fmtRpS(r.p * (1 - r.d / 100))}</span>` },
-    { k: 'pcs', label: 'Stok', r: 1, h: r => `<b>${fmtN(r.pcs)}</b>` }, { k: 'ns', label: 'Toko', r: 1, h: r => fmtN(r.ns) }, { k: 'q', label: 'Terjual', r: 1, h: r => fmtN(r.q) }, { k: 'val', label: 'Nilai stok', r: 1, h: r => fmtRpS(r.val) }] });
+    { k: 'p', label: 'Harga', r: 1, h: r => `<span style="text-decoration:line-through;color:var(--muted)">${fmtRp(r.p)}</span><span class="sub">${fmtRp(r.p * (1 - r.d / 100))}</span>` },
+    { k: 'pcs', label: 'Stok', r: 1, h: r => `<b>${fmtN(r.pcs)}</b>` }, { k: 'ns', label: 'Toko', r: 1, h: r => fmtN(r.ns) }, { k: 'q', label: 'Terjual', r: 1, h: r => fmtN(r.q) }, { k: 'val', label: 'Nilai stok', r: 1, h: r => fmtRp(r.val) }] });
 }
 
 /* ================= halaman: Detention Stock (logika repo Detention Stock, sudut pandang BM) ================= */

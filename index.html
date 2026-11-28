@@ -870,6 +870,7 @@ button.pd-sz:hover{box-shadow:0 0 0 3px rgba(15,49,146,.12)}
 .msel-static{display:inline-flex;align-items:center;gap:6px;background:#F1F5F9;border-radius:10px;padding:7px 12px;font-size:13.5px;color:var(--muted,#64748B)}.msel-static b{color:#0F3192}
   .pt-tile b.ps-big{font-size:clamp(17px,1.65vw,23px);white-space:nowrap;letter-spacing:-.3px}
   @media (max-width:760px){.pt-tile b.ps-big{font-size:18px}}
+  .px-card .px-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.px-tpl{font-size:13px;color:var(--muted,#64748B);flex:1;min-width:160px}.px-tpl b{color:#1E293B}
 </style>
 </head>
 <body>
@@ -3814,6 +3815,190 @@ function picaAISection(label) {
         <p class="small" id="pcCopyMsg" style="margin:8px 0 0"></p></div>
       <div id="pcAI">${App.aiReady ? `<button class="btn primary" id="pcAIBtn">Minta analisa AI untuk ${esc(label)}</button>${App.admin ? ' <button class="btn" id="pcAIRe" title="Buat ulang analisa (abaikan hasil tersimpan)">Buat ulang</button>' : ''}<p class="small muted" style="margin:8px 0 0">Hasil disimpan per analisa per tanggal, jadi analisa yang sama tidak memanggil AI dua kali.</p>` : `${App.admin ? '<p class="small muted" style="margin:0">Opsional: analisa AI langsung di dashboard (tanpa salin-tempel) bisa diaktifkan dengan mengisi <b>ANTHROPIC_API_KEY</b> di Apps Script › Script Properties (memakai saldo API Claude Console).</p>' : ''}`}</div></section>`;
 }
+/* ================= Isi Template PICA (Excel HO) =================
+   Template (format PICA Store Kamus v2) diupload sekali, disimpan di browser. Hub mengisi Diagnosa_Toko + indikator yang datanya ada,
+   mengosongkan isian bulan lalu (Form_PICA, Monitoring), lalu file yang SAMA diunduh lagi — rumus, dropdown, kamus & format tetap utuh. */
+let _zipP = null;
+function needZip() {
+  if (typeof JSZip !== 'undefined') return Promise.resolve(true);
+  return _zipP || (_zipP = new Promise(res => { const sc = document.createElement('script'); sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js'; sc.onload = () => res(true); sc.onerror = () => { _zipP = null; res(false); }; document.head.appendChild(sc); }));
+}
+const PX_KEY = 'dash_pica_tpl';
+function pxSaved() { try { const s = localStorage.getItem(PX_KEY); if (s) return JSON.parse(s); } catch (e) { } return App._pxOnce || null; }
+function pxSave(name, b64) { try { localStorage.setItem(PX_KEY, JSON.stringify({ name, b64, at: new Date().toISOString() })); return true; } catch (e) { return false; } }
+const pxB64 = buf => { let s = ''; const u = new Uint8Array(buf); for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000)); return btoa(s); };
+const pxBuf = b64 => { const s = atob(b64), u = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) u[i] = s.charCodeAt(i); return u.buffer; };
+
+/* ---- penulis sel XML (tanpa merusak style / rumus lain) ---- */
+const PX_NS = 'http://schemas.openxmlformats.org/spreadsheetml/2006/main';
+const pxCol = ref => ref.replace(/\d+/g, ''), pxRow = ref => +ref.replace(/\D+/g, '');
+const pxColN = col => [...col].reduce((a, ch) => a * 26 + ch.charCodeAt(0) - 64, 0);
+const pxColL = n => { let s = ''; while (n > 0) { const r = (n - 1) % 26; s = String.fromCharCode(65 + r) + s; n = Math.floor((n - 1) / 26); } return s; };
+function pxSheet(doc) {
+  const sd = doc.getElementsByTagNameNS(PX_NS, 'sheetData')[0];
+  const rows = new Map(); for (const r of sd.getElementsByTagNameNS(PX_NS, 'row')) rows.set(+r.getAttribute('r'), r);
+  const rowEl = n => { let r = rows.get(n); if (r) return r; r = doc.createElementNS(PX_NS, 'row'); r.setAttribute('r', n);
+    const after = [...rows.keys()].filter(k => k > n).sort((a, b) => a - b)[0]; sd.insertBefore(r, after ? rows.get(after) : null); rows.set(n, r); return r; };
+  const cellEl = (ref, make) => { const r = make ? rowEl(pxRow(ref)) : rows.get(pxRow(ref)); if (!r) return null;
+    let nxt = null; for (const c of r.getElementsByTagNameNS(PX_NS, 'c')) { const cr = c.getAttribute('r'); if (cr === ref) return c; if (!nxt && pxColN(pxCol(cr)) > pxColN(pxCol(ref))) nxt = c; }
+    if (!make) return null; const c = doc.createElementNS(PX_NS, 'c'); c.setAttribute('r', ref);
+    /* gaya baris (bila ada) dipakai supaya sel baru tidak polos */
+    r.insertBefore(c, nxt); return c; };
+  const strip = (c, keepF) => { for (const k of [...c.childNodes]) if (!(keepF && k.localName === 'f')) c.removeChild(k); c.removeAttribute('t'); };
+  const isF = ref => { const c = cellEl(ref, false); return !!(c && c.getElementsByTagNameNS(PX_NS, 'f').length); };
+  return {
+    isF,
+    get(ref) { const c = cellEl(ref, false); if (!c) return null; const v = c.getElementsByTagNameNS(PX_NS, 'v')[0], is = c.getElementsByTagNameNS(PX_NS, 'is')[0]; return { t: c.getAttribute('t'), v: v ? v.textContent : is ? is.textContent : null }; },
+    clear(ref, evenFormula) { const c = cellEl(ref, false); if (!c) return; if (!evenFormula && c.getElementsByTagNameNS(PX_NS, 'f').length) return; strip(c); },
+    num(ref, v) { if (v == null || !isFinite(v)) return this.clear(ref, true); const c = cellEl(ref, true); strip(c); const e = doc.createElementNS(PX_NS, 'v'); e.textContent = String(v); c.appendChild(e); },
+    str(ref, s) { if (s == null || s === '') return this.clear(ref, true); const c = cellEl(ref, true); strip(c); c.setAttribute('t', 'inlineStr'); const is = doc.createElementNS(PX_NS, 'is'), t = doc.createElementNS(PX_NS, 't'); t.setAttribute('xml:space', 'preserve'); t.textContent = s; is.appendChild(t); c.appendChild(is); }
+  };
+}
+async function pxOpen(buf) {
+  const zip = await JSZip.loadAsync(buf);
+  const wbx = new DOMParser().parseFromString(await zip.file('xl/workbook.xml').async('string'), 'application/xml');
+  const rel = new DOMParser().parseFromString(await zip.file('xl/_rels/workbook.xml.rels').async('string'), 'application/xml');
+  const rid = {}; for (const r of rel.getElementsByTagName('Relationship')) rid[r.getAttribute('Id')] = r.getAttribute('Target');
+  const sheets = {}; for (const s of wbx.getElementsByTagNameNS(PX_NS, 'sheet')) { const id = s.getAttributeNS('http://schemas.openxmlformats.org/officeDocument/2006/relationships', 'id') || s.getAttribute('r:id'); let t = rid[id] || ''; t = t.replace(/^\/?xl\//, ''); sheets[s.getAttribute('name')] = 'xl/' + t; }
+  /* shared strings untuk membaca kode/nama toko di template */
+  let sst = []; const sf = zip.file('xl/sharedStrings.xml');
+  if (sf) { const d = new DOMParser().parseFromString(await sf.async('string'), 'application/xml'); sst = [...d.getElementsByTagNameNS(PX_NS, 'si')].map(si => [...si.getElementsByTagNameNS(PX_NS, 't')].map(t => t.textContent).join('')); }
+  const docs = {};
+  const sheet = async name => { if (!sheets[name]) throw new Error('Sheet "' + name + '" tidak ditemukan — pastikan memakai template PICA Store (Kamus v2).');
+    if (!docs[name]) { const d = new DOMParser().parseFromString(await zip.file(sheets[name]).async('string'), 'application/xml'); docs[name] = { d, w: pxSheet(d) }; } return docs[name].w; };
+  const text = (w, ref) => { const x = w.get(ref); if (!x || x.v == null) return ''; return x.t === 's' ? (sst[+x.v] || '') : x.v; };
+  const save = async () => {
+    /* buang nilai cache semua rumus (di semua sheet) supaya Excel / Sheets / LibreOffice pasti menghitung ulang dengan data baru */
+    for (const n in sheets) { if (!docs[n]) { const f = zip.file(sheets[n]); if (!f) continue; docs[n] = { d: new DOMParser().parseFromString(await f.async('string'), 'application/xml') }; }
+      for (const fe of [...docs[n].d.getElementsByTagNameNS(PX_NS, 'f')]) { const c = fe.parentNode; for (const v of [...c.getElementsByTagNameNS(PX_NS, 'v')]) c.removeChild(v); c.removeAttribute('t'); } }
+    if (zip.file('xl/calcChain.xml')) { zip.remove('xl/calcChain.xml'); const ct = await zip.file('[Content_Types].xml').async('string'); zip.file('[Content_Types].xml', ct.replace(/<Override[^>]*calcChain[^>]*\/>/, ''));
+      const wr = await zip.file('xl/_rels/workbook.xml.rels').async('string'); zip.file('xl/_rels/workbook.xml.rels', wr.replace(/<Relationship[^>]*calcChain[^>]*\/>/, '')); }
+    for (const n in docs) zip.file(sheets[n], new XMLSerializer().serializeToString(docs[n].d));
+    /* minta Excel menghitung ulang semua rumus saat file dibuka */
+    let cp = wbx.getElementsByTagNameNS(PX_NS, 'calcPr')[0]; if (!cp) { cp = wbx.createElementNS(PX_NS, 'calcPr'); wbx.documentElement.appendChild(cp); }
+    cp.setAttribute('fullCalcOnLoad', '1'); zip.file('xl/workbook.xml', new XMLSerializer().serializeToString(wbx));
+    return zip.generateAsync({ type: 'blob', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', compression: 'DEFLATE' });
+  };
+  return { sheet, text, save, names: Object.keys(sheets) };
+}
+
+/* ---- data per toko untuk bulan m ---- */
+const PX_OMNI = l => typeof OMNI !== 'undefined' && OMNI.some(o => o[2](l));
+async function pxData(m, stores, prog) {
+  const Y = m.slice(0, 4), mEnd = m + '-' + pad(dim(m)), L = repLast();
+  if (!L || L < m + '-01') throw new Error('Belum ada data penjualan untuk ' + fmtMonth(m) + '.');
+  const D = L < mEnd ? L : mEnd, day = +D.slice(8), full = day >= dim(m);
+  const cw = full ? 1 : cumWeight(m, day), f = cw > 0 ? 1 / cw : 1;
+  /* BS baseline: Jan s/d bulan sebelumnya pada tahun yang sama, kecuali Maret */
+  const base = []; for (let k = Y + '-01'; k < m; k = addMonths(k, 1)) if (k.slice(5) !== '03') base.push(k);
+  const upt3 = [addMonths(m, -3), addMonths(m, -2), addMonths(m, -1)];
+  const need = [...new Set([...base, ...upt3, m])].filter(k => App.index.sales[k]).sort();
+  prog && prog('Mengambil penjualan ' + need.length + ' bulan…');
+  if (need.length) await ensureMonths(need[0] + '-01', D);
+  const baseAv = base.filter(k => App.index.sales[k]);
+  const mStat = (k, c) => picaStats(linesIn(k + '-01', k + '-' + pad(dim(k)), c));
+  const live = m === todayISO().slice(0, 7) || m === (L || '').slice(0, 7);
+  const out = new Map();
+  for (const c of stores) {
+    prog && prog('Menghitung ' + sName(c) + '…');
+    const Lm = linesIn(m + '-01', D, c), s = picaStats(Lm), T = monthTarget(c, m);
+    const r = { c, T, day, D, full, f, sales: s.v ? s.v * f : (s.v || null), trx: s.n ? Math.round(s.n * f) : null, salesMTD: s.v, trxMTD: s.n, upt: s.upt };
+    const bs = baseAv.map(k => mStat(k, c).bs).filter(x => x > 0); r.bsBase = bs.length ? bs.reduce((a, x) => a + x, 0) / bs.length : null; r.bsN = bs.length;
+    const u3 = upt3.filter(k => App.index.sales[k]).map(k => mStat(k, c).upt).filter(x => x > 0); r.upt3 = u3.length ? u3.reduce((a, x) => a + x, 0) / u3.length : null;
+    let ov = 0, tv = 0; for (const l of Lm) { const v = VAL(l); tv += v; if (PX_OMNI(l)) ov += v; } r.omni = tv ? ov / tv : null;
+    try { const C = raCalc({ from: m + '-01', to: D }, c); const W = C.rows.filter(x => x.sp !== '(TANPA NAMA)' && !x.out && x.tgt > 0);
+      r.raN = W.length; r.raLow = W.length ? W.filter(x => x.v * f < x.tgt).length / W.length : null; } catch (e) { r.raLow = null; }
+    const et = (App.eac[m] || {})[c]; if (et) { let mv = 0; for (const l of Lm) if (lineOk(l) && salesOk(l) && isMember(l)) mv += l.g; r.eac = mv * f / et; }
+    if (live && App.stock[c]) { const d = detOf(c); if (d && !d.old) r.disp = d.gP; }
+    out.set(c, r);
+  }
+  return { m, D, day, full, f, base, baseAv, upt3, live, rows: out };
+}
+/* saran problem dari data (kode sesuai Kamus v2), maksimal 3, urut paling jauh dari ambang */
+function pxAdvice(r) {
+  const A = [], add = (sev, code, name, why) => A.push({ sev, t: `Saran data: ${code} | ${name} — ${why}` });
+  if (r.disp != null && r.disp < .95) add((.95 - r.disp) / .95, 'TRX-01', 'Display by Generik di bawah target', `generic terdisplay ${fmtPct(r.disp, 1)} (< 95%)`);
+  if (r.raLow != null && r.raLow >= .5) add(r.raLow - .5 + .05, 'TRX-08', 'Jumlah RA tidak mencapai target individu', `${fmtPct(r.raLow, 0)} RA diperkirakan di bawah target tagging (dari ${r.raN} RA)`);
+  if (r.omni != null && r.omni < .055) add((.055 - r.omni) / .055, 'TRX-19', 'Kontribusi Omnichannel tidak mencapai target', `omnichannel ${fmtPct(r.omni, 1)} dari sales (< 5,5%)`);
+  if (r.eac != null && r.eac < 1) add(1 - r.eac, 'TRX-21', 'Transaksi member (EAC) tidak mencapai target', `sales member EAC ${fmtPct(r.eac, 1)} dari target`);
+  if (r.upt != null && r.upt3 && r.upt < r.upt3) add((r.upt3 - r.upt) / r.upt3, 'UPT-03', 'UPT toko di bawah rata-rata 3 bulan terakhir', `UPT ${fmtX(r.upt, 2)} vs rata-rata 3 bln ${fmtX(r.upt3, 2)}`);
+  return A.sort((a, b) => b.sev - a.sev).slice(0, 3).map(x => x.t);
+}
+async function pxFill(buf, m, prog) {
+  const X = await pxOpen(buf);
+  const DG = await X.sheet('Diagnosa_Toko'), PI = await X.sheet('Peta_Indikator'), FP = await X.sheet('Form_PICA');
+  const MO = X.names.includes('Monitoring') ? await X.sheet('Monitoring') : null;
+  /* toko: urutan dari template (lewati baris CONTOH), lalu toko hub yang punya target/penjualan bulan itu */
+  const tpl = [], nm = {};
+  for (let r = 6; r <= 35; r++) { const code = String(X.text(DG, 'B' + r)).trim(); if (!code || /contoh/i.test(code)) continue; tpl.push(code); nm[code] = X.text(DG, 'C' + r); }
+  const hub = storeCodes().filter(c => monthTarget(c, m) || ((App.index.sales[m] || {})[c] || { d: [] }).d.length);
+  const stores = [...tpl, ...hub.filter(c => !tpl.includes(c))].slice(0, 30);
+  const P = await pxData(m, stores, prog);
+  prog && prog('Menulis ke template…');
+  /* Diagnosa_Toko */
+  DG.num('C3', dim(m)); DG.str('L3', MON[+m.slice(5) - 1] + ' ' + m.slice(0, 4));
+  DG.str('E4', P.full ? 'Actual = 1 bulan penuh' : `Actual & Trx = 1–${P.day} ${MON[+m.slice(5) - 1]} + estimasi s/d ${dim(m)} (bobot harian)`);
+  DG.str('G4', P.baseAv.length ? 'BS Baseline = rata-rata ' + P.baseAv.map(k => MON[+k.slice(5) - 1]).join(', ') + ' (' + P.baseAv.length + ' bln, exc. Maret)' : 'BS Baseline: belum ada data bulan sebelumnya di hub');
+  for (let r = 6; r <= 35; r++) for (const col of ['B', 'C', 'D', 'E', 'F', 'G']) DG.clear(col + r, true);
+  stores.forEach((c, i) => { const r = 6 + i, x = P.rows.get(c);
+    if (/^\d+$/.test(c)) DG.num('B' + r, +c); else DG.str('B' + r, c);
+    DG.str('C' + r, nm[c] || (App.stores[c] && App.stores[c].name) || sName(c));
+    if (x.T) DG.num('D' + r, Math.round(x.T)); if (x.sales != null) DG.num('E' + r, Math.round(x.sales)); if (x.trx != null) DG.num('F' + r, x.trx); if (x.bsBase) DG.num('G' + r, Math.round(x.bsBase)); });
+  /* Peta_Indikator: kosongkan isian bulan lalu (kolom input D..AG), isi yang ada datanya */
+  for (let r = 9; r <= 38; r++) for (let k = pxColN('D'); k <= pxColN('AG'); k++) { const ref = pxColL(k) + r; if (!PI.isF(ref)) PI.clear(ref); }
+  stores.forEach((c, i) => { const r = 9 + i, x = P.rows.get(c);
+    if (x.disp != null) PI.num('D' + r, Math.round(x.disp * 10000) / 10000);
+    if (x.raLow != null) PI.num('H' + r, Math.round(x.raLow * 10000) / 10000);
+    if (x.omni != null) PI.num('O' + r, Math.round(x.omni * 10000) / 10000);
+    if (x.eac != null) PI.num('R' + r, Math.round(x.eac * 10000) / 10000);
+    if (x.upt != null) PI.num('Z' + r, Math.round(x.upt * 100) / 100);
+    if (x.upt3 != null) PI.num('AA' + r, Math.round(x.upt3 * 100) / 100); });
+  /* Form_PICA: kosongkan pilihan bulan lalu; saran data ditaruh di Catatan BM */
+  for (let r = 6; r <= 95; r++) for (const col of ['G', 'I', 'J', 'Q', 'U', 'V']) FP.clear(col + r, true);
+  stores.forEach((c, i) => { const x = P.rows.get(c); if (!x.T || x.sales == null || x.sales >= x.T) return;
+    pxAdvice(x).forEach((t, j) => FP.str('V' + (6 + i * 3 + j), t)); });
+  if (MO) for (let r = 6; r <= 95; r++) for (const col of ['H', 'I', 'K', 'L', 'N', 'O', 'Q', 'R']) MO.clear(col + r, true);
+  return { blob: await X.save(), P, stores };
+}
+/* ---- panel di menu Analisa PICA ---- */
+function pxPanel() {
+  const S = pxSaved(), cur = (repLast() || todayISO()).slice(0, 7), ms = Object.keys(App.index.sales || {}).filter(k => k <= cur).sort().reverse();
+  const m = App.ui.pxM && ms.includes(App.ui.pxM) ? App.ui.pxM : (ms[0] || cur);
+  return `<section class="card px-card"><div class="card-h"><h3>📄 Isi Template PICA (Excel HO)</h3><span class="small muted">format PICA Store Kamus v2 · rumus, dropdown & kamus tetap utuh</span></div>
+    <div class="px-row">
+      <label class="small muted" for="pxM">Bulan</label><select id="pxM" class="inp">${ms.map(k => `<option value="${k}" ${k === m ? 'selected' : ''}>${esc(fmtMonth(k))}${k === cur && +(repLast() || '').slice(8) < dim(k) ? ' (berjalan · + estimasi)' : ''}</option>`).join('')}</select>
+      <span class="px-tpl">${S ? `Template: <b>${esc(S.name)}</b>` : '<b>Belum ada template</b>'}</span>
+      <label class="btn sm" for="pxFile">${S ? 'Ganti template' : 'Upload template'}</label><input type="file" id="pxFile" accept=".xlsx" hidden>
+      <button class="btn primary" id="pxGo" ${S ? '' : 'disabled'}>⬇ Isi & download</button>
+    </div>
+    <p class="small muted" style="margin:8px 0 0">Diisi otomatis: Diagnosa_Toko (target, actual & transaksi${m === cur ? ' + estimasi akhir bulan' : ''}, BS baseline Jan–bulan lalu kecuali Maret) dan Peta_Indikator (Display by Generik, % RA di bawah target, Omnichannel, Sales member EAC, UPT & UPT 3 bln). Isian bulan lalu di Form_PICA & Monitoring dikosongkan; saran problem dari data ditulis di kolom <b>Catatan BM</b>. Indikator lain tetap diisi manual.</p>
+    <div id="pxMsg" class="small" style="margin-top:6px"></div></section>`;
+}
+async function pxRun() {
+  const S = pxSaved(), msg = $('#pxMsg'), btn = $('#pxGo'); if (!S) return;
+  const say = t => { if (msg) msg.textContent = t; };
+  if (btn) btn.disabled = true;
+  try {
+    if (!(await needZip())) throw new Error('Gagal memuat pengolah Excel. Cek koneksi lalu coba lagi.');
+    const m = ($('#pxM') || {}).value || App.ui.pxM;
+    const { blob, P, stores } = await pxFill(pxBuf(S.b64), m, say);
+    const dl = await getDownloads(); await dl.save({ filename: `PICA_Store_${MONL[+m.slice(5) - 1]}_${m.slice(0, 4)}_Jateng_01.xlsx`, data: blob });
+    say(`✅ Selesai: ${stores.length} toko · ${P.full ? 'data 1 bulan penuh' : 'data 1–' + P.day + ' + estimasi s/d ' + dim(m)} · BS baseline ${P.baseAv.length} bulan.`);
+  } catch (e) { say('⚠ ' + (e && e.message ? e.message : e)); }
+  if (btn) btn.disabled = false;
+}
+document.addEventListener('change', async e => {
+  const t = e.target; if (!t) return;
+  if (t.id === 'pxM') { App.ui.pxM = t.value; return; }
+  if (t.id === 'pxFile' && t.files && t.files[0]) { const f = t.files[0], buf = await f.arrayBuffer();
+    if (!(await needZip())) { toast('Gagal memuat pengolah Excel'); return; }
+    try { const X = await pxOpen(buf); for (const n of ['Diagnosa_Toko', 'Peta_Indikator', 'Form_PICA']) await X.sheet(n); }
+    catch (err) { toast(err.message || 'File bukan template PICA'); return; }
+    if (!pxSave(f.name, pxB64(buf))) toast('Template dipakai sekali (tidak bisa disimpan di browser ini)'); else toast('Template PICA tersimpan');
+    App._pxOnce = { name: f.name, b64: pxB64(buf) }; render(); }
+});
+document.addEventListener('click', e => { const t = e.target; if (t && t.id === 'pxGo') pxRun(); });
+
 function pagePica(view) {
   const U = App.ui, maxD = repLast();
   if (!maxD) { setHead('Analisa PICA', ''); view.innerHTML = '<div class="empty-state"><h2>Belum ada data penjualan</h2></div>'; return; }
@@ -3853,7 +4038,7 @@ function pagePica(view) {
     if (fN0('basket') >= 2) areaAct.push(`Dorong <b>produk harga tinggi di area depan</b> untuk toko dengan basket turun: ${per.filter(p => p.flags.basket).slice(0, 4).map(p => esc(p.name)).join(', ')}.`);
     if (visit.length) areaAct.push(`<b>Kunjungan / call prioritas BM</b>: ${visit.map(p => esc(p.name) + ' (' + fmtPct(p.ach, 0) + ')').join(', ')}.`);
     if (P.rem > 0 && P.remDays > 0) areaAct.push(`Area perlu <b>${fmtRpS(P.needDay)}/hari</b> selama ${P.remDays} hari tersisa untuk menutup gap ${fmtRpS(P.rem)}.`);
-    view.innerHTML = `<div class="stack">${controls}
+    view.innerHTML = `<div class="stack">${controls}${sc ? '' : pxPanel()}
       <div class="pt-tiles" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr))">
         <div class="pt-tile" style="background:${P.ach >= G ? '#13806F' : '#C0392B'}"><span>Pencapaian ${cum ? 'kumulatif' : 'harian'} area</span><b>${fmtPct(P.ach, 1)}</b><small>${fmtRpS(P.achSales)} vs ${fmtRpS(P.achTarget)}</small></div>
         <div class="pt-tile" style="background:#E46636"><span>Toko belum capai target</span><b>${below.length} / ${withT.length}</b><small>gap ${fmtRpS(gapTot)}</small></div>
@@ -3878,7 +4063,7 @@ function pagePica(view) {
   const st = sc || (U.pcStore && R.rows.some(r => r.c === U.pcStore) ? U.pcStore : (listRows[0] || {}).c || '');
   U.pcStore = st;
   const P = st ? picaData(st, D, R, mode) : null, X = P ? picaRules(P) : null;
-  view.innerHTML = `<div class="stack">${controls}
+  view.innerHTML = `<div class="stack">${controls}${sc ? '' : pxPanel()}
     ${P ? `<section class="card"><div class="card-h"><h3>${esc(P.name)} · ${esc(st)}</h3><p class="small muted">${cum ? 'kumulatif 1–' + (+D.slice(8)) + ' ' + MON[+D.slice(5, 7) - 1] : fmtDate(D)}</p></div>
       <div class="pt-tiles" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr))">
         <div class="pt-tile" style="background:${P.row.cAch >= G ? '#13806F' : '#C0392B'}"><span>Pencapaian kumulatif</span><b>${fmtPct(P.row.cAch, 1)}</b><small>${fmtRpS(P.row.cs)} vs target ${fmtRpS(P.row.cT)}</small></div>

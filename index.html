@@ -3902,7 +3902,8 @@ async function pxData(m, stores, prog) {
   for (const c of stores) {
     prog && prog('Menghitung ' + sName(c) + '…');
     const Lm = linesIn(m + '-01', D, c), s = picaStats(Lm), T = monthTarget(c, m);
-    const r = { c, T, day, D, full, f, sales: s.v ? s.v * f : (s.v || null), trx: s.n ? Math.round(s.n * f) : null, salesMTD: s.v, trxMTD: s.n, upt: s.upt };
+    const pmS = picaStats(linesIn(addMonths(m, -1) + '-01', addMonths(m, -1) + '-' + pad(dim(addMonths(m, -1))), c));
+    const r = { c, m, trxL: pmS.n || null, T, day, D, full, f, sales: s.v ? s.v * f : (s.v || null), trx: s.n ? Math.round(s.n * f) : null, salesMTD: s.v, trxMTD: s.n, upt: s.upt };
     const bs = baseAv.map(k => mStat(k, c).bs).filter(x => x > 0); r.bsBase = bs.length ? bs.reduce((a, x) => a + x, 0) / bs.length : null; r.bsN = bs.length;
     const u3 = upt3.filter(k => App.index.sales[k]).map(k => mStat(k, c).upt).filter(x => x > 0); r.upt3 = u3.length ? u3.reduce((a, x) => a + x, 0) / u3.length : null;
     let ov = 0, tv = 0; for (const l of Lm) { const v = VAL(l); tv += v; if (PX_OMNI(l)) ov += v; } r.omni = tv ? ov / tv : null;
@@ -3914,15 +3915,22 @@ async function pxData(m, stores, prog) {
   }
   return { m, D, day, full, f, base, baseAv, upt3, live, rows: out };
 }
-/* saran problem dari data (kode sesuai Kamus v2), maksimal 3, urut paling jauh dari ambang */
-function pxAdvice(r) {
-  const A = [], add = (sev, code, name, why) => A.push({ sev, t: `Saran data: ${code} | ${name} — ${why}` });
-  if (r.disp != null && r.disp < .95) add((.95 - r.disp) / .95, 'TRX-01', 'Display by Generik di bawah target', `generic terdisplay ${fmtPct(r.disp, 1)} (< 95%)`);
-  if (r.raLow != null && r.raLow >= .5) add(r.raLow - .5 + .05, 'TRX-08', 'Jumlah RA tidak mencapai target individu', `${fmtPct(r.raLow, 0)} RA diperkirakan di bawah target tagging (dari ${r.raN} RA)`);
-  if (r.omni != null && r.omni < .055) add((.055 - r.omni) / .055, 'TRX-19', 'Kontribusi Omnichannel tidak mencapai target', `omnichannel ${fmtPct(r.omni, 1)} dari sales (< 5,5%)`);
-  if (r.eac != null && r.eac < 1) add(1 - r.eac, 'TRX-21', 'Transaksi member (EAC) tidak mencapai target', `sales member EAC ${fmtPct(r.eac, 1)} dari target`);
-  if (r.upt != null && r.upt3 && r.upt < r.upt3) add((r.upt3 - r.upt) / r.upt3, 'UPT-03', 'UPT toko di bawah rata-rata 3 bulan terakhir', `UPT ${fmtX(r.upt, 2)} vs rata-rata 3 bln ${fmtX(r.upt3, 2)}`);
-  return A.sort((a, b) => b.sev - a.sev).slice(0, 3).map(x => x.t);
+/* pilih 3 problem per toko dari data (kode Kamus v2) + root cause default + alasan berangka.
+   Barang dulu (TRX-01), lalu yang paling jauh dari ambang; bila kurang dari 3 diisi problem yang datanya belum ada di hub. */
+const PX_RC = { 'TRX-01': 'RC-A', 'TRX-08': 'Default', 'TRX-19': 'RC-B', 'TRX-21': 'RC-A', 'UPT-03': 'RC-C', 'TRX-22': 'RC-B', 'TRX-11': 'RC-2', 'TRX-03': 'RC-F' };
+function pxPick(r, drv) {
+  const A = [], add = (sev, code, why) => { if (!A.some(x => x.code === code)) A.push({ sev, code, why }); };
+  const p1 = v => fmtPct(v, 1);
+  if (r.disp != null && r.disp < .95) add(10 + (.95 - r.disp), 'TRX-01', `Generic terdisplay ${p1(r.disp)}, di bawah target 95%.`);
+  if (r.raLow != null && r.raLow >= .5) add(1 + r.raLow - .5, 'TRX-08', `${Math.round(r.raLow * r.raN)} dari ${r.raN} RA diperkirakan belum mencapai target tagging akhir bulan (${fmtPct(r.raLow, 0)}).`);
+  if (r.omni != null && r.omni < .055) add(1 + (.055 - r.omni) / .055, 'TRX-19', `Kontribusi omnichannel baru ${p1(r.omni)} dari sales, di bawah 5,5%.`);
+  if (r.eac != null && r.eac < 1) add(1 + (1 - r.eac), 'TRX-21', `Sales member EAC diperkirakan ${p1(r.eac)} dari target bulan ini.`);
+  if (r.upt != null && r.upt3 && r.upt < r.upt3) add(1 + (r.upt3 - r.upt) / r.upt3 + (drv === 'Basket Size' ? 1 : 0), 'UPT-03', `UPT ${fmtX(r.upt, 2)} di bawah rata-rata 3 bulan terakhir ${fmtX(r.upt3, 2)}.`);
+  const ach = r.T ? r.sales / r.T : null, perDay = r.bsBase && r.T ? Math.max(0, r.T - r.sales) / r.bsBase / dim(r.m) : null;
+  if (A.length < 3 && ach != null && ach < 1) add(.5, 'TRX-22', `Sales diperkirakan ${p1(ach)} dari target${perDay ? `; perlu tambahan ±${fmtN(Math.ceil(perDay))} transaksi/hari` : ''}${r.trxL ? `, transaksi ${r.trx < r.trxL ? 'turun' : 'naik'} ${fmtPct(Math.abs(r.trx / r.trxL - 1), 1)} vs bulan lalu` : ''}.`);
+  if (A.length < 3) add(.2, 'TRX-11', 'Konsistensi ESS RA saat melayani customer perlu dicek (skor ESS bulan ini belum ada di hub).');
+  if (A.length < 3) add(.1, 'TRX-03', 'Penawaran aktif barang SMDS/DCNP oleh RA perlu ditingkatkan untuk menambah transaksi.');
+  return A.sort((a, b) => b.sev - a.sev).slice(0, 3);
 }
 async function pxFill(buf, m, prog) {
   const X = await pxOpen(buf);
@@ -3955,8 +3963,20 @@ async function pxFill(buf, m, prog) {
     if (x.upt3 != null) PI.num('AA' + r, Math.round(x.upt3 * 100) / 100); });
   /* Form_PICA: kosongkan pilihan bulan lalu; saran data ditaruh di Catatan BM */
   for (let r = 6; r <= 95; r++) for (const col of ['G', 'I', 'J', 'Q', 'U', 'V']) FP.clear(col + r, true);
-  stores.forEach((c, i) => { const x = P.rows.get(c); if (!x.T || x.sales == null || x.sales >= x.T) return;
-    pxAdvice(x).forEach((t, j) => FP.str('V' + (6 + i * 3 + j), t)); });
+  /* label persis dari template (REF_Problem & Kamus) supaya cocok dengan dropdown */
+  const RP = await X.sheet('REF_Problem'), KM = await X.sheet('Kamus'), pLab = {}, rcLab = {};
+  for (let r = 2; r <= 60; r++) { const k = String(X.text(RP, 'A' + r)).trim(); if (k) pLab[k] = k + ' | ' + X.text(RP, 'B' + r); }
+  for (let r = 5; r <= 200; r++) { const k = String(X.text(KM, 'B' + r)).trim(), rc = String(X.text(KM, 'D' + r)).trim(); if (k && rc) rcLab[k + '|' + rc] = X.text(KM, 'E' + r); }
+  const nm1 = addMonths(m, 1), due = Math.round((Date.UTC(+nm1.slice(0, 4), +nm1.slice(5), 0) - Date.UTC(1899, 11, 30)) / 864e5);
+  let nPica = 0;
+  stores.forEach((c, i) => { const x = P.rows.get(c); if (!x.T || x.sales == null || x.sales >= x.T) return; nPica++;
+    const ach = x.sales / x.T, bsA = x.trx ? x.sales / x.trx : null, impl = x.bsBase ? x.T / x.bsBase : null;
+    const gT = impl != null ? (impl - x.trx) * x.bsBase : 0, gB = bsA != null && x.bsBase ? (x.bsBase - bsA) * x.trx : 0, gap = x.T - x.sales;
+    const drv = gap > 0 ? (gT / gap >= .6 ? 'Transaksi' : gB / gap >= .6 ? 'Basket Size' : 'Campuran') : '';
+    pxPick(x, drv).forEach((p, j) => { const row = 6 + i * 3 + j, rc = rcLab[p.code + '|' + PX_RC[p.code]];
+      if (!pLab[p.code] || !rc) return;
+      FP.str('G' + row, pLab[p.code]); FP.str('I' + row, rc); FP.str('J' + row, p.why); FP.num('Q' + row, due); }); });
+  P.nPica = nPica;
   if (MO) for (let r = 6; r <= 95; r++) for (const col of ['H', 'I', 'K', 'L', 'N', 'O', 'Q', 'R']) MO.clear(col + r, true);
   return { blob: await X.save(), P, stores };
 }
@@ -3971,7 +3991,7 @@ function pxPanel() {
       <label class="btn sm" for="pxFile">${S ? 'Ganti template' : 'Upload template'}</label><input type="file" id="pxFile" accept=".xlsx" hidden>
       <button class="btn primary" id="pxGo" ${S ? '' : 'disabled'}>⬇ Isi & download</button>
     </div>
-    <p class="small muted" style="margin:8px 0 0">Diisi otomatis: Diagnosa_Toko (target, actual & transaksi${m === cur ? ' + estimasi akhir bulan' : ''}, BS baseline Jan–bulan lalu kecuali Maret) dan Peta_Indikator (Display by Generik, % RA di bawah target, Omnichannel, Sales member EAC, UPT & UPT 3 bln). Isian bulan lalu di Form_PICA & Monitoring dikosongkan; saran problem dari data ditulis di kolom <b>Catatan BM</b>. Indikator lain tetap diisi manual.</p>
+    <p class="small muted" style="margin:8px 0 0">Diisi otomatis: Diagnosa_Toko (target, actual & transaksi${m === cur ? ' + estimasi akhir bulan' : ''}, BS baseline Jan–bulan lalu kecuali Maret) dan Peta_Indikator (Display by Generik, % RA di bawah target, Omnichannel, Sales member EAC, UPT & UPT 3 bln). Form_PICA ikut terisi untuk toko yang wajib PICA: 3 problem, dugaan root cause, alasan berangka & target selesai (akhir bulan berikutnya). Isian Monitoring bulan lalu dikosongkan. Indikator lain tetap diisi manual.</p>
     <div id="pxMsg" class="small" style="margin-top:6px"></div></section>`;
 }
 async function pxRun() {
@@ -3983,7 +4003,7 @@ async function pxRun() {
     const m = ($('#pxM') || {}).value || App.ui.pxM;
     const { blob, P, stores } = await pxFill(pxBuf(S.b64), m, say);
     const dl = await getDownloads(); await dl.save({ filename: `PICA_Store_${MONL[+m.slice(5) - 1]}_${m.slice(0, 4)}_Jateng_01.xlsx`, data: blob });
-    say(`✅ Selesai: ${stores.length} toko · ${P.full ? 'data 1 bulan penuh' : 'data 1–' + P.day + ' + estimasi s/d ' + dim(m)} · BS baseline ${P.baseAv.length} bulan.`);
+    say(`✅ Selesai: ${stores.length} toko · ${P.nPica || 0} toko wajib PICA terisi · ${P.full ? 'data 1 bulan penuh' : 'data 1–' + P.day + ' + estimasi s/d ' + dim(m)} · BS baseline ${P.baseAv.length} bulan.`);
   } catch (e) { say('⚠ ' + (e && e.message ? e.message : e)); }
   if (btn) btn.disabled = false;
 }
